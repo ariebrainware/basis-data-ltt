@@ -7,5 +7,5 @@ type Patient struct {
 	Job           string `json:"job"`
 	Address       string `json:"address"`
 	PhoneNumber   string `json:"phone_number"`
-	HealthHistory []uint `json:"health_history"`
+	HealthHistory string `json:"health_history"`
 }

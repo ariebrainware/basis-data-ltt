@@ -7,12 +7,20 @@ import (
 	"net/http"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/endpoint"
+	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	// Load the configuration
 	cfg := config.LoadConfig()
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		log.Fatalf("Error connecting to MySQL: %v", err)
+	}
+	db.AutoMigrate(&model.Patient{}, &model.Decease{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
@@ -23,9 +31,11 @@ func main() {
 	// Basic HTTP handler for root path
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"message": "Hello, world!",
+			"message": fmt.Sprintf("Welcome to %s!", cfg.AppName),
 		})
 	})
+
+	router.POST("/patients", endpoint.CreatePatient)
 
 	// Start server on specified port
 	address := fmt.Sprintf(":%d", cfg.AppPort)

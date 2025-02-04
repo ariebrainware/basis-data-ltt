@@ -1,25 +1,28 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"sync"
 
 	"github.com/joho/godotenv"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // Config holds the application's configuration values.
 type Config struct {
-	AppName string
-	AppEnv  string
-	AppPort uint16
-	GinMode string
-	DBHost  string
-	DBPort  uint16
-	DBName  string
-	DBUSER  string
-	DBPass  string
+	AppName string `json:"appname"`
+	AppEnv  string `json:"appenv"`
+	AppPort uint16 `json:"appport"`
+	GinMode string `json:"ginmode"`
+	DBHost  string `json:"dbhost"`
+	DBPort  uint16 `json:"dbport"`
+	DBName  string `json:"dbname"`
+	DBUSER  string `json:"dbuser"`
+	DBPass  string `json:"dbpass"`
 }
 
 var config *Config
@@ -33,8 +36,8 @@ func LoadConfig() *Config {
 			log.Fatalf("Error loading .env file: %v", err)
 		}
 
-		appPort, _ := strconv.ParseUint("APPPORT", 10, 16)
-		dbPort, _ := strconv.ParseUint("DBPORT", 10, 16)
+		appPort, _ := strconv.ParseUint(os.Getenv("APPPORT"), 10, 16)
+		dbPort, _ := strconv.ParseUint(os.Getenv("DBPORT"), 10, 16)
 
 		// Initialize the Config struct with values from environment variables.
 		config = &Config{
@@ -50,4 +53,19 @@ func LoadConfig() *Config {
 		}
 	})
 	return config
+}
+
+// ConnectMySQL establishes a connection to a MySQL database using the configuration values.
+func ConnectMySQL() (*gorm.DB, error) {
+	cfg := LoadConfig()
+	// Build the Data Source Name (DSN) using the configuration values.
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+
+	// Open a database connection.
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
