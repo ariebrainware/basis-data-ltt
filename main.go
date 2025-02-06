@@ -35,7 +35,9 @@ func main() {
 		})
 	})
 
-	router.POST("/patients", endpoint.CreatePatient)
+	router.GET("/patient", endpoint.ListPatients)
+	router.POST("/patient", endpoint.CreatePatient)
+	router.PATCH("/patient/:id", endpoint.UpdatePatient)
 
 	// Start server on specified port
 	address := fmt.Sprintf(":%d", cfg.AppPort)

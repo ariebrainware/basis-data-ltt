@@ -1,6 +1,9 @@
 package model
 
+import "gorm.io/gorm"
+
 type Patient struct {
+	gorm.Model
 	FullName      string `json:"full_name"`
 	Gender        string `json:"gender"`
 	Age           int    `json:"age"`
