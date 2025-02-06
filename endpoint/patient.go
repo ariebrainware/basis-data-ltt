@@ -130,3 +130,44 @@ func UpdatePatient(c *gin.Context) {
 		Data: existingPatient,
 	})
 }
+
+func DeletePatient(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing patient ID",
+			Err: fmt.Errorf("patient ID is required"),
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return
+	}
+
+	var patient model.Patient
+	if err := db.First(&patient, id).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Patient not found",
+			Err: err,
+		})
+		return
+	}
+
+	if err := db.Delete(&patient).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to delete patient",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg: "Patient deleted",
+	})
+}
