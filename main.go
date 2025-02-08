@@ -8,6 +8,7 @@ import (
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
 )
@@ -27,6 +28,9 @@ func main() {
 
 	// Create a Gin router with default middleware
 	router := gin.Default()
+
+	// Use custom CORS middleware
+	router.Use(middleware.CORSMiddleware())
 
 	// Basic HTTP handler for root path
 	router.GET("/", func(c *gin.Context) {
