@@ -7,6 +7,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func ListPatients(c *gin.Context) {
@@ -54,19 +55,21 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// Check if username and phone already registered
-	var existingPatient model.Patient
-	if err := db.Where("full_name = ? AND phone_number = ?", patient.FullName, patient.PhoneNumber).First(&existingPatient).Error; err == nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Failed to create patient",
-			Err: fmt.Errorf("patient already registered"),
-		})
-		return
-	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		// Check if username and phone already registered
+		var existingPatient model.Patient
+		if err := tx.Where("full_name = ? AND phone_number = ?", patient.FullName, patient.PhoneNumber).First(&existingPatient).Error; err == nil {
+			return fmt.Errorf("patient already registered")
+		}
 
-	db = db.Debug()
-	// Assume db is a *gorm.DB instance available in your package.
-	if err := db.Create(&patient).Error; err != nil {
+		// Create the patient record within the transaction.
+		if err := tx.Create(&patient).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create patient",
 			Err: err,
