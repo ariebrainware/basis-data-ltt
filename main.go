@@ -21,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Decease{})
+	db.AutoMigrate(&model.Patient{}, &model.Decease{}, &model.User{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
@@ -38,6 +38,9 @@ func main() {
 			"message": fmt.Sprintf("Welcome to %s!", cfg.AppName),
 		})
 	})
+
+	router.POST("/login", endpoint.Login)
+	router.POST("/signup", endpoint.Signup)
 
 	router.GET("/patient", endpoint.ListPatients)
 	router.POST("/patient", endpoint.CreatePatient)
