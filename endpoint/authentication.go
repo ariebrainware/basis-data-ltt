@@ -79,6 +79,21 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// Record Session
+	session := model.Session{
+		UserID:       User.ID,
+		SessionToken: tokenString,
+		ExpiresAt:    time.Now().Add(time.Hour * 1),
+	}
+
+	if err := db.Create(&session).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to record session",
+			Err: err,
+		})
+		return
+	}
+
 	// Return the token in a JSON response
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Login successful",
