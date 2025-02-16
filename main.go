@@ -41,6 +41,7 @@ func main() {
 
 	router.POST("/login", endpoint.Login)
 	router.POST("/signup", endpoint.Signup)
+	router.DELETE("/logout", endpoint.Logout)
 
 	router.GET("/patient", endpoint.ListPatients)
 	router.POST("/patient", endpoint.CreatePatient)

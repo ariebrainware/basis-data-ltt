@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"crypto/hmac"
@@ -100,6 +101,53 @@ func Login(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Login successful",
 		Data: tokenString,
+	})
+}
+
+func Logout(c *gin.Context) {
+	// Extract the user ID from the request context
+	authHeader := c.GetHeader("Authorization")
+	sessionToken := strings.TrimPrefix(authHeader, "Bearer ")
+	if sessionToken == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Session token not provided in header",
+			Err: fmt.Errorf("session token not provided"),
+		})
+		return
+	}
+
+	// Connect to the database
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return
+	}
+
+	// Find the session record in the database based on sessionToken
+	var session model.Session
+	if err := db.Where("session_token = ?", sessionToken).First(&session).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Session not found",
+			Err: err,
+		})
+		return
+	}
+
+	// Delete the session record from the database
+	if err := db.Where("session_token = ?", sessionToken).Delete(&session).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to delete session",
+			Err: err,
+		})
+		return
+	}
+
+	// Respond with a success message
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg: "Logout successful",
 	})
 }
 
