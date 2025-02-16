@@ -21,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Decease{}, &model.User{})
+	db.AutoMigrate(&model.Patient{}, &model.Decease{}, &model.User{}, &model.Session{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
