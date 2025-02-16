@@ -54,7 +54,7 @@ func Login(c *gin.Context) {
 
 	// Check if user exists
 	var User model.User
-	err = db.Model(&User).Where("email = ? AND password = ?", req.Email, hashedPassword).First(&model.User{}).Error
+	err = db.Model(&User).Where("email = ? AND password = ?", req.Email, hashedPassword).First(&User).Error
 	if err == gorm.ErrRecordNotFound {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "User not found, please sign up first",
@@ -84,6 +84,8 @@ func Login(c *gin.Context) {
 		UserID:       User.ID,
 		SessionToken: tokenString,
 		ExpiresAt:    time.Now().Add(time.Hour * 1),
+		ClientIP:     c.ClientIP(),
+		Browser:      c.Request.UserAgent(),
 	}
 
 	if err := db.Create(&session).Error; err != nil {
