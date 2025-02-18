@@ -27,30 +27,30 @@ func main() {
 	gin.SetMode(cfg.GinMode)
 
 	// Create a Gin router with default middleware
-	router := gin.Default()
+	r := gin.Default()
 
 	// Use custom CORS middleware
-	router.Use(middleware.CORSMiddleware())
+	r.Use(middleware.CORSMiddleware())
 
 	// Basic HTTP handler for root path
-	router.GET("/", func(c *gin.Context) {
+	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": fmt.Sprintf("Welcome to %s!", cfg.AppName),
 		})
 	})
 
-	router.POST("/login", endpoint.Login)
-	router.POST("/signup", endpoint.Signup)
-	router.DELETE("/logout", endpoint.Logout)
+	r.POST("/login", endpoint.Login)
+	r.POST("/signup", endpoint.Signup)
+	r.DELETE("/logout", endpoint.Logout)
 
-	router.GET("/patient", endpoint.ListPatients)
-	router.POST("/patient", endpoint.CreatePatient)
-	router.PATCH("/patient/:id", endpoint.UpdatePatient)
-	router.DELETE("/patient/:id", endpoint.DeletePatient)
+	r.GET("/patient", endpoint.ListPatients)
+	r.POST("/patient", endpoint.CreatePatient)
+	r.PATCH("/patient/:id", endpoint.UpdatePatient)
+	r.DELETE("/patient/:id", endpoint.DeletePatient)
 
 	// Start server on specified port
 	address := fmt.Sprintf(":%d", cfg.AppPort)
-	if err := router.Run(address); err != nil {
+	if err := r.Run(address); err != nil {
 		log.Fatalf("error starting server: %v", err)
 	}
 }
