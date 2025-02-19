@@ -46,6 +46,15 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
+	// validate the patient data here is no empty
+	if patient.FullName == "" || patient.PhoneNumber == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Full name and phone number are required",
+			Err: fmt.Errorf("full name and phone number are required"),
+		})
+		return
+	}
+
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
