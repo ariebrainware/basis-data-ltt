@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -35,17 +36,34 @@ func ListPatients(c *gin.Context) {
 	})
 }
 
-func CreatePatient(c *gin.Context) {
-	patient := model.Patient{}
+type createPatientRequest struct {
+	FullName      string   `json:"full_name"`
+	Gender        string   `json:"gender"`
+	Age           int      `json:"age"`
+	Job           string   `json:"job"`
+	Address       string   `json:"address"`
+	PhoneNumber   string   `json:"phone_number"`
+	HealthHistory []string `json:"health_history"`
+}
 
-	if err := c.ShouldBindJSON(&patient); err != nil {
+func CreatePatient(c *gin.Context) {
+	patientRequest := createPatientRequest{}
+
+	err := c.ShouldBindJSON(&patientRequest)
+	if err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
 			Err: err,
 		})
 		return
 	}
-
+	if patientRequest.FullName == "" || patientRequest.PhoneNumber == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Patient payload is empty or missing required fields",
+			Err: fmt.Errorf("invalid payload"),
+		})
+		return
+	}
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -55,15 +73,22 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
+	var patient, existingPatient model.Patient
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
-		var existingPatient model.Patient
-		if err := tx.Where("full_name = ? AND phone_number = ?", patient.FullName, patient.PhoneNumber).First(&existingPatient).Error; err == nil {
+		if err := tx.Where("full_name = ? AND phone_number = ?", patientRequest.FullName, patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
 			return fmt.Errorf("patient already registered")
 		}
 
-		// Create the patient record within the transaction.
-		if err := tx.Create(&patient).Error; err != nil {
+		if err := tx.Model(&patient).Create(&model.Patient{
+			FullName:      patientRequest.FullName,
+			Gender:        patientRequest.Gender,
+			Age:           patientRequest.Age,
+			Job:           patientRequest.Job,
+			Address:       patientRequest.Address,
+			PhoneNumber:   patientRequest.PhoneNumber,
+			HealthHistory: strings.Join(patientRequest.HealthHistory, ","),
+		}).Error; err != nil {
 			return err
 		}
 		return nil
@@ -79,7 +104,7 @@ func CreatePatient(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Patient created",
-		Data: patient,
+		Data: nil,
 	})
 }
 
