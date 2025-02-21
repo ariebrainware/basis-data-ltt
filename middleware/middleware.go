@@ -13,7 +13,7 @@ import (
 // CORSMiddleware configures CORS headers for incoming requests.
 func CORSMiddleware() gin.HandlerFunc {
 	// create api token validation
-	expectedToken := fmt.Sprintf("Bearer %s", os.Getenv("API_TOKEN"))
+	expectedToken := fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))
 
 	tokenValidator := func(c *gin.Context) bool {
 		token := c.GetHeader("Authorization")
