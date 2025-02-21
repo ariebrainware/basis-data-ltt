@@ -32,8 +32,10 @@ var once sync.Once
 func LoadConfig() *Config {
 	once.Do(func() {
 		// Load environment variables from .env file.
-		if err := godotenv.Load(); err != nil {
-			log.Fatalf("Error loading .env file: %v", err)
+		if os.Getenv("APPNAME") == "" {
+			if err := godotenv.Load(); err != nil {
+				log.Printf("Error loading .env file: %v", err)
+			}
 		}
 
 		appPort, _ := strconv.ParseUint(os.Getenv("APPPORT"), 10, 16)
