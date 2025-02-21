@@ -38,15 +38,21 @@ func main() {
 			"message": fmt.Sprintf("Welcome to %s!", cfg.AppName),
 		})
 	})
+	// Group routes that require a valid login token
+	auth := r.Group("/")
+	auth.Use(middleware.ValidateLoginToken())
+	{
+		auth.GET("/patient", endpoint.ListPatients)
+		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
+		auth.DELETE("/patient/:id", endpoint.DeletePatient)
+	}
+
+	// the exception for create patient so it can be accessed without login
+	r.POST("/patient", endpoint.CreatePatient)
 
 	r.POST("/login", endpoint.Login)
 	r.POST("/signup", endpoint.Signup)
 	r.DELETE("/logout", endpoint.Logout)
-
-	r.GET("/patient", endpoint.ListPatients)
-	r.POST("/patient", endpoint.CreatePatient)
-	r.PATCH("/patient/:id", endpoint.UpdatePatient)
-	r.DELETE("/patient/:id", endpoint.DeletePatient)
 
 	// Start server on specified port
 	address := fmt.Sprintf(":%d", cfg.AppPort)
