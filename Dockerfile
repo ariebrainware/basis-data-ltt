@@ -15,6 +15,30 @@ FROM alpine:latest
 LABEL maintainer="Arie Brainware"
 WORKDIR /app
 
+# Declare build args
+ARG APPNAME
+ARG APITOKEN
+ARG APPENV
+ARG APPPORT
+ARG GINMODE
+ARG DBHOST
+ARG DBPORT
+ARG DBNAME
+ARG DBUSER
+ARG DBPASS
+
+# Optionally, set them as environment variables inside the image
+ENV APPNAME=$APPNAME \
+    APITOKEN=$APITOKEN \
+    APPENV=$APPENV \
+    APPPORT=$APPPORT \
+    GINMODE=$GINMODE \
+    DBHOST=$DBHOST \
+    DBPORT=$DBPORT \
+    DBNAME=$DBNAME \
+    DBUSER=$DBUSER \
+    DBPASS=$DBPASS
+    
 # Copy binary from builder stage.
 COPY --from=builder /app/app .
 
