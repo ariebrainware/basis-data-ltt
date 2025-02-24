@@ -44,6 +44,7 @@ type createPatientRequest struct {
 	Address       string   `json:"address"`
 	PhoneNumber   string   `json:"phone_number"`
 	HealthHistory []string `json:"health_history"`
+	PatientCode   string   `json:"patient_code"`
 }
 
 func CreatePatient(c *gin.Context) {
@@ -87,6 +88,7 @@ func CreatePatient(c *gin.Context) {
 			Job:           patientRequest.Job,
 			Address:       patientRequest.Address,
 			PhoneNumber:   patientRequest.PhoneNumber,
+			PatientCode:   patientRequest.PatientCode,
 			HealthHistory: strings.Join(patientRequest.HealthHistory, ","),
 		}).Error; err != nil {
 			return err

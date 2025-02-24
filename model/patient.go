@@ -12,4 +12,5 @@ type Patient struct {
 	Address       string `json:"address"`
 	PhoneNumber   string `json:"phone_number"`
 	HealthHistory string `json:"health_history"`
+	PatientCode   string `json:"patient_code"`
 }
