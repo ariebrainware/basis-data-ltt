@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -16,7 +17,10 @@ func CORSMiddleware() gin.HandlerFunc {
 	expectedToken := fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))
 
 	tokenValidator := func(c *gin.Context) bool {
-		token := c.GetHeader("Authorization")
+		if c.Request.Method == http.MethodOptions {
+			return true
+		}
+		token := strings.TrimSpace(c.GetHeader("Authorization"))
 		if token != expectedToken {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid API token"})
 			return false
@@ -30,9 +34,9 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PATCH")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Authorization, session_token")
 		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Content-Type", "application/json")
@@ -72,12 +76,12 @@ func ValidateLoginToken() gin.HandlerFunc {
 			return
 		}
 
-		// Delete the session record from the database
-		if err := db.Where("session_token = ?", sessionToken).Delete(&session).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete session"})
-			c.Abort()
-			return
-		}
+		// // Delete the session record from the database
+		// if err := db.Where("session_token = ?", sessionToken).Delete(&session).Error; err != nil {
+		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete session"})
+		// 	c.Abort()
+		// 	return
+		// }
 
 		c.Next()
 	}
