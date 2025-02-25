@@ -11,64 +11,66 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// CORSMiddleware configures CORS headers for incoming requests.
-func CORSMiddleware() gin.HandlerFunc {
-	// create api token validation
-	expectedToken := fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))
-
-	tokenValidator := func(c *gin.Context) bool {
-		if c.Request.Method == http.MethodOptions {
-			return true
-		}
-		token := strings.TrimSpace(c.GetHeader("Authorization"))
-		if token != expectedToken {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid API token"})
-			return false
-		}
+func tokenValidator(c *gin.Context, expectedToken string) bool {
+	if c.Request.Method == http.MethodOptions {
 		return true
 	}
+	token := strings.TrimSpace(c.GetHeader("Authorization"))
+	if token != expectedToken {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid API token"})
+		return false
+	}
+	return true
+}
 
+func setCorsHeaders(c *gin.Context) {
+	origin := os.Getenv("CORSALLOWORIGIN")
+	if origin == "" {
+		origin = "http://localhost:3000"
+	}
+	c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+
+	methods := os.Getenv("CORSALLOWMETHODS")
+	if methods == "" {
+		methods = "POST, GET, OPTIONS, DELETE, PATCH"
+	}
+	c.Writer.Header().Set("Access-Control-Allow-Methods", methods)
+
+	headers := os.Getenv("CORSALLOWHEADERS")
+	if headers == "" {
+		headers = "X-Requested-With, Content-Type, Authorization, session_token"
+	}
+	c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
+
+	maxAge := os.Getenv("CORSMAXAGE")
+	if maxAge == "" {
+		maxAge = "86400"
+	}
+	c.Writer.Header().Set("Access-Control-Max-Age", maxAge)
+
+	credentials := os.Getenv("CORSALLOWCREDENTIALS")
+	if credentials == "" {
+		credentials = "true"
+	}
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", credentials)
+
+	contentType := os.Getenv("CORSCONTENTTYPE")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	c.Writer.Header().Set("Content-Type", contentType)
+}
+
+// CORSMiddleware configures CORS headers for incoming requests.
+func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Call tokenValidator at the beginning of the returned handler.
-		if !tokenValidator(c) {
+		if !tokenValidator(c, fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))) {
 			return
 		}
 
-		origin := os.Getenv("CORSALLOWORIGIN")
-		if origin == "" {
-			origin = "http://localhost:3000"
-		}
-		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-
-		methods := os.Getenv("CORSALLOWMETHODS")
-		if methods == "" {
-			methods = "POST, GET, OPTIONS, DELETE, PATCH"
-		}
-		c.Writer.Header().Set("Access-Control-Allow-Methods", methods)
-
-		headers := os.Getenv("CORSALLOWHEADERS")
-		if headers == "" {
-			headers = "X-Requested-With, Content-Type, Authorization, session_token"
-		}
-		c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
-
-		maxAge := os.Getenv("CORSMAXAGE")
-		if maxAge == "" {
-			maxAge = "86400"
-		}
-		c.Writer.Header().Set("Access-Control-Max-Age", maxAge)
-
-		credentials := os.Getenv("CORSALLOWCREDENTIALS")
-		if credentials == "" {
-			credentials = "true"
-		}
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", credentials)
-
-		contentType := os.Getenv("CORSCONTENTTYPE")
-		if contentType == "" {
-			contentType = "application/json"
-		}
-		c.Writer.Header().Set("Content-Type", contentType)
+		// Set CORS headers
+		setCorsHeaders(c)
 
 		// For preflight requests, respond with 204 and abort further processing.
 		if c.Request.Method == "OPTIONS" {
@@ -104,14 +106,6 @@ func ValidateLoginToken() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-
-		// // Delete the session record from the database
-		// if err := db.Where("session_token = ?", sessionToken).Delete(&session).Error; err != nil {
-		// 	c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete session"})
-		// 	c.Abort()
-		// 	return
-		// }
-
 		c.Next()
 	}
 }
