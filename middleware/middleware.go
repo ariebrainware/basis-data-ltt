@@ -32,7 +32,7 @@ func setCorsHeaders(c *gin.Context) {
 
 	methods := os.Getenv("CORSALLOWMETHODS")
 	if methods == "" {
-		methods = "POST, GET, OPTIONS, DELETE, PATCH"
+		methods = "POST, PUT, GET, OPTIONS, DELETE, PATCH"
 	}
 	c.Writer.Header().Set("Access-Control-Allow-Methods", methods)
 
@@ -64,15 +64,15 @@ func setCorsHeaders(c *gin.Context) {
 // CORSMiddleware configures CORS headers for incoming requests.
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Call tokenValidator at the beginning of the returned handler.
+		// Set CORS headers
+		setCorsHeaders(c)
+
+		// Call tokenValidator after setting CORS headers.
 		if !tokenValidator(c, fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))) {
 			return
 		}
 
-		// Set CORS headers
-		setCorsHeaders(c)
-
-		// For preflight requests, respond with 204 and abort further processing.
+		// For preflight requests, simply return after setting CORS headers.
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
