@@ -8,6 +8,7 @@ import (
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
+	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,7 +39,7 @@ func setCorsHeaders(c *gin.Context) {
 
 	headers := os.Getenv("CORSALLOWHEADERS")
 	if headers == "" {
-		headers = "X-Requested-With, Content-Type, Authorization, session_token"
+		headers = "X-Requested-With, Content-Type, Authorization, session-token"
 	}
 	c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
 
@@ -84,9 +85,12 @@ func CORSMiddleware() gin.HandlerFunc {
 
 func ValidateLoginToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		sessionToken := c.GetHeader("session_token")
+		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session token not provided"})
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Session token not provided",
+				Err: fmt.Errorf("session token not provided"),
+			})
 			c.Abort()
 			return
 		}

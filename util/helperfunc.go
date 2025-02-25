@@ -89,12 +89,11 @@ func CallUserFound(c *gin.Context, params APISuccessParams) {
 }
 
 // CallUserNotAuthorized is for return API response with status code 403, you need to specify msg, and data as function paramenter
-func CallUserNotAuthorized(c *gin.Context, params APISuccessParams) {
+func CallUserNotAuthorized(c *gin.Context, params APIErrorParams) {
 	response := APIResponse{
 		Success: false,
-		Error:   "",
+		Error:   params.Err.Error(),
 		Msg:     params.Msg,
-		Data:    params.Data,
 	}
 	c.JSON(http.StatusUnauthorized, response)
 }
