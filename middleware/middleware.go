@@ -34,12 +34,41 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PATCH")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "X-Requested-With, Content-Type, Authorization, session_token")
-		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Content-Type", "application/json")
+		origin := os.Getenv("CORSALLOWORIGIN")
+		if origin == "" {
+			origin = "http://localhost:3000"
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+
+		methods := os.Getenv("CORSALLOWMETHODS")
+		if methods == "" {
+			methods = "POST, GET, OPTIONS, DELETE, PATCH"
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Methods", methods)
+
+		headers := os.Getenv("CORSALLOWHEADERS")
+		if headers == "" {
+			headers = "X-Requested-With, Content-Type, Authorization, session_token"
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
+
+		maxAge := os.Getenv("CORSMAXAGE")
+		if maxAge == "" {
+			maxAge = "86400"
+		}
+		c.Writer.Header().Set("Access-Control-Max-Age", maxAge)
+
+		credentials := os.Getenv("CORSALLOWCREDENTIALS")
+		if credentials == "" {
+			credentials = "true"
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", credentials)
+
+		contentType := os.Getenv("CORSCONTENTTYPE")
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		c.Writer.Header().Set("Content-Type", contentType)
 
 		// For preflight requests, respond with 204 and abort further processing.
 		if c.Request.Method == "OPTIONS" {
