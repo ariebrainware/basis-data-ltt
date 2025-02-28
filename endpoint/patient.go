@@ -74,14 +74,14 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	var patient, existingPatient model.Patient
+	var existingPatient model.Patient
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
 		if err := tx.Where("full_name = ? AND phone_number = ?", patientRequest.FullName, patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
 			return fmt.Errorf("patient already registered")
 		}
 
-		if err := tx.Model(&patient).Create(&model.Patient{
+		if err := tx.Create(&model.Patient{
 			FullName:      patientRequest.FullName,
 			Gender:        patientRequest.Gender,
 			Age:           patientRequest.Age,
@@ -93,6 +93,7 @@ func CreatePatient(c *gin.Context) {
 		}).Error; err != nil {
 			return err
 		}
+
 		return nil
 	})
 
@@ -199,5 +200,39 @@ func DeletePatient(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg: "Patient deleted",
+	})
+}
+
+func GetPatientInfo(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing patient ID",
+			Err: fmt.Errorf("patient ID is required"),
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return
+	}
+
+	var patient model.Patient
+	if err := db.First(&patient, id).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Patient not found",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Patient retrieved",
+		Data: patient,
 	})
 }
