@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
@@ -16,6 +17,13 @@ import (
 func main() {
 	// Load the configuration
 	cfg := config.LoadConfig()
+
+	// Set the timezone to Asia/Jakarta
+	location, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		log.Fatalf("Error loading timezone: %v", err)
+	}
+	time.Local = location
 
 	db, err := config.ConnectMySQL()
 	if err != nil {
@@ -43,6 +51,7 @@ func main() {
 	auth.Use(middleware.ValidateLoginToken())
 	{
 		auth.GET("/patient", endpoint.ListPatients)
+		auth.GET("/patient/:id", endpoint.GetPatientInfo)
 		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
 		auth.DELETE("/patient/:id", endpoint.DeletePatient)
 	}

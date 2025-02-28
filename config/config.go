@@ -62,7 +62,7 @@ func LoadConfig() *Config {
 func ConnectMySQL() (*gorm.DB, error) {
 	cfg := LoadConfig()
 	// Build the Data Source Name (DSN) using the configuration values.
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	// Open a database connection.
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
