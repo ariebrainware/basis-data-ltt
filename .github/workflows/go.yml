@@ -22,13 +22,13 @@ jobs:
 
     - name: Build and push Docker image
       run: |
-        SHORT_SHA: ${GITHUB_SHA:0:7}
+        SHORT_SHA=${GITHUB_SHA:0:7}
         docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA .
         docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA
 
     - name: Deploy container
       run: |
-        SHORT_SHA: ${GITHUB_SHA:0:7}
+        SHORT_SHA=${GITHUB_SHA:0:7}
         docker stop ltt-be || true
         docker rm ltt-be || true
         docker run --name=ltt-be -d -p 19091:19091 --env=APPNAME=${{ env.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPENV=${{ env.APPENV }} --env=APPPORT=${{ env.APPPORT }} --env=GINMODE=${{ env.GINMODE }} --env=DBHOST=${{ env.DBHOST }} --env=DBPORT=${{ env.DBPORT }} --env=DBNAME=${{ env.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ env.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ env.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ env.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ env.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ env.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA
