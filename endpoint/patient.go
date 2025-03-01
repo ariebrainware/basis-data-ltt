@@ -42,7 +42,7 @@ type createPatientRequest struct {
 	Age           int      `json:"age"`
 	Job           string   `json:"job"`
 	Address       string   `json:"address"`
-	PhoneNumber   string   `json:"phone_number"`
+	PhoneNumber   []string `json:"phone_number"`
 	HealthHistory []string `json:"health_history"`
 	PatientCode   string   `json:"patient_code"`
 }
@@ -58,7 +58,7 @@ func CreatePatient(c *gin.Context) {
 		})
 		return
 	}
-	if patientRequest.FullName == "" || patientRequest.PhoneNumber == "" {
+	if patientRequest.FullName == "" || len(patientRequest.PhoneNumber) == 0 {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Patient payload is empty or missing required fields",
 			Err: fmt.Errorf("invalid payload"),
@@ -77,7 +77,7 @@ func CreatePatient(c *gin.Context) {
 	var existingPatient model.Patient
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
-		if err := tx.Where("full_name = ? AND phone_number = ?", patientRequest.FullName, patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
+		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber,","),patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
 			return fmt.Errorf("patient already registered")
 		}
 
@@ -87,7 +87,7 @@ func CreatePatient(c *gin.Context) {
 			Age:           patientRequest.Age,
 			Job:           patientRequest.Job,
 			Address:       patientRequest.Address,
-			PhoneNumber:   patientRequest.PhoneNumber,
+			PhoneNumber:   strings.Join(patientRequest.PhoneNumber, ","),
 			PatientCode:   patientRequest.PatientCode,
 			HealthHistory: strings.Join(patientRequest.HealthHistory, ","),
 		}).Error; err != nil {
