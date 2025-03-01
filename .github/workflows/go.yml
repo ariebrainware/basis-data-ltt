@@ -23,5 +23,6 @@ jobs:
 
     - name: Build and push Docker image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.${{ github.sha[0:7] }} .
-        docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.${{ github.sha[0:7] }}
+        SHORT_SHA=${GITHUB_SHA:0:7}
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA .
+        docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA
