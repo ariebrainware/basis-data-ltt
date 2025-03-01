@@ -39,6 +39,12 @@ ENV APPNAME=$APPNAME \
     DBUSER=$DBUSER \
     DBPASS=$DBPASS
     
+# Set timezone to UTC+7.
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Bangkok /etc/localtime && \
+    echo "Asia/Jakarta" > /etc/timezone && \
+    apk del tzdata
+
 # Copy binary from builder stage.
 COPY --from=builder /app/app .
 
