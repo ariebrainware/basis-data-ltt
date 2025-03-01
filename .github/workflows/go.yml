@@ -26,3 +26,9 @@ jobs:
         SHORT_SHA=${GITHUB_SHA:0:7}
         docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA .
         docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA
+
+    - name: Deploy container
+      run: |
+        docker stop ltt-be || true
+        docker rm ltt-be || true
+        docker run --name=ltt-be -d --env-file .env -p 19091:19091 ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.$SHORT_SHA
