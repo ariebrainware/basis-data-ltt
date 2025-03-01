@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	_ "time/tzdata"
+
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
