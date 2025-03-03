@@ -2,7 +2,6 @@ package endpoint
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"crypto/hmac"
@@ -105,14 +104,14 @@ func Login(c *gin.Context) {
 }
 
 func Logout(c *gin.Context) {
-	// Extract the user ID from the request context
-	authHeader := c.GetHeader("Authorization")
-	sessionToken := strings.TrimPrefix(authHeader, "Bearer ")
+	// Extract the session-token from the request header
+	sessionToken := c.GetHeader("session-token")
 	if sessionToken == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Session token not provided in header",
+		util.CallUserNotAuthorized(c, util.APIErrorParams{
+			Msg: "Session token not provided",
 			Err: fmt.Errorf("session token not provided"),
 		})
+		c.Abort()
 		return
 	}
 
