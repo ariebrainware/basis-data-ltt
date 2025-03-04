@@ -63,7 +63,7 @@ jobs:
     - name: Build and push Docker image
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker build --privileged -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA .
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA .
         docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
 
     - name: Deploy container
