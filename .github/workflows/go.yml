@@ -63,13 +63,13 @@ jobs:
     - name: Build and push Docker image
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        sudo docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA .
-        sudo docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA .
+        docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
 
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        sudo docker stop ltt-be || true
-        sudo docker rm ltt-be || true
+        docker stop ltt-be || true
+        docker rm ltt-be || true
         echo ${{ vars.DBPORT }}
-        sudo docker run --name=ltt-be -d -p 19091:19091 --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPvars=${{ vars.APPvars }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
+        docker run --name=ltt-be -d -p 19091:19091 --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPvars=${{ vars.APPvars }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
