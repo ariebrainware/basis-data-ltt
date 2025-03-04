@@ -56,6 +56,7 @@ func main() {
 		auth.GET("/patient/:id", endpoint.GetPatientInfo)
 		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
 		auth.DELETE("/patient/:id", endpoint.DeletePatient)
+		auth.DELETE("/logout", endpoint.Logout)
 	}
 
 	// the exception for create patient so it can be accessed without login
@@ -63,7 +64,6 @@ func main() {
 
 	r.POST("/login", endpoint.Login)
 	r.POST("/signup", endpoint.Signup)
-	r.DELETE("/logout", endpoint.Logout)
 
 	// Start server on specified port
 	address := fmt.Sprintf(":%d", cfg.AppPort)

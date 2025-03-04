@@ -106,7 +106,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 
 		// Find the session record in the database based on sessionToken
 		var session model.Session
-		if err := db.Where("session_token = ? AND expires_at > ?", sessionToken, time.Now()).First(&session).Error; err != nil {
+		if err := db.Where("session_token = ? AND expires_at > ? AND deleted_at IS NULL", sessionToken, time.Now()).First(&session).Error; err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session not found"})
 			c.Abort()
 			return
