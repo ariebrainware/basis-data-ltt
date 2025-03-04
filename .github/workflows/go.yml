@@ -71,5 +71,4 @@ jobs:
         SHORT_SHA=${GITHUB_SHA:0:7}
         docker stop ltt-be || true
         docker rm ltt-be || true
-        echo ${{ vars.DBPORT }}
         docker run --name=ltt-be -d -p 19091:19091 --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPvars=${{ vars.APPvars }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
