@@ -56,7 +56,14 @@ func main() {
 		auth.GET("/patient/:id", endpoint.GetPatientInfo)
 		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
 		auth.DELETE("/patient/:id", endpoint.DeletePatient)
+
 		auth.DELETE("/logout", endpoint.Logout)
+
+		auth.GET("/decease", endpoint.ListDeceases)
+		auth.POST("/decease", endpoint.CreateDecease)
+		auth.GET("/decease/:id", endpoint.GetDeceaseInfo)
+		auth.PATCH("/decease/:id", endpoint.UpdateDecease)
+		auth.DELETE("/decease/:id", endpoint.DeleteDecease)
 	}
 
 	// the exception for create patient so it can be accessed without login
