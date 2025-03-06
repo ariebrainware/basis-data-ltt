@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
@@ -12,6 +13,9 @@ import (
 )
 
 func ListPatients(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -22,7 +26,7 @@ func ListPatients(c *gin.Context) {
 	}
 
 	var patients []model.Patient
-	if err := db.Find(&patients).Error; err != nil {
+	if err := db.Limit(limit).Offset(offset).Find(&patients).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",
 			Err: err,
@@ -77,7 +81,7 @@ func CreatePatient(c *gin.Context) {
 	var existingPatient model.Patient
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
-		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber,","),patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
+		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber, ","), patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
 			return fmt.Errorf("patient already registered")
 		}
 
