@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -10,6 +11,9 @@ import (
 )
 
 func ListDiseases(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -20,7 +24,7 @@ func ListDiseases(c *gin.Context) {
 	}
 
 	var diseases []model.Disease
-	if err := db.Find(&diseases).Error; err != nil {
+	if err := db.Limit(limit).Offset(offset).Find(&diseases).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve diseases",
 			Err: err,
