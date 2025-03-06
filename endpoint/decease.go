@@ -19,7 +19,7 @@ func ListDeceases(c *gin.Context) {
 		return
 	}
 
-	var deceases []model.Patient
+	var deceases []model.Decease
 	if err := db.Find(&deceases).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve deceases",
