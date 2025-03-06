@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func ListDeceases(c *gin.Context) {
+func ListDiseases(c *gin.Context) {
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -19,30 +19,30 @@ func ListDeceases(c *gin.Context) {
 		return
 	}
 
-	var deceases []model.Decease
-	if err := db.Find(&deceases).Error; err != nil {
+	var diseases []model.Disease
+	if err := db.Find(&diseases).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to retrieve deceases",
+			Msg: "Failed to retrieve diseases",
 			Err: err,
 		})
 		return
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Deceases retrieved",
-		Data: deceases,
+		Msg:  "Diseases retrieved",
+		Data: diseases,
 	})
 }
 
-type createDeceaseRequest struct {
+type createDiseaseRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
-func CreateDecease(c *gin.Context) {
-	deceaseRequest := createDeceaseRequest{}
+func CreateDisease(c *gin.Context) {
+	diseaseRequest := createDiseaseRequest{}
 
-	err := c.ShouldBindJSON(&deceaseRequest)
+	err := c.ShouldBindJSON(&diseaseRequest)
 	if err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
@@ -60,37 +60,37 @@ func CreateDecease(c *gin.Context) {
 		return
 	}
 
-	decease := model.Decease{
-		Name:        deceaseRequest.Name,
-		Description: deceaseRequest.Description,
+	disease := model.Disease{
+		Name:        diseaseRequest.Name,
+		Description: diseaseRequest.Description,
 	}
-	if err := db.Create(&decease).Error; err != nil {
+	if err := db.Create(&disease).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to create decease",
+			Msg: "Failed to create disease",
 			Err: err,
 		})
 		return
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Decease created",
-		Data: decease,
+		Msg:  "Disease created",
+		Data: disease,
 	})
 }
 
-func UpdateDecease(c *gin.Context) {
+func UpdateDisease(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing decease ID",
-			Err: fmt.Errorf("decease ID is required"),
+			Msg: "Missing disease ID",
+			Err: fmt.Errorf("disease ID is required"),
 		})
 		return
 	}
 
-	deceaseRequest := createDeceaseRequest{}
+	diseaseRequest := createDiseaseRequest{}
 
-	err := c.ShouldBindJSON(&deceaseRequest)
+	err := c.ShouldBindJSON(&diseaseRequest)
 	if err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
@@ -108,35 +108,35 @@ func UpdateDecease(c *gin.Context) {
 		return
 	}
 
-	var existingDecease model.Decease
-	if err := db.First(&existingDecease, id).Error; err != nil {
+	var existingDisease model.Disease
+	if err := db.First(&existingDisease, id).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Decease not found",
+			Msg: "Disease not found",
 			Err: err,
 		})
 		return
 	}
 
-	if err := db.Model(&existingDecease).Updates(deceaseRequest).Error; err != nil {
+	if err := db.Model(&existingDisease).Updates(diseaseRequest).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to update decease",
+			Msg: "Failed to update disease",
 			Err: err,
 		})
 		return
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Decease updated",
-		Data: existingDecease,
+		Msg:  "Disease updated",
+		Data: existingDisease,
 	})
 }
 
-func DeleteDecease(c *gin.Context) {
+func DeleteDisease(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing decease ID",
-			Err: fmt.Errorf("decease ID is required"),
+			Msg: "Missing disease ID",
+			Err: fmt.Errorf("disease ID is required"),
 		})
 		return
 	}
@@ -150,35 +150,35 @@ func DeleteDecease(c *gin.Context) {
 		return
 	}
 
-	var existingDecease model.Decease
-	if err := db.First(&existingDecease, id).Error; err != nil {
+	var existingDisease model.Disease
+	if err := db.First(&existingDisease, id).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Decease not found",
+			Msg: "Disease not found",
 			Err: err,
 		})
 		return
 	}
 
-	if err := db.Delete(&existingDecease).Error; err != nil {
+	if err := db.Delete(&existingDisease).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to delete decease",
+			Msg: "Failed to delete disease",
 			Err: err,
 		})
 		return
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Decease deleted",
+		Msg:  "Disease deleted",
 		Data: nil,
 	})
 }
 
-func GetDeceaseInfo(c *gin.Context) {
+func GetDiseaseInfo(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing decease ID",
-			Err: fmt.Errorf("decease ID is required"),
+			Msg: "Missing disease ID",
+			Err: fmt.Errorf("disease ID is required"),
 		})
 		return
 	}
@@ -192,17 +192,17 @@ func GetDeceaseInfo(c *gin.Context) {
 		return
 	}
 
-	var existingDecease model.Decease
-	if err := db.First(&existingDecease, id).Error; err != nil {
+	var existingDisease model.Disease
+	if err := db.First(&existingDisease, id).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Decease not found",
+			Msg: "Disease not found",
 			Err: err,
 		})
 		return
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Decease retrieved",
-		Data: existingDecease,
+		Msg:  "Disease retrieved",
+		Data: existingDisease,
 	})
 }
