@@ -13,8 +13,8 @@ import (
 )
 
 func ListPatients(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	offset, _ := strconv.Atoi(c.Query("offset"))
 
 	db, err := config.ConnectMySQL()
 	if err != nil {
@@ -26,7 +26,14 @@ func ListPatients(c *gin.Context) {
 	}
 
 	var patients []model.Patient
-	if err := db.Limit(limit).Offset(offset).Find(&patients).Error; err != nil {
+	query := db.Offset(offset).Order("patient_code ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if err := query.Find(&patients).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",
 			Err: err,
