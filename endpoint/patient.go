@@ -13,6 +13,7 @@ import (
 )
 
 func ListPatients(c *gin.Context) {
+	var totalPatient int64
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 
@@ -41,9 +42,10 @@ func ListPatients(c *gin.Context) {
 		return
 	}
 
+	db.Model(&model.Patient{}).Count(&totalPatient)
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Patients retrieved",
-		Data: patients,
+		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
 	})
 }
 
