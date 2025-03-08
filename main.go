@@ -14,6 +14,8 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -26,12 +28,17 @@ func main() {
 		log.Fatalf("Error loading timezone: %v", err)
 	}
 	time.Local = location
-
+	gormConfig := &gorm.Config{}
+	if cfg.AppEnv == "production" {
+		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
+	} else {
+		gormConfig.Logger = logger.Default.LogMode(logger.Info)
+	}
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Decease{}, &model.User{}, &model.Session{})
+	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
@@ -56,7 +63,14 @@ func main() {
 		auth.GET("/patient/:id", endpoint.GetPatientInfo)
 		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
 		auth.DELETE("/patient/:id", endpoint.DeletePatient)
+
 		auth.DELETE("/logout", endpoint.Logout)
+
+		auth.GET("/disease", endpoint.ListDiseases)
+		auth.POST("/disease", endpoint.CreateDisease)
+		auth.GET("/disease/:id", endpoint.GetDiseaseInfo)
+		auth.PATCH("/disease/:id", endpoint.UpdateDisease)
+		auth.DELETE("/disease/:id", endpoint.DeleteDisease)
 	}
 
 	// the exception for create patient so it can be accessed without login
