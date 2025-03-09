@@ -13,30 +13,23 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListPatients(c *gin.Context) {
-	limit, offset, keyword, groupByDate := parseQueryParams(c)
-
-	patients, totalPatient, err := fetchPatients(limit, offset, keyword, groupByDate)
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to retrieve patients",
-			Err: err,
-		})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Patients retrieved",
-		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
-	})
-}
-
 func parseQueryParams(c *gin.Context) (int, int, string, string) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 	keyword := c.Query("keyword")
 	groupByDate := c.Query("group_by_date")
 	return limit, offset, keyword, groupByDate
+}
+func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
+	switch groupByDate {
+	case "last_2_days":
+		query = query.Where("created_at >= ?", time.Now().AddDate(0, 0, -2))
+	case "last_3_months":
+		query = query.Where("created_at >= ?", time.Now().AddDate(0, -3, 0))
+	case "last_6_months":
+		query = query.Where("created_at >= ?", time.Now().AddDate(0, -6, 0))
+	}
+	return query
 }
 
 func fetchPatients(limit, offset int, keyword, groupByDate string) ([]model.Patient, int64, error) {
@@ -68,16 +61,22 @@ func fetchPatients(limit, offset int, keyword, groupByDate string) ([]model.Pati
 	return patients, totalPatient, nil
 }
 
-func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
-	switch groupByDate {
-	case "last_2_days":
-		query = query.Where("created_at >= ?", time.Now().AddDate(0, 0, -2))
-	case "last_3_months":
-		query = query.Where("created_at >= ?", time.Now().AddDate(0, -3, 0))
-	case "last_6_months":
-		query = query.Where("created_at >= ?", time.Now().AddDate(0, -6, 0))
+func ListPatients(c *gin.Context) {
+	limit, offset, keyword, groupByDate := parseQueryParams(c)
+
+	patients, totalPatient, err := fetchPatients(limit, offset, keyword, groupByDate)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to retrieve patients",
+			Err: err,
+		})
+		return
 	}
-	return query
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Patients retrieved",
+		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
+	})
 }
 
 type createPatientRequest struct {
@@ -206,14 +205,14 @@ func UpdatePatient(c *gin.Context) {
 	})
 }
 
-func DeletePatient(c *gin.Context) {
+func getPatientByID(c *gin.Context) (string, *gorm.DB, model.Patient, error) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing patient ID",
 			Err: fmt.Errorf("patient ID is required"),
 		})
-		return
+		return "", nil, model.Patient{}, fmt.Errorf("patient ID is required")
 	}
 
 	db, err := config.ConnectMySQL()
@@ -222,7 +221,7 @@ func DeletePatient(c *gin.Context) {
 			Msg: "Failed to connect to MySQL",
 			Err: err,
 		})
-		return
+		return "", nil, model.Patient{}, err
 	}
 
 	var patient model.Patient
@@ -231,6 +230,15 @@ func DeletePatient(c *gin.Context) {
 			Msg: "Patient not found",
 			Err: err,
 		})
+		return "", nil, model.Patient{}, err
+	}
+
+	return id, db, patient, nil
+}
+
+func DeletePatient(c *gin.Context) {
+	_, db, patient, err := getPatientByID(c)
+	if err != nil {
 		return
 	}
 
@@ -248,30 +256,8 @@ func DeletePatient(c *gin.Context) {
 }
 
 func GetPatientInfo(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing patient ID",
-			Err: fmt.Errorf("patient ID is required"),
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
+	_, _, patient, err := getPatientByID(c)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return
-	}
-
-	var patient model.Patient
-	if err := db.First(&patient, id).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Patient not found",
-			Err: err,
-		})
 		return
 	}
 
