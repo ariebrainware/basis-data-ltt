@@ -16,6 +16,7 @@ func ListPatients(c *gin.Context) {
 	var totalPatient int64
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
+	keyword := c.Query("keyword")
 
 	db, err := config.ConnectMySQL()
 	if err != nil {
@@ -34,6 +35,10 @@ func ListPatients(c *gin.Context) {
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
+	if keyword != "" {
+		query = query.Where("full_name LIKE ? OR patient_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	}
+
 	if err := query.Find(&patients).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",
