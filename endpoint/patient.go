@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -13,21 +14,40 @@ import (
 )
 
 func ListPatients(c *gin.Context) {
-	var totalPatient int64
-	limit, _ := strconv.Atoi(c.Query("limit"))
-	offset, _ := strconv.Atoi(c.Query("offset"))
-	keyword := c.Query("keyword")
+	limit, offset, keyword, groupByDate := parseQueryParams(c)
 
-	db, err := config.ConnectMySQL()
+	patients, totalPatient, err := fetchPatients(limit, offset, keyword, groupByDate)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
+			Msg: "Failed to retrieve patients",
 			Err: err,
 		})
 		return
 	}
 
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Patients retrieved",
+		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
+	})
+}
+
+func parseQueryParams(c *gin.Context) (int, int, string, string) {
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	offset, _ := strconv.Atoi(c.Query("offset"))
+	keyword := c.Query("keyword")
+	groupByDate := c.Query("group_by_date")
+	return limit, offset, keyword, groupByDate
+}
+
+func fetchPatients(limit, offset int, keyword, groupByDate string) ([]model.Patient, int64, error) {
 	var patients []model.Patient
+	var totalPatient int64
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		return nil, 0, err
+	}
+
 	query := db.Offset(offset).Order("patient_code ASC")
 	if limit > 0 {
 		query = query.Limit(limit)
@@ -38,20 +58,26 @@ func ListPatients(c *gin.Context) {
 	if keyword != "" {
 		query = query.Where("full_name LIKE ? OR patient_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 	}
+	query = applyGroupByDateFilter(query, groupByDate)
 
 	if err := query.Find(&patients).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to retrieve patients",
-			Err: err,
-		})
-		return
+		return nil, 0, err
 	}
 
 	db.Model(&model.Patient{}).Count(&totalPatient)
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Patients retrieved",
-		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
-	})
+	return patients, totalPatient, nil
+}
+
+func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
+	switch groupByDate {
+	case "last_2_days":
+		query = query.Where("created_at >= ?", time.Now().AddDate(0, 0, -2))
+	case "last_3_months":
+		query = query.Where("created_at >= ?", time.Now().AddDate(0, -3, 0))
+	case "last_6_months":
+		query = query.Where("created_at >= ?", time.Now().AddDate(0, -6, 0))
+	}
+	return query
 }
 
 type createPatientRequest struct {
