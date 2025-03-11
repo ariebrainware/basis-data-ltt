@@ -75,7 +75,7 @@ func main() {
 		// auth.GET("/therapist", endpoint.ListTherapist)
 		auth.POST("/therapist", endpoint.CreateTherapist)
 		// auth.GET("/therapist/:id", endpoint.GetTherapistInfo)
-		// auth.PATCH("/therapist/:id", endpoint.UpdateTherapist)
+		auth.PATCH("/therapist/:id", endpoint.UpdateTherapist)
 		// auth.DELETE("/therapist/:id", endpoint.DeleteTherapist)
 	}
 

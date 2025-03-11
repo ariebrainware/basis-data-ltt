@@ -13,7 +13,7 @@ import (
 type createTherapistRequest struct {
 	FullName    string `json:"full_name" binding:"required"`
 	Email       string `json:"email" binding:"required"`
-	Password    string `json:"password" binding:"required"`
+	Password    string `json:"password"`
 	PhoneNumber string `json:"phone_number" binding:"required"`
 	Address     string `json:"address" binding:"required"`
 	DateOfBirth string `json:"date_of_birth" binding:"required"`
@@ -24,31 +24,71 @@ type createTherapistRequest struct {
 	IsApproved  bool   `json:"is_approved"`
 }
 
+func validateTherapistRequest(req createTherapistRequest) error {
+	requiredFields := map[string]string{
+		"FullName":    req.FullName,
+		"PhoneNumber": req.PhoneNumber,
+		"NIK":         req.NIK,
+	}
+
+	for fieldName, fieldValue := range requiredFields {
+		if fieldValue == "" {
+			return fmt.Errorf("%s is empty or missing required fields", fieldName)
+		}
+	}
+	return nil
+}
+
+func createTherapistInDB(db *gorm.DB, req createTherapistRequest) error {
+	var hashedPassword string
+	if req.Password != "" {
+		hashedPassword = util.HashPassword(req.Password)
+	}
+
+	var existingTherapist model.Therapist
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Check if email and NIK already registered
+		if err := tx.Where("email = ? AND NIK = ?").First(&existingTherapist).Error; err == nil {
+			return fmt.Errorf("therapist already registered")
+		}
+
+		if err := tx.Create(&model.Therapist{
+			FullName:    req.FullName,
+			Email:       req.Email,
+			Password:    hashedPassword,
+			PhoneNumber: req.PhoneNumber,
+			Address:     req.Address,
+			DateOfBirth: req.DateOfBirth,
+			NIK:         req.NIK,
+			Weight:      req.Weight,
+			Height:      req.Height,
+			Role:        req.Role,
+			IsApproved:  req.IsApproved,
+		}).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
 func CreateTherapist(c *gin.Context) {
 	therapistRequest := createTherapistRequest{}
 
-	err := c.ShouldBindJSON(&therapistRequest)
-	if err != nil {
+	if err := c.ShouldBindJSON(&therapistRequest); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
 			Err: err,
 		})
 		return
 	}
-	requiredFields := map[string]string{
-		"FullName":    therapistRequest.FullName,
-		"PhoneNumber": therapistRequest.PhoneNumber,
-		"NIK":         therapistRequest.NIK,
-	}
 
-	for fieldName, fieldValue := range requiredFields {
-		if fieldValue == "" {
-			util.CallUserError(c, util.APIErrorParams{
-				Msg: fmt.Sprintf("%s is empty or missing required fields", fieldName),
-				Err: fmt.Errorf("invalid payload"),
-			})
-			return
-		}
+	if err := validateTherapistRequest(therapistRequest); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: err.Error(),
+			Err: fmt.Errorf("invalid payload"),
+		})
+		return
 	}
 
 	db, err := config.ConnectMySQL()
@@ -60,38 +100,7 @@ func CreateTherapist(c *gin.Context) {
 		return
 	}
 
-	var hashedPassword string
-	if therapistRequest.Password != "" {
-		hashedPassword = util.HashPassword(therapistRequest.Password)
-	}
-
-	var existingTherapist model.Therapist
-	err = db.Transaction(func(tx *gorm.DB) error {
-		// Check if email and NIK already registered
-		if err := tx.Where("email = ? AND NIK = ?").First(&existingTherapist).Error; err == nil {
-			return fmt.Errorf("therapist already registered")
-		}
-
-		if err := tx.Create(&model.Therapist{
-			FullName:    therapistRequest.FullName,
-			Email:       therapistRequest.Email,
-			Password:    hashedPassword,
-			PhoneNumber: therapistRequest.PhoneNumber,
-			Address:     therapistRequest.Address,
-			DateOfBirth: therapistRequest.DateOfBirth,
-			NIK:         therapistRequest.NIK,
-			Weight:      therapistRequest.Weight,
-			Height:      therapistRequest.Height,
-			Role:        therapistRequest.Role,
-			IsApproved:  therapistRequest.IsApproved,
-		}).Error; err != nil {
-			return err
-		}
-
-		return nil
-	})
-
-	if err != nil {
+	if err := createTherapistInDB(db, therapistRequest); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create therapist",
 			Err: err,
@@ -101,6 +110,57 @@ func CreateTherapist(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Therapist created",
+		Data: nil,
+	})
+}
+
+func UpdateTherapist(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing therapist ID",
+			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return
+	}
+
+	therapist := model.Therapist{}
+	if err := c.ShouldBindJSON(&therapist); err != nil {	
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body",
+			Err: err,
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return
+	}
+
+	var existingTherapist model.Therapist
+	if err := db.First(&existingTherapist, id).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Therapist not found",
+			Err: err,
+		})
+		return
+	}
+
+	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to update therapist",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Therapist updated",
 		Data: nil,
 	})
 }
