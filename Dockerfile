@@ -26,6 +26,7 @@ ARG DBPORT
 ARG DBNAME
 ARG DBUSER
 ARG DBPASS
+ARG JWTSECRET
 
 # Optionally, set them as environment variables inside the image
 ENV APPNAME=$APPNAME \
@@ -37,7 +38,8 @@ ENV APPNAME=$APPNAME \
     DBPORT=$DBPORT \
     DBNAME=$DBNAME \
     DBUSER=$DBUSER \
-    DBPASS=$DBPASS
+    DBPASS=$DBPASS \
+    JWTSECRET=$JWTSECRET
     
 # Set timezone to UTC+7.
 RUN apk add --no-cache tzdata && \

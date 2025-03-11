@@ -10,6 +10,96 @@ import (
 	"gorm.io/gorm"
 )
 
+func fetchTherapist(limit, offset int, keyword, groupByDate string) ([]model.Therapist, int64, error) {
+	var therapist []model.Therapist
+	var totalTherapist int64
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query := db.Offset(offset).Order("created_at ASC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	if keyword != "" {
+		query = query.Where("full_name LIKE ? OR patient_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+	}
+	query = applyGroupByDateFilter(query, groupByDate)
+
+	if err := query.Find(&therapist).Error; err != nil {
+		return nil, 0, err
+	}
+
+	db.Model(&model.Therapist{}).Count(&totalTherapist)
+	return therapist, totalTherapist, nil
+}
+
+func ListTherapist(c *gin.Context) {
+	limit, offset, keyword, groupByDate := parseQueryParams(c)
+
+	therapist, totalTherapist, err := fetchTherapist(limit, offset, keyword, groupByDate)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to retrieve therapist",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Therapist retrieved",
+		Data: map[string]interface{}{"total": totalTherapist, "therapist": therapist},
+	})
+}
+
+func getTherapistByID(c *gin.Context) (string, *gorm.DB, model.Therapist, error) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing therapist ID",
+			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return "", nil, model.Therapist{}, fmt.Errorf("therapist ID is required")
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return "", nil, model.Therapist{}, err
+	}
+
+	var therapist model.Therapist
+	if err := db.First(&therapist, id).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Therapist not found",
+			Err: err,
+		})
+		return "", nil, model.Therapist{}, err
+	}
+
+	return id, db, therapist, nil
+}
+
+func GetTherapistInfo(c *gin.Context) {
+	_, _, therapist, err := getTherapistByID(c)
+	if err != nil {
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Therapist retrieved",
+		Data: therapist,
+	})
+}
+
 type createTherapistRequest struct {
 	FullName    string `json:"full_name" binding:"required"`
 	Email       string `json:"email" binding:"required"`
@@ -125,7 +215,7 @@ func UpdateTherapist(c *gin.Context) {
 	}
 
 	therapist := model.Therapist{}
-	if err := c.ShouldBindJSON(&therapist); err != nil {	
+	if err := c.ShouldBindJSON(&therapist); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
 			Err: err,
@@ -161,6 +251,48 @@ func UpdateTherapist(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Therapist updated",
+		Data: nil,
+	})
+}
+
+func DeleteTherapist(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing therapist ID",
+			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return
+	}
+
+	var existingTherapist model.Therapist
+	if err := db.First(&existingTherapist, id).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Therapist not found",
+			Err: err,
+		})
+		return
+	}
+
+	if err := db.Delete(&existingTherapist).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to delete therapist",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Therapist deleted",
 		Data: nil,
 	})
 }
