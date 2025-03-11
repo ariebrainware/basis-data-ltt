@@ -21,7 +21,7 @@ type createTherapistRequest struct {
 	Weight      int    `json:"weight" binding:"required"`
 	Height      int    `json:"height" binding:"required"`
 	Role        string `json:"role" binding:"required"`
-	IsApproved  bool   `json:"is_approved" binding:"required"`
+	IsApproved  bool   `json:"is_approved"`
 }
 
 func CreateTherapist(c *gin.Context) {
@@ -33,6 +33,7 @@ func CreateTherapist(c *gin.Context) {
 			Msg: "Invalid request body",
 			Err: err,
 		})
+		return
 	}
 	requiredFields := map[string]string{
 		"FullName":    therapistRequest.FullName,
@@ -59,6 +60,11 @@ func CreateTherapist(c *gin.Context) {
 		return
 	}
 
+	var hashedPassword string
+	if therapistRequest.Password != "" {
+		hashedPassword = util.HashPassword(therapistRequest.Password)
+	}
+
 	var existingTherapist model.Therapist
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if email and NIK already registered
@@ -67,9 +73,9 @@ func CreateTherapist(c *gin.Context) {
 		}
 
 		if err := tx.Create(&model.Therapist{
-			FullName: therapistRequest.FullName,
-			Email:    therapistRequest.Email,
-			// Password: ,
+			FullName:    therapistRequest.FullName,
+			Email:       therapistRequest.Email,
+			Password:    hashedPassword,
 			PhoneNumber: therapistRequest.PhoneNumber,
 			Address:     therapistRequest.Address,
 			DateOfBirth: therapistRequest.DateOfBirth,
@@ -94,7 +100,7 @@ func CreateTherapist(c *gin.Context) {
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Patient created",
+		Msg:  "Therapist created",
 		Data: nil,
 	})
 }
