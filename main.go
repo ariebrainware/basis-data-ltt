@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{})
+	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
@@ -71,6 +71,12 @@ func main() {
 		auth.GET("/disease/:id", endpoint.GetDiseaseInfo)
 		auth.PATCH("/disease/:id", endpoint.UpdateDisease)
 		auth.DELETE("/disease/:id", endpoint.DeleteDisease)
+
+		// auth.GET("/therapist", endpoint.ListTherapist)
+		auth.POST("/therapist", endpoint.CreateTherapist)
+		// auth.GET("/therapist/:id", endpoint.GetTherapistInfo)
+		// auth.PATCH("/therapist/:id", endpoint.UpdateTherapist)
+		// auth.DELETE("/therapist/:id", endpoint.DeleteTherapist)
 	}
 
 	// the exception for create patient so it can be accessed without login
