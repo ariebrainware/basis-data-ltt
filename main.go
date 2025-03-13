@@ -77,7 +77,7 @@ func main() {
 		auth.GET("/therapist/:id", endpoint.GetTherapistInfo)
 		auth.PATCH("/therapist/:id", endpoint.UpdateTherapist)
 		auth.DELETE("/therapist/:id", endpoint.DeleteTherapist)
-		
+		auth.PUT("/therapist/:id", endpoint.TherapistApproval)
 	}
 
 	// the exception for create patient so it can be accessed without login

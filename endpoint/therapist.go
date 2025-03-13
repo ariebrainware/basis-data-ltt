@@ -263,6 +263,56 @@ func UpdateTherapist(c *gin.Context) {
 	})
 }
 
+func TherapistApproval(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing therapist ID",
+			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return
+	}
+
+	therapist := model.Therapist{}
+	if err := c.ShouldBindJSON(&therapist); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body",
+			Err: err,
+		})
+		return
+	}
+
+	if !therapist.IsApproved {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Changes allowed only for approval and it must be true",
+			Err: fmt.Errorf("misinterpretation of request"),
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to MySQL",
+			Err: err,
+		})
+		return
+	}
+
+	if err := db.Model(&therapist).Where("id = ?", id).Update("is_approved", true).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to update therapist",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Therapist approved",
+		Data: nil,
+	})
+}
+
 func DeleteTherapist(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
