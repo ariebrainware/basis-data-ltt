@@ -205,21 +205,8 @@ func CreateTherapist(c *gin.Context) {
 }
 
 func UpdateTherapist(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing therapist ID",
-			Err: fmt.Errorf("therapist ID is required"),
-		})
-		return
-	}
-
-	therapist := model.Therapist{}
-	if err := c.ShouldBindJSON(&therapist); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request body",
-			Err: err,
-		})
+	id, therapist, err := getTherapistAndBindJSON(c)
+	if err != nil {
 		return
 	}
 
@@ -231,25 +218,28 @@ func UpdateTherapist(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
+	handleTherapistUpdate(c, id, therapist)
+}
+
+func TherapistApproval(c *gin.Context) {
+	id, therapist, err := getTherapistAndBindJSON(c)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
 		return
 	}
 
-	var existingTherapist model.Therapist
-	if err := db.First(&existingTherapist, id).Error; err != nil {
+	if !therapist.IsApproved {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Therapist not found",
-			Err: err,
+			Msg: "Changes allowed only for approval and it must be true",
+			Err: fmt.Errorf("misinterpretation of request"),
 		})
 		return
 	}
 
-	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
+	handleTherapistUpdate(c, id, therapist)
+}
+
+func handleTherapistUpdate(c *gin.Context, id string, therapist model.Therapist) {
+	if err := updateTherapistInDB(id, therapist); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update therapist",
 			Err: err,
@@ -263,14 +253,32 @@ func UpdateTherapist(c *gin.Context) {
 	})
 }
 
-func TherapistApproval(c *gin.Context) {
+func updateTherapistInDB(id string, therapist model.Therapist) error {
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		return err
+	}
+
+	var existingTherapist model.Therapist
+	if err := db.First(&existingTherapist, id).Error; err != nil {
+		return err
+	}
+
+	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing therapist ID",
 			Err: fmt.Errorf("therapist ID is required"),
 		})
-		return
+		return "", model.Therapist{}, fmt.Errorf("therapist ID is required")
 	}
 
 	therapist := model.Therapist{}
@@ -279,38 +287,10 @@ func TherapistApproval(c *gin.Context) {
 			Msg: "Invalid request body",
 			Err: err,
 		})
-		return
+		return "", model.Therapist{}, err
 	}
 
-	if !therapist.IsApproved {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Changes allowed only for approval and it must be true",
-			Err: fmt.Errorf("misinterpretation of request"),
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return
-	}
-
-	if err := db.Model(&therapist).Where("id = ?", id).Update("is_approved", true).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to update therapist",
-			Err: err,
-		})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Therapist approved",
-		Data: nil,
-	})
+	return id, therapist, nil
 }
 
 func DeleteTherapist(c *gin.Context) {
