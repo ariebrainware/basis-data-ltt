@@ -4,10 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
-
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -15,8 +11,6 @@ import (
 	"github.com/golang-jwt/jwt"
 	"gorm.io/gorm"
 )
-
-var jwtSecret = []byte("b54a241b0c864466e44ac93eed2d5719bfb887801f708f410db9a566eecee28122eb9df518b5116b5c19ded4519978ec7602116a7446ba4b057d4c8f220fef2df65e6c42c26854d9ff156c8d6561856530cec8ab5eeb2e011e259ae3c4ba4947201faf1573ae899078f6a220cc2c99e3d933fcfbb079b4b98345f873199e4f53b9b2781140e708b9ee2c213b443e371454ae479ace3a6b703de3de3dee7451463fb31a054bfb9f0fee73852dc09dc800ce37b6b79b83a0e280d414ed32444d3dd0674615803146e6ecca1ffffbfa8f8f0c8441ba5195911b78b7104ebd53223169c4073138c2e7101d5efb3119d981e7d839dd1c737da42bdd7220755ad60fbc")
 
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -47,10 +41,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Hash the provided password using HMAC-SHA256 with jwtSecret as key
-	h := hmac.New(sha256.New, jwtSecret)
-	h.Write([]byte(req.Password))
-	hashedPassword := hex.EncodeToString(h.Sum(nil))
+	var hashedPassword string
+	if req.Password != "" {
+		hashedPassword = util.HashPassword(req.Password)
+	} else {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request payload",
+			Err: fmt.Errorf("password cannot be empty"),
+		})
+	}
 
 	// Check if user exists
 	var User model.User
@@ -70,7 +69,7 @@ func Login(c *gin.Context) {
 		"role":  "admin",
 	})
 
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(util.JWTSecretByte)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Could not generate token",
@@ -189,13 +188,11 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	// Here you would typically hash the password and store the user in your database.
-	// This example omits database operations for simplicity.
-
 	// Hash the password using HMAC-SHA256 with jwtSecret as key.
-	h := hmac.New(sha256.New, jwtSecret)
-	h.Write([]byte(req.Password))
-	hashedPassword := hex.EncodeToString(h.Sum(nil))
+	var hashedPassword string
+	if req.Password != "" {
+		hashedPassword = util.HashPassword(req.Password)
+	}
 
 	newUser := model.User{
 		Name:     req.Name,
@@ -219,7 +216,7 @@ func Signup(c *gin.Context) {
 		"role":  newUser.Role,
 	})
 
-	tokenString, err := token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(util.JWTSecretByte)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Could not generate token",
