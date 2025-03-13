@@ -222,12 +222,16 @@ func UpdateTherapist(c *gin.Context) {
 }
 
 func TherapistApproval(c *gin.Context) {
+	handleTherapistApproval(c, true)
+}
+
+func handleTherapistApproval(c *gin.Context, isApproval bool) {
 	id, therapist, err := getTherapistAndBindJSON(c)
 	if err != nil {
 		return
 	}
 
-	if !therapist.IsApproved {
+	if isApproval && !therapist.IsApproved {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Changes allowed only for approval and it must be true",
 			Err: fmt.Errorf("misinterpretation of request"),
