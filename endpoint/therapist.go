@@ -205,43 +205,45 @@ func CreateTherapist(c *gin.Context) {
 }
 
 func UpdateTherapist(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing therapist ID",
-			Err: fmt.Errorf("therapist ID is required"),
-		})
-		return
-	}
-
-	therapist := model.Therapist{}
-	if err := c.ShouldBindJSON(&therapist); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request body",
-			Err: err,
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
+	id, therapist, err := getTherapistAndBindJSON(c)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
 		return
 	}
 
-	var existingTherapist model.Therapist
-	if err := db.First(&existingTherapist, id).Error; err != nil {
+	if therapist.IsApproved {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Therapist not found",
-			Err: err,
+			Msg: "Cannot update therapist approval",
+			Err: fmt.Errorf("cannot update therapist approval"),
 		})
 		return
 	}
 
-	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
+	handleTherapistUpdate(c, id, therapist)
+}
+
+func TherapistApproval(c *gin.Context) {
+	handleTherapistApproval(c, true)
+}
+
+func handleTherapistApproval(c *gin.Context, isApproval bool) {
+	id, therapist, err := getTherapistAndBindJSON(c)
+	if err != nil {
+		return
+	}
+
+	if isApproval && !therapist.IsApproved {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Changes allowed only for approval and it must be true",
+			Err: fmt.Errorf("misinterpretation of request"),
+		})
+		return
+	}
+
+	handleTherapistUpdate(c, id, therapist)
+}
+
+func handleTherapistUpdate(c *gin.Context, id string, therapist model.Therapist) {
+	if err := updateTherapistInDB(id, therapist); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update therapist",
 			Err: err,
@@ -253,6 +255,46 @@ func UpdateTherapist(c *gin.Context) {
 		Msg:  "Therapist updated",
 		Data: nil,
 	})
+}
+
+func updateTherapistInDB(id string, therapist model.Therapist) error {
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		return err
+	}
+
+	var existingTherapist model.Therapist
+	if err := db.First(&existingTherapist, id).Error; err != nil {
+		return err
+	}
+
+	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing therapist ID",
+			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return "", model.Therapist{}, fmt.Errorf("therapist ID is required")
+	}
+
+	therapist := model.Therapist{}
+	if err := c.ShouldBindJSON(&therapist); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body",
+			Err: err,
+		})
+		return "", model.Therapist{}, err
+	}
+
+	return id, therapist, nil
 }
 
 func DeleteTherapist(c *gin.Context) {
