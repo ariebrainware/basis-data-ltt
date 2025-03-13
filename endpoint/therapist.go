@@ -223,6 +223,14 @@ func UpdateTherapist(c *gin.Context) {
 		return
 	}
 
+	if therapist.IsApproved {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Cannot update therapist approval",
+			Err: fmt.Errorf("cannot update therapist approval"),
+		})
+		return
+	}
+
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
