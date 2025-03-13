@@ -62,7 +62,7 @@ jobs:
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
-          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA .
   prod_deploy:
     runs-on: [self-hosted, production]
     if: github.ref == 'refs/heads/main'
