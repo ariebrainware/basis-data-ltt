@@ -38,8 +38,10 @@ jobs:
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker stop ltt-be || true
-        docker rm ltt-be || true
+        if [ "$(docker ps -aq -f name=ltt-be)" ]; then
+          docker stop ltt-be
+          docker rm ltt-be
+        fi
         # Check if all required environment variables are set
         if [ -z "${{ secrets.APITOKEN }}" ] || [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
           echo "One or more required environment variables are missing."
@@ -62,7 +64,7 @@ jobs:
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
-          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA .
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA
   prod_deploy:
     runs-on: [self-hosted, production]
     if: github.ref == 'refs/heads/main'
