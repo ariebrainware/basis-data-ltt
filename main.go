@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{})
+	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
@@ -85,6 +85,7 @@ func main() {
 
 	r.POST("/login", endpoint.Login)
 	r.POST("/signup", endpoint.Signup)
+	r.GET("/token/validate", endpoint.ValidateToken)
 
 	// Start server on specified port
 	address := fmt.Sprintf(":%d", cfg.AppPort)
