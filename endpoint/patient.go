@@ -80,14 +80,15 @@ func ListPatients(c *gin.Context) {
 }
 
 type createPatientRequest struct {
-	FullName      string   `json:"full_name"`
-	Gender        string   `json:"gender"`
-	Age           int      `json:"age"`
-	Job           string   `json:"job"`
-	Address       string   `json:"address"`
-	PhoneNumber   []string `json:"phone_number"`
-	HealthHistory []string `json:"health_history"`
-	PatientCode   string   `json:"patient_code"`
+	FullName       string   `json:"full_name"`
+	Gender         string   `json:"gender"`
+	Age            int      `json:"age"`
+	Job            string   `json:"job"`
+	Address        string   `json:"address"`
+	PhoneNumber    []string `json:"phone_number"`
+	HealthHistory  []string `json:"health_history"`
+	SurgeryHistory string   `json:"surgery_history"`
+	PatientCode    string   `json:"patient_code"`
 }
 
 func CreatePatient(c *gin.Context) {
@@ -125,14 +126,15 @@ func CreatePatient(c *gin.Context) {
 		}
 
 		if err := tx.Create(&model.Patient{
-			FullName:      patientRequest.FullName,
-			Gender:        patientRequest.Gender,
-			Age:           patientRequest.Age,
-			Job:           patientRequest.Job,
-			Address:       patientRequest.Address,
-			PhoneNumber:   strings.Join(patientRequest.PhoneNumber, ","),
-			PatientCode:   patientRequest.PatientCode,
-			HealthHistory: strings.Join(patientRequest.HealthHistory, ","),
+			FullName:       patientRequest.FullName,
+			Gender:         patientRequest.Gender,
+			Age:            patientRequest.Age,
+			Job:            patientRequest.Job,
+			Address:        patientRequest.Address,
+			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
+			PatientCode:    patientRequest.PatientCode,
+			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
+			SurgeryHistory: patientRequest.SurgeryHistory,
 		}).Error; err != nil {
 			return err
 		}
