@@ -27,7 +27,7 @@ func fetchTherapist(limit, offset int, keyword, groupByDate string) ([]model.The
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Where("full_name LIKE ? OR patient_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		query = query.Where("full_name LIKE ? OR NIK LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 	}
 	query = applyGroupByDateFilter(query, groupByDate)
 
@@ -264,7 +264,7 @@ func updateTherapistInDB(id string, therapist model.Therapist) error {
 	}
 
 	var existingTherapist model.Therapist
-	if err := db.First(&existingTherapist, id).Error; err != nil {
+	if err := db.Where("id = ?", id).First(&existingTherapist, id).Error; err != nil {
 		return err
 	}
 
