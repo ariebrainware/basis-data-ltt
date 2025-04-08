@@ -72,12 +72,17 @@ func main() {
 		auth.PATCH("/disease/:id", endpoint.UpdateDisease)
 		auth.DELETE("/disease/:id", endpoint.DeleteDisease)
 
-		auth.GET("/therapist", endpoint.ListTherapist)
-		auth.POST("/therapist", endpoint.CreateTherapist)
-		auth.GET("/therapist/:id", endpoint.GetTherapistInfo)
-		auth.PATCH("/therapist/:id", endpoint.UpdateTherapist)
-		auth.DELETE("/therapist/:id", endpoint.DeleteTherapist)
-		auth.PUT("/therapist/:id", endpoint.TherapistApproval)
+		therapist := auth.Group("/therapist")
+		therapist.GET("/", endpoint.ListTherapist)
+		therapist.POST("/", endpoint.CreateTherapist)
+		therapist.GET("/:id", endpoint.GetTherapistInfo)
+		therapist.PATCH("/:id", endpoint.UpdateTherapist)
+		therapist.DELETE("/:id", endpoint.DeleteTherapist)
+		therapist.PUT("/:id", endpoint.TherapistApproval)
+		therapist.POST("/schedule", endpoint.CreateTherapistSchedule)
+		therapist.GET("/schedule/:id", endpoint.GetTherapistSchedule)
+		therapist.PATCH("/schedule/:id", endpoint.UpdateTherapistSchedule)
+		therapist.DELETE("/schedule/:id", endpoint.DeleteTherapistSchedule)
 	}
 
 	// the exception for create patient so it can be accessed without login
