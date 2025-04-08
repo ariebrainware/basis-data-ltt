@@ -299,11 +299,15 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 }
 
 func DeleteTherapist(c *gin.Context) {
+	deleteEntity(c, "therapist ID", &model.Therapist{})
+}
+
+func deleteEntity(c *gin.Context, idName string, entity interface{}) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing therapist ID",
-			Err: fmt.Errorf("therapist ID is required"),
+			Msg: fmt.Sprintf("Missing %s", idName),
+			Err: fmt.Errorf("%s is required", idName),
 		})
 		return
 	}
@@ -317,25 +321,24 @@ func DeleteTherapist(c *gin.Context) {
 		return
 	}
 
-	var existingTherapist model.Therapist
-	if err := db.First(&existingTherapist, id).Error; err != nil {
+	if err := db.First(entity, id).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Therapist not found",
+			Msg: fmt.Sprintf("%s not found", idName),
 			Err: err,
 		})
 		return
 	}
 
-	if err := db.Delete(&existingTherapist).Error; err != nil {
+	if err := db.Delete(entity).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to delete therapist",
+			Msg: fmt.Sprintf("Failed to delete %s", idName),
 			Err: err,
 		})
 		return
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Therapist deleted",
+		Msg:  fmt.Sprintf("%s deleted", idName),
 		Data: nil,
 	})
 }
