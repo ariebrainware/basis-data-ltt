@@ -367,7 +367,7 @@ func CreateTherapistSchedule(c *gin.Context) {
 	}
 
 	var existingSchedule model.Schedule
-	if err := db.Where("therapist_id = ? AND patient_id = ? AND ? BETWEEN start_time AND end_time", therapistSchedule.TherapistID, therapistSchedule.PatientID, time.Now()).First(&existingSchedule).Error; err == nil {
+	if err := db.Where("therapist_id = ? AND patient_id = ? AND ? BETWEEN start_time AND end_time", therapistSchedule.TherapistID, therapistSchedule.PatientID, time.Now().Format(time.RFC3339)).First(&existingSchedule).Error; err == nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Schedule already exists for this therapist and patient within the given time range",
 			Err: fmt.Errorf("duplicate schedule"),
@@ -390,8 +390,8 @@ func CreateTherapistSchedule(c *gin.Context) {
 }
 
 func GetTherapistSchedule(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
+	therapistID := c.Query("therapist_id")
+	if therapistID == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing schedule ID",
 			Err: fmt.Errorf("schedule ID is required"),
@@ -409,7 +409,7 @@ func GetTherapistSchedule(c *gin.Context) {
 	}
 
 	var schedule model.Schedule
-	if err := db.First(&schedule, id).Error; err != nil {
+	if err := db.Where("therapist_id = ?", therapistID).First(&schedule).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Schedule not found",
 			Err: err,
@@ -424,8 +424,8 @@ func GetTherapistSchedule(c *gin.Context) {
 }
 
 func UpdateTherapistSchedule(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
+	scheduleID := c.Query("id")
+	if scheduleID == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing schedule ID",
 			Err: fmt.Errorf("schedule ID is required"),
@@ -452,7 +452,7 @@ func UpdateTherapistSchedule(c *gin.Context) {
 	}
 
 	var existingSchedule model.Schedule
-	if err := db.First(&existingSchedule, id).Error; err != nil {
+	if err := db.First(&existingSchedule, scheduleID).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Schedule not found",
 			Err: err,
@@ -460,7 +460,7 @@ func UpdateTherapistSchedule(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&existingSchedule).Updates(schedule).Error; err != nil {
+	if err := db.Where("id = ?", scheduleID).Model(&existingSchedule).Updates(schedule).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update schedule",
 			Err: err,
@@ -473,6 +473,7 @@ func UpdateTherapistSchedule(c *gin.Context) {
 		Data: nil,
 	})
 }
+
 func DeleteTherapistSchedule(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {

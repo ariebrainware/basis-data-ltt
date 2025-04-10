@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{})
+	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{})
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
@@ -80,7 +80,7 @@ func main() {
 		therapist.DELETE("/:id", endpoint.DeleteTherapist)
 		therapist.PUT("/:id", endpoint.TherapistApproval)
 		therapist.POST("/schedule", endpoint.CreateTherapistSchedule)
-		therapist.GET("/schedule/:id", endpoint.GetTherapistSchedule)
+		therapist.GET("/schedule", endpoint.GetTherapistSchedule)
 		therapist.PATCH("/schedule/:id", endpoint.UpdateTherapistSchedule)
 		therapist.DELETE("/schedule/:id", endpoint.DeleteTherapistSchedule)
 	}
