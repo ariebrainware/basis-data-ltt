@@ -19,6 +19,7 @@ type LoginRequest struct {
 
 type LoginResponse struct {
 	Token string `json:"token"`
+	Role  string `json:"role"`
 }
 
 func Login(c *gin.Context) {
@@ -62,6 +63,17 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// Check role
+	var role model.Role
+	err = db.Model(&role).Where("id = ?", User.RoleID).First(&role).Error
+	if err == gorm.ErrRecordNotFound {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Role not found",
+			Err: fmt.Errorf("role not found"),
+		})
+		return
+	}
+	
 	// Create JWT token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": User.Email,
@@ -98,7 +110,7 @@ func Login(c *gin.Context) {
 	// Return the token in a JSON response
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Login successful",
-		Data: tokenString,
+		Data: LoginResponse{Token: tokenString, Role: role.Name},
 	})
 }
 
