@@ -12,7 +12,7 @@ on:
 
 jobs:
   dev_deploy:
-    runs-on: [ltt-server, development]
+    runs-on: [ltt-server]
     if: github.ref == 'refs/heads/dev'
     steps:
     - name: Checkout code
@@ -66,7 +66,7 @@ jobs:
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
           --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA
   prod_deploy:
-    runs-on: [ltt-server, production]
+    runs-on: [ltt-server]
     if: github.ref == 'refs/heads/main'
     steps:
     - name: Checkout code
