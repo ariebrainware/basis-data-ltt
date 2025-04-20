@@ -38,7 +38,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{})
+	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{})
+	if err != nil {
+		log.Fatalf("Error migrating database: %v", err)
+	}
+
+	// Seed data example.
+	if err := model.SeedRoles(db); err != nil {
+		log.Fatalf("Seeding failed: %v", err)
+	}
 
 	// Set Gin mode from config
 	gin.SetMode(cfg.GinMode)
