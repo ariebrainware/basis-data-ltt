@@ -89,6 +89,8 @@ type createPatientRequest struct {
 	HealthHistory  []string `json:"health_history"`
 	SurgeryHistory string   `json:"surgery_history"`
 	PatientCode    string   `json:"patient_code"`
+	Password       string   `json:"password,omitempty"`
+	Email          string   `json:"email,omitempty"`
 }
 
 func CreatePatient(c *gin.Context) {
@@ -119,6 +121,7 @@ func CreatePatient(c *gin.Context) {
 	}
 
 	var existingPatient model.Patient
+	var existingUser model.User
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
 		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber, ","), patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
@@ -135,10 +138,27 @@ func CreatePatient(c *gin.Context) {
 			PatientCode:    patientRequest.PatientCode,
 			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
 			SurgeryHistory: patientRequest.SurgeryHistory,
+			Email:          patientRequest.Email,
+			Password:       util.HashPassword(patientRequest.Password),
 		}).Error; err != nil {
 			return err
 		}
 
+		if patientRequest.Email != "" && patientRequest.Password != "" {
+			// Check if users already registered
+			if err := tx.Where("email = ?", patientRequest.Email).First(&existingUser).Error; err == nil {
+				return fmt.Errorf("user already registered")
+			}
+			// Create user
+			if err := tx.Create(&model.User{
+				Name:     patientRequest.FullName,
+				Email:    patientRequest.Email,
+				Password: util.HashPassword(patientRequest.Password),
+				RoleID:   2,
+			}).Error; err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 
