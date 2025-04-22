@@ -42,7 +42,8 @@ ENV APPNAME=$APPNAME \
     JWTSECRET=$JWTSECRET
     
 # Set timezone to UTC+7.
-RUN apk add --no-cache tzdata iputils && \
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirror.sjtu.edu.cn|g' /etc/apk/repositories && \
+    apk add --no-cache tzdata iputils && \
     cp /usr/share/zoneinfo/Asia/Bangkok /etc/localtime && \
     echo "Asia/Jakarta" > /etc/timezone && \
     apk del tzdata
