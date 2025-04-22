@@ -43,6 +43,7 @@ ENV APPNAME=$APPNAME \
     
 # Set timezone to UTC+7.
 RUN sed -i 's|dl-cdn.alpinelinux.org|mirror.sjtu.edu.cn|g' /etc/apk/repositories && \
+    apk update && \
     apk add --no-cache tzdata iputils && \
     cp /usr/share/zoneinfo/Asia/Bangkok /etc/localtime && \
     echo "Asia/Jakarta" > /etc/timezone && \
