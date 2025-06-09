@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{})
+	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{}, &model.Treatment{})
 	if err != nil {
 		log.Fatalf("Error migrating database: %v", err)
 	}
@@ -67,12 +67,17 @@ func main() {
 	auth := r.Group("/")
 	auth.Use(middleware.ValidateLoginToken())
 	{
-		auth.GET("/patient", endpoint.ListPatients)
-		auth.GET("/patient/:id", endpoint.GetPatientInfo)
-		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
-		auth.DELETE("/patient/:id", endpoint.DeletePatient)
-
 		auth.DELETE("/logout", endpoint.Logout)
+
+		patient := auth.Group("/patient")
+		patient.GET("/", endpoint.ListPatients)
+		patient.GET("/:id", endpoint.GetPatientInfo)
+		patient.PATCH("/:id", endpoint.UpdatePatient)
+		patient.DELETE("/:id", endpoint.DeletePatient)
+
+		treatment := patient.Group("/treatment")
+		treatment.GET("/", endpoint.ListTreatments)
+		treatment.POST("/", endpoint.CreateTreatment)
 
 		auth.GET("/disease", endpoint.ListDiseases)
 		auth.POST("/disease", endpoint.CreateDisease)
