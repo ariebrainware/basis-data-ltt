@@ -70,7 +70,7 @@ func main() {
 		auth.DELETE("/logout", endpoint.Logout)
 
 		patient := auth.Group("/patient")
-		patient.GET("/", endpoint.ListPatients)
+		patient.GET("", endpoint.ListPatients)
 		patient.GET("/:id", endpoint.GetPatientInfo)
 		patient.PATCH("/:id", endpoint.UpdatePatient)
 		patient.DELETE("/:id", endpoint.DeletePatient)
@@ -85,9 +85,9 @@ func main() {
 		auth.PATCH("/disease/:id", endpoint.UpdateDisease)
 		auth.DELETE("/disease/:id", endpoint.DeleteDisease)
 
-		therapist := auth.Group("/therapist")
-		therapist.GET("/", endpoint.ListTherapist)
-		therapist.POST("/", endpoint.CreateTherapist)
+		therapist := auth.Group("therapist")
+		therapist.GET("", endpoint.ListTherapist)
+		therapist.POST("", endpoint.CreateTherapist)
 		therapist.GET("/:id", endpoint.GetTherapistInfo)
 		therapist.PATCH("/:id", endpoint.UpdateTherapist)
 		therapist.DELETE("/:id", endpoint.DeleteTherapist)
