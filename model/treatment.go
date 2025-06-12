@@ -24,3 +24,9 @@ type TreatementRequest struct {
 	Remarks       string   `json:"remarks"`
 	NextVisit     string   `json:"next_visit" binding:"required"`
 }
+
+type ListTreatementResponse struct {
+	Treatment
+	TherapistName string `json:"therapist_name" gorm:"column:therapist_name"`
+	PatientName   string `json:"patient_name" gorm:"column:patient_name"`
+}

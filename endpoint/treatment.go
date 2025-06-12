@@ -19,17 +19,23 @@ func ListTreatments(c *gin.Context) {
 		return
 	}
 
-	var treatments []model.Treatment
-	if err := db.Find(&treatments).Error; err != nil {
+	var data []model.ListTreatementResponse
+	err = db.Table("treatments").
+		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
+		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name").
+		Scan(&data).Error
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to fetch treatments",
+			Msg: "Failed to fetch treatments with join",
 			Err: err,
 		})
 		return
 	}
+
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Treatments fetched successfully",
-		Data: treatments,
+		Data: data,
 	})
 }
 
