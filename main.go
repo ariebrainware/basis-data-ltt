@@ -76,8 +76,8 @@ func main() {
 		patient.DELETE("/:id", endpoint.DeletePatient)
 
 		treatment := patient.Group("/treatment")
-		treatment.GET("/", endpoint.ListTreatments)
-		treatment.POST("/", endpoint.CreateTreatment)
+		treatment.GET("", endpoint.ListTreatments)
+		treatment.POST("", endpoint.CreateTreatment)
 
 		auth.GET("/disease", endpoint.ListDiseases)
 		auth.POST("/disease", endpoint.CreateDisease)
