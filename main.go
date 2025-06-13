@@ -14,8 +14,6 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -28,12 +26,7 @@ func main() {
 		log.Fatalf("Error loading timezone: %v", err)
 	}
 	time.Local = location
-	gormConfig := &gorm.Config{}
-	if cfg.AppEnv == "production" {
-		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
-	} else {
-		gormConfig.Logger = logger.Default.LogMode(logger.Info)
-	}
+
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)

@@ -20,6 +20,7 @@ func parseQueryParams(c *gin.Context) (int, int, string, string) {
 	groupByDate := c.Query("group_by_date")
 	return limit, offset, keyword, groupByDate
 }
+
 func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	switch groupByDate {
 	case "last_2_days":
