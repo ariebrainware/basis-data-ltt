@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 // Config holds the application's configuration values.
@@ -60,11 +61,27 @@ func LoadConfig() *Config {
 
 // ConnectMySQL establishes a connection to a MySQL database using the configuration values.
 func ConnectMySQL() (*gorm.DB, error) {
+
 	cfg := LoadConfig()
 	// Build the Data Source Name (DSN) using the configuration values.
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	gormConfig := &gorm.Config{}
+	if cfg.AppEnv == "production" {
+		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
+	} else {
+		gormConfig = &gorm.Config{
+			Logger: logger.New(
+				log.New(os.Stdout, "\r\n", log.LstdFlags),
+				logger.Config{
+					SlowThreshold: 200 * time.Millisecond, // Slow SQL threshold
+					LogLevel:      logger.Info,            // Log level
+					Colorful:      true,                   // Enable colorful output
+				},
+			),
+		}
+	}
 	// Open a database connection.
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dsn), gormConfig)
 	if err != nil {
 		return nil, err
 	}
