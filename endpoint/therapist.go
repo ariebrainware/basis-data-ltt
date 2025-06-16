@@ -54,7 +54,7 @@ func ListTherapist(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Therapist retrieved",
-		Data: map[string]interface{}{"total": totalTherapist, "therapist": therapist},
+		Data: map[string]interface{}{"total": totalTherapist, "therapists": therapist},
 	})
 }
 
