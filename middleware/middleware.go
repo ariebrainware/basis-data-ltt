@@ -69,14 +69,14 @@ func CORSMiddleware() gin.HandlerFunc {
 		// Set CORS headers
 		setCorsHeaders(c)
 
-		// Call tokenValidator after setting CORS headers.
-		if !tokenValidator(c, fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))) {
-			return
-		}
-
 		// For preflight requests, simply return after setting CORS headers.
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		// Call tokenValidator after handling preflight.
+		if !tokenValidator(c, fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))) {
 			return
 		}
 
