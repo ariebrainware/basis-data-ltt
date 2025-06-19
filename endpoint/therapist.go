@@ -54,7 +54,7 @@ func ListTherapist(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Therapist retrieved",
-		Data: map[string]interface{}{"total": totalTherapist, "therapist": therapist},
+		Data: map[string]interface{}{"total": totalTherapist, "therapists": therapist},
 	})
 }
 
@@ -102,16 +102,16 @@ func GetTherapistInfo(c *gin.Context) {
 }
 
 type createTherapistRequest struct {
-	FullName    string `json:"full_name" binding:"required"`
-	Email       string `json:"email" binding:"required"`
+	FullName    string `json:"full_name"`
+	Email       string `json:"email"`
 	Password    string `json:"password"`
-	PhoneNumber string `json:"phone_number" binding:"required"`
-	Address     string `json:"address" binding:"required"`
-	DateOfBirth string `json:"date_of_birth" binding:"required"`
-	NIK         string `json:"nik" binding:"required"`
-	Weight      int    `json:"weight" binding:"required"`
-	Height      int    `json:"height" binding:"required"`
-	Role        string `json:"role" binding:"required"`
+	PhoneNumber string `json:"phone_number"`
+	Address     string `json:"address"`
+	DateOfBirth string `json:"date_of_birth"`
+	NIK         string `json:"nik"`
+	Weight      int    `json:"weight"`
+	Height      int    `json:"height"`
+	Role        string `json:"role"`
 	IsApproved  bool   `json:"is_approved"`
 }
 

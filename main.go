@@ -14,8 +14,6 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -28,17 +26,12 @@ func main() {
 		log.Fatalf("Error loading timezone: %v", err)
 	}
 	time.Local = location
-	gormConfig := &gorm.Config{}
-	if cfg.AppEnv == "production" {
-		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
-	} else {
-		gormConfig.Logger = logger.Default.LogMode(logger.Info)
-	}
+
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{})
+	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{}, &model.Treatment{})
 	if err != nil {
 		log.Fatalf("Error migrating database: %v", err)
 	}
@@ -67,12 +60,17 @@ func main() {
 	auth := r.Group("/")
 	auth.Use(middleware.ValidateLoginToken())
 	{
-		auth.GET("/patient", endpoint.ListPatients)
-		auth.GET("/patient/:id", endpoint.GetPatientInfo)
-		auth.PATCH("/patient/:id", endpoint.UpdatePatient)
-		auth.DELETE("/patient/:id", endpoint.DeletePatient)
-
 		auth.DELETE("/logout", endpoint.Logout)
+
+		patient := auth.Group("/patient")
+		patient.GET("", endpoint.ListPatients)
+		patient.GET("/:id", endpoint.GetPatientInfo)
+		patient.PATCH("/:id", endpoint.UpdatePatient)
+		patient.DELETE("/:id", endpoint.DeletePatient)
+
+		treatment := patient.Group("/treatment")
+		treatment.GET("", endpoint.ListTreatments)
+		treatment.POST("", endpoint.CreateTreatment)
 
 		auth.GET("/disease", endpoint.ListDiseases)
 		auth.POST("/disease", endpoint.CreateDisease)
@@ -80,9 +78,9 @@ func main() {
 		auth.PATCH("/disease/:id", endpoint.UpdateDisease)
 		auth.DELETE("/disease/:id", endpoint.DeleteDisease)
 
-		therapist := auth.Group("/therapist")
-		therapist.GET("/", endpoint.ListTherapist)
-		therapist.POST("/", endpoint.CreateTherapist)
+		therapist := auth.Group("therapist")
+		therapist.GET("", endpoint.ListTherapist)
+		therapist.POST("", endpoint.CreateTherapist)
 		therapist.GET("/:id", endpoint.GetTherapistInfo)
 		therapist.PATCH("/:id", endpoint.UpdateTherapist)
 		therapist.DELETE("/:id", endpoint.DeleteTherapist)
