@@ -7,7 +7,7 @@ import (
 type Treatment struct {
 	gorm.Model
 	TreatmentDate string `json:"treatment_date" gorm:"not null"`
-	PatientCode   string `json:"patient_code" gorm:"not null;unique"`
+	PatientCode   string `json:"patient_code" gorm:"not null"`
 	TherapistID   uint   `json:"therapist_id" gorm:"not null"`
 	Issues        string `json:"issues" gorm:"not null"`
 	Treatment     string `json:"treatment" gorm:"not null"`
