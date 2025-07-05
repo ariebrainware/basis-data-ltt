@@ -50,7 +50,7 @@ func fetchPatients(limit, offset int, keyword, groupByDate string) ([]model.Pati
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Where("full_name LIKE ? OR patient_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		query = query.Where("full_name LIKE ? OR patient_code LIKE ? OR address LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
 	}
 	query = applyGroupByDateFilter(query, groupByDate)
 
