@@ -1,5 +1,6 @@
 # Project Documentation
 
+
 This document summarizes the setup, available routes, and core functionalities provided by the project.
 
 ## Table of Contents
