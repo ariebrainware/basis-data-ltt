@@ -41,7 +41,7 @@ func fetchTherapist(limit, offset int, keyword, groupByDate string) ([]model.The
 }
 
 func ListTherapist(c *gin.Context) {
-	limit, offset, keyword, groupByDate := parseQueryParams(c)
+	limit, offset, _,keyword, groupByDate := parseQueryParams(c)
 
 	therapist, totalTherapist, err := fetchTherapist(limit, offset, keyword, groupByDate)
 	if err != nil {
