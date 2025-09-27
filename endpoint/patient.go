@@ -13,12 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func parseQueryParams(c *gin.Context) (int, int, string, string) {
+func parseQueryParams(c *gin.Context) (int, int, int, string, string) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
+	therapistID, _ := strconv.Atoi(c.Query("therapist_id"))
 	keyword := c.Query("keyword")
 	groupByDate := c.Query("group_by_date")
-	return limit, offset, keyword, groupByDate
+	return limit, offset, therapistID, keyword, groupByDate
 }
 
 func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
@@ -33,7 +34,7 @@ func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	return query
 }
 
-func fetchPatients(limit, offset int, keyword, groupByDate string) ([]model.Patient, int64, error) {
+func fetchPatients(limit, offset, therapistID int, keyword, groupByDate string) ([]model.Patient, int64, error) {
 	var patients []model.Patient
 	var totalPatient int64
 
@@ -63,9 +64,9 @@ func fetchPatients(limit, offset int, keyword, groupByDate string) ([]model.Pati
 }
 
 func ListPatients(c *gin.Context) {
-	limit, offset, keyword, groupByDate := parseQueryParams(c)
+	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
 
-	patients, totalPatient, err := fetchPatients(limit, offset, keyword, groupByDate)
+	patients, totalPatient, err := fetchPatients(limit, offset, therapistID, keyword, groupByDate)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",

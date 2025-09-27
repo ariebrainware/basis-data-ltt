@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func fetchTreatments(limit, offset int, keyword string) ([]model.ListTreatementResponse, int64, error) {
+func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		return nil, 0, err
@@ -32,6 +32,9 @@ func fetchTreatments(limit, offset int, keyword string) ([]model.ListTreatementR
 	if keyword != "" {
 		query = query.Where("patients.full_name LIKE ? OR treatments.patient_code LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
 	}
+	if therapistID != 0 {
+		query = query.Where("treatments.therapist_id = ?", therapistID)
+	}
 
 	if err := query.Find(&treatments).Error; err != nil {
 		return nil, 0, err
@@ -45,9 +48,9 @@ func fetchTreatments(limit, offset int, keyword string) ([]model.ListTreatementR
 }
 
 func ListTreatments(c *gin.Context) {
-	limit, offset, keyword, _ := parseQueryParams(c)
+	limit, offset, keyword, therapistID, groupByDate := parseQueryParams(c)
 
-	treatments, totalTreatments, err := fetchTreatments(limit, offset, keyword)
+	treatments, totalTreatments, err := fetchTreatments(limit, offset, keyword, therapistID, groupByDate)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to fetch treatments",
