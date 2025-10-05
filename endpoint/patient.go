@@ -126,8 +126,34 @@ func CreatePatient(c *gin.Context) {
 	var existingUser model.User
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
-		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber, ","), patientRequest.PhoneNumber).First(&existingPatient).Error; err == nil {
-			return fmt.Errorf("patient already registered")
+		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber, ","), patientRequest.PhoneNumber).First(&existingPatient).Error; err != nil {
+			if err != gorm.ErrRecordNotFound {
+				return fmt.Errorf("database error: %v", err)
+			} // else continue to create new patient
+		}
+
+		// determine the patient code by fullname initials + incremented number
+		initials := getInitials(patientRequest.FullName)
+
+		// generate patient.patient_code based on patient_codes table
+		var patientCode model.PatientCode
+		err := tx.Order("id DESC").Where("alphabet = ?", initials).First(&patientCode).Error
+		if err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("patient code not found")
+			} else {
+				return err
+			}
+		}
+
+		newNumber := patientCode.Number + 1
+		newCode := fmt.Sprintf("%s%d", initials, newNumber)
+		if err := tx.Where("alphabet = ?", initials).Updates(&model.PatientCode{
+			Number:   newNumber,
+			Alphabet: initials,
+			Code:     newCode,
+		}).Error; err != nil {
+			return err
 		}
 
 		if err := tx.Create(&model.Patient{
@@ -137,7 +163,7 @@ func CreatePatient(c *gin.Context) {
 			Job:            patientRequest.Job,
 			Address:        patientRequest.Address,
 			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
-			PatientCode:    patientRequest.PatientCode,
+			PatientCode:    newCode,
 			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
 			SurgeryHistory: patientRequest.SurgeryHistory,
 			Email:          patientRequest.Email,
@@ -146,19 +172,21 @@ func CreatePatient(c *gin.Context) {
 			return err
 		}
 
-		if patientRequest.Email != "" && patientRequest.Password != "" {
-			// Check if users already registered
-			if err := tx.Where("email = ?", patientRequest.Email).First(&existingUser).Error; err == nil {
-				return fmt.Errorf("user already registered")
-			}
-			// Create user
-			if err := tx.Create(&model.User{
-				Name:     patientRequest.FullName,
-				Email:    patientRequest.Email,
-				Password: util.HashPassword(patientRequest.Password),
-				RoleID:   2,
-			}).Error; err != nil {
-				return err
+		if patientRequest.Email != "" && patientRequest.Email != "-" {
+			if patientRequest.Password != "" {
+				// Check if users already registered
+				if err := tx.Where("email = ?", patientRequest.Email).First(&existingUser).Error; err == nil {
+					return fmt.Errorf("email already registered")
+				}
+				// Create user
+				if err := tx.Create(&model.User{
+					Name:     patientRequest.FullName,
+					Email:    patientRequest.Email,
+					Password: util.HashPassword(patientRequest.Password),
+					RoleID:   2,
+				}).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -227,6 +255,15 @@ func UpdatePatient(c *gin.Context) {
 		Msg:  "Patient updated",
 		Data: existingPatient,
 	})
+}
+
+func getInitials(fullName string) string {
+	words := strings.Fields(fullName)
+	initials := ""
+	if len(words) > 0 && len(words[0]) > 0 {
+		initials = strings.ToUpper(string(words[0][0]))
+	}
+	return initials
 }
 
 func getPatientByID(c *gin.Context) (string, *gorm.DB, model.Patient, error) {
