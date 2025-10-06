@@ -124,6 +124,7 @@ func CreatePatient(c *gin.Context) {
 
 	var existingPatient model.Patient
 	var existingUser model.User
+
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
 		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber, ","), patientRequest.PhoneNumber).First(&existingPatient).Error; err != nil {
@@ -136,8 +137,8 @@ func CreatePatient(c *gin.Context) {
 		initials := getInitials(patientRequest.FullName)
 
 		// generate patient.patient_code based on patient_codes table
-		var patientCode model.PatientCode
-		err := tx.Order("id DESC").Where("alphabet = ?", initials).First(&patientCode).Error
+		var patientCodeTable model.PatientCode
+		err := tx.Order("id DESC").Where("alphabet = ?", initials).First(&patientCodeTable).Error
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return fmt.Errorf("patient code not found")
@@ -146,14 +147,19 @@ func CreatePatient(c *gin.Context) {
 			}
 		}
 
-		newNumber := patientCode.Number + 1
-		newCode := fmt.Sprintf("%s%d", initials, newNumber)
-		if err := tx.Where("alphabet = ?", initials).Updates(&model.PatientCode{
-			Number:   newNumber,
-			Alphabet: initials,
-			Code:     newCode,
-		}).Error; err != nil {
-			return err
+		var patientCode string
+		if patientRequest.PatientCode != "" {
+			patientCode = patientRequest.PatientCode
+		} else {
+			newNumber := patientCodeTable.Number + 1
+			patientCode = fmt.Sprintf("%s%d", initials, newNumber)
+			if err := tx.Where("alphabet = ?", initials).Updates(&model.PatientCode{
+				Number:   newNumber,
+				Alphabet: initials,
+				Code:     patientCode,
+			}).Error; err != nil {
+				return err
+			}
 		}
 
 		if err := tx.Create(&model.Patient{
@@ -163,7 +169,7 @@ func CreatePatient(c *gin.Context) {
 			Job:            patientRequest.Job,
 			Address:        patientRequest.Address,
 			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
-			PatientCode:    newCode,
+			PatientCode:    patientCode,
 			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
 			SurgeryHistory: patientRequest.SurgeryHistory,
 			Email:          patientRequest.Email,
