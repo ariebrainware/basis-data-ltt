@@ -43,7 +43,7 @@ func fetchPatients(limit, offset, therapistID int, keyword, groupByDate string) 
 		return nil, 0, err
 	}
 
-	query := db.Offset(offset).Order("patient_code ASC")
+	query := db.Offset(offset).Order("created_at DESC")
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
