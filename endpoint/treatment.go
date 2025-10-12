@@ -30,7 +30,10 @@ func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+		query = query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+
+	} else {
+		query = query.Order("treatments.created_at DESC")
 	}
 	if therapistID != 0 {
 		query = query.Where("treatments.therapist_id = ?", therapistID)
