@@ -36,7 +36,7 @@ func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string
 		query = query.Where("treatments.therapist_id = ?", therapistID)
 	}
 
-	if err := query.Find(&treatments).Error; err != nil {
+	if err := query.Order("created_at DESC").Find(&treatments).Error; err != nil {
 		return nil, 0, err
 	}
 
