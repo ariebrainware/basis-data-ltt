@@ -9,10 +9,9 @@ on:
     branches:
       - dev
       - main
-
 jobs:
   dev_deploy:
-    runs-on: [ltt-server]
+    runs-on: [evolto3-runner]
     if: github.ref == 'refs/heads/dev'
     steps:
     - name: Checkout code
