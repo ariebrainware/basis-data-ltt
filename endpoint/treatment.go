@@ -38,6 +38,9 @@ func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string
 	if therapistID != 0 {
 		query = query.Where("treatments.therapist_id = ?", therapistID)
 	}
+	if groupByDate != "" {
+		query = query.Where("treatments.treatment_date like ?", groupByDate+"%")
+	}
 
 	if err := query.Find(&treatments).Error; err != nil {
 		return nil, 0, err
