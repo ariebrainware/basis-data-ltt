@@ -2,7 +2,6 @@ package endpoint
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -41,7 +40,7 @@ func fetchTherapist(limit, offset int, keyword, groupByDate string) ([]model.The
 }
 
 func ListTherapist(c *gin.Context) {
-	limit, offset, _,keyword, groupByDate := parseQueryParams(c)
+	limit, offset, _, keyword, groupByDate := parseQueryParams(c)
 
 	therapist, totalTherapist, err := fetchTherapist(limit, offset, keyword, groupByDate)
 	if err != nil {
@@ -336,182 +335,6 @@ func DeleteTherapist(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Therapist deleted",
-		Data: nil,
-	})
-}
-
-func CreateTherapistSchedule(c *gin.Context) {
-	therapistSchedule := model.Schedule{}
-	if err := c.ShouldBindJSON(&therapistSchedule); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request body",
-			Err: err,
-		})
-		return
-	}
-	if therapistSchedule.PatientID == 0 || therapistSchedule.TherapistID == 0 {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing patient ID or therapist ID",
-			Err: fmt.Errorf("patient ID or therapist ID is required"),
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return
-	}
-
-	var existingSchedule model.Schedule
-	if err := db.Where("therapist_id = ? AND patient_id = ? AND ? BETWEEN start_time AND end_time", therapistSchedule.TherapistID, therapistSchedule.PatientID, time.Now().Format(time.RFC3339)).First(&existingSchedule).Error; err == nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Schedule already exists for this therapist and patient within the given time range",
-			Err: fmt.Errorf("duplicate schedule"),
-		})
-		return
-	}
-
-	if err := db.Create(&therapistSchedule).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to create therapist schedule",
-			Err: err,
-		})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Therapist schedule created",
-		Data: nil,
-	})
-}
-
-func GetTherapistSchedule(c *gin.Context) {
-	therapistID := c.Query("therapist_id")
-	if therapistID == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing schedule ID",
-			Err: fmt.Errorf("schedule ID is required"),
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return
-	}
-
-	var schedule model.Schedule
-	if err := db.Where("therapist_id = ?", therapistID).First(&schedule).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Schedule not found",
-			Err: err,
-		})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Schedule retrieved",
-		Data: schedule,
-	})
-}
-
-func UpdateTherapistSchedule(c *gin.Context) {
-	scheduleID := c.Query("id")
-	if scheduleID == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing schedule ID",
-			Err: fmt.Errorf("schedule ID is required"),
-		})
-		return
-	}
-
-	schedule := model.Schedule{}
-	if err := c.ShouldBindJSON(&schedule); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request body",
-			Err: err,
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return
-	}
-
-	var existingSchedule model.Schedule
-	if err := db.First(&existingSchedule, scheduleID).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Schedule not found",
-			Err: err,
-		})
-		return
-	}
-
-	if err := db.Where("id = ?", scheduleID).Model(&existingSchedule).Updates(schedule).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to update schedule",
-			Err: err,
-		})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Schedule updated",
-		Data: nil,
-	})
-}
-
-func DeleteTherapistSchedule(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing schedule ID",
-			Err: fmt.Errorf("schedule ID is required"),
-		})
-		return
-	}
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return
-	}
-
-	var existingSchedule model.Schedule
-	if err := db.First(&existingSchedule, id).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Schedule not found",
-			Err: err,
-		})
-		return
-	}
-
-	if err := db.Delete(&existingSchedule).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to delete schedule",
-			Err: err,
-		})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Schedule deleted",
 		Data: nil,
 	})
 }

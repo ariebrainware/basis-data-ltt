@@ -31,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
-	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Schedule{}, &model.Treatment{}, &model.PatientCode{})
+	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{})
 	if err != nil {
 		log.Fatalf("Error migrating database: %v", err)
 	}
@@ -85,10 +85,6 @@ func main() {
 		therapist.PATCH("/:id", endpoint.UpdateTherapist)
 		therapist.DELETE("/:id", endpoint.DeleteTherapist)
 		therapist.PUT("/:id", endpoint.TherapistApproval)
-		therapist.POST("/schedule", endpoint.CreateTherapistSchedule)
-		therapist.GET("/schedule", endpoint.GetTherapistSchedule)
-		therapist.PATCH("/schedule/:id", endpoint.UpdateTherapistSchedule)
-		therapist.DELETE("/schedule/:id", endpoint.DeleteTherapistSchedule)
 	}
 
 	// the exception for create patient so it can be accessed without login
