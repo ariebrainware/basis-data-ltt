@@ -1,5 +1,4 @@
 # Project Documentation
-[TEST DEPLOY]
 
 This document summarize the setup, available routes, and core functionalities provided by the project.
 
