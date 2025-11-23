@@ -162,20 +162,9 @@ func CreatePatient(c *gin.Context) {
 			}
 		}
 
-		if err := tx.Create(&model.Patient{
-			FullName:       patientRequest.FullName,
-			Gender:         patientRequest.Gender,
-			Age:            patientRequest.Age,
-			Job:            patientRequest.Job,
-			Address:        patientRequest.Address,
-			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
-			PatientCode:    patientCode,
-			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
-			SurgeryHistory: patientRequest.SurgeryHistory,
-			Email:          patientRequest.Email,
-			Password:       util.HashPassword(patientRequest.Password),
-		}).Error; err != nil {
-			return err
+		// Check if patients.patient_code already registered
+		if err := tx.Where("patient_code = ?", patientCode).First(&existingPatient).Error; err == nil {
+			return fmt.Errorf("patient_code already registered")
 		}
 
 		if patientRequest.Email != "" && patientRequest.Email != "-" {
@@ -194,6 +183,22 @@ func CreatePatient(c *gin.Context) {
 					return err
 				}
 			}
+		}
+
+		if err := tx.Create(&model.Patient{
+			FullName:       patientRequest.FullName,
+			Gender:         patientRequest.Gender,
+			Age:            patientRequest.Age,
+			Job:            patientRequest.Job,
+			Address:        patientRequest.Address,
+			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
+			PatientCode:    patientCode,
+			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
+			SurgeryHistory: patientRequest.SurgeryHistory,
+			Email:          patientRequest.Email,
+			Password:       util.HashPassword(patientRequest.Password),
+		}).Error; err != nil {
+			return err
 		}
 		return nil
 	})
