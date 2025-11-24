@@ -21,7 +21,7 @@ func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string
 	query := db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
-		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name")
+		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age")
 
 	if limit > 0 {
 		query = query.Limit(limit)
