@@ -20,9 +20,9 @@ type TreatementRequest struct {
 	PatientCode   string   `json:"patient_code" binding:"required"`
 	TherapistID   uint     `json:"therapist_id" binding:"required"`
 	Issues        string   `json:"issues" binding:"required"`
-	Treatment     []string `json:"treatment" binding:"required"`
-	Remarks       string   `json:"remarks"`
-	NextVisit     string   `json:"next_visit" binding:"required"`
+	Treatment     []string `json:"treatment,omitempty"`
+	Remarks       string   `json:"remarks,omitempty"`
+	NextVisit     string   `json:"next_visit,omitempty"`
 }
 
 type ListTreatementResponse struct {
