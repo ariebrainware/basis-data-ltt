@@ -158,6 +158,14 @@ func createTherapistInDB(db *gorm.DB, req createTherapistRequest) error {
 			return err
 		}
 
+		if err := tx.Create(&model.User{
+			Name:     req.FullName,
+			Email:    req.Email,
+			Password: hashedPassword,
+			RoleID:   3,
+		}).Error; err != nil {
+			return err
+		}
 		return nil
 	})
 }
