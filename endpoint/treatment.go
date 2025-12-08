@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
@@ -109,5 +110,56 @@ func CreateTreatment(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Treatment created successfully",
 		Data: nil,
+	})
+}
+
+func UpdateTreatment(c *gin.Context) {
+	treatmentID := c.Param("id")
+	if treatmentID == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing treatment ID",
+			Err: fmt.Errorf("treatment ID is required"),
+		})
+		return
+	}
+
+	treatment := model.Treatment{}
+	if err := c.ShouldBindJSON(&treatment); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid input data",
+			Err: err,
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to database",
+			Err: err,
+		})
+		return
+	}
+
+	var existingTreatment model.Treatment
+	if err := db.First(&existingTreatment, treatmentID).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Treatment not found",
+			Err: err,
+		})
+		return
+	}
+
+	if err := db.Model(&existingTreatment).Updates(treatment).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to update treatment",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Treatment updated successfully",
+		Data: existingTreatment,
 	})
 }
