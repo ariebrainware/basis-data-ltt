@@ -71,6 +71,7 @@ func main() {
 		treatment := patient.Group("/treatment")
 		treatment.GET("", endpoint.ListTreatments)
 		treatment.POST("", endpoint.CreateTreatment)
+		treatment.PATCH("/:id", endpoint.UpdateTreatment)
 
 		auth.GET("/disease", endpoint.ListDiseases)
 		auth.POST("/disease", endpoint.CreateDisease)

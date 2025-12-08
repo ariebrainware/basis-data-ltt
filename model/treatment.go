@@ -16,10 +16,10 @@ type Treatment struct {
 }
 
 type TreatementRequest struct {
-	TreatmentDate string   `json:"treatment_date" binding:"required"`
-	PatientCode   string   `json:"patient_code" binding:"required"`
-	TherapistID   uint     `json:"therapist_id" binding:"required"`
-	Issues        string   `json:"issues" binding:"required"`
+	TreatmentDate string   `json:"treatment_date"`
+	PatientCode   string   `json:"patient_code"`
+	TherapistID   uint     `json:"therapist_id"`
+	Issues        string   `json:"issues"`
 	Treatment     []string `json:"treatment,omitempty"`
 	Remarks       string   `json:"remarks,omitempty"`
 	NextVisit     string   `json:"next_visit,omitempty"`
