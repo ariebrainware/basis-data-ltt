@@ -91,6 +91,15 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
+	var existingTreatment model.Treatment
+	if err := db.Where("treatment_date = ? AND patient_code = ?", createTreatmentRequest.TreatmentDate, createTreatmentRequest.PatientCode).First(&existingTreatment).Error; err == nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Treatment with this date already exists for this patient",
+			Err: fmt.Errorf("duplicate treatment date"),
+		})
+		return
+	}
+
 	if err := db.Create(&model.Treatment{
 		TreatmentDate: createTreatmentRequest.TreatmentDate,
 		PatientCode:   createTreatmentRequest.PatientCode,
