@@ -68,7 +68,7 @@ func ListTreatments(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Treatments fetched successfully",
-		Data: map[string]interface{}{"total": totalTreatments, "treatments": treatments},
+		Data: map[string]interface{}{"total": totalTreatments, "total_fetched": len(treatments), "treatments": treatments},
 	})
 }
 
