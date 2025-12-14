@@ -172,3 +172,45 @@ func UpdateTreatment(c *gin.Context) {
 		Data: existingTreatment,
 	})
 }
+
+func DeleteTreatment(c *gin.Context) {
+	treatmentID := c.Param("id")
+	if treatmentID == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing treatment ID",
+			Err: fmt.Errorf("treatment ID is required"),
+		})
+		return
+	}
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to connect to database",
+			Err: err,
+		})
+		return
+	}
+
+	var existingTreatment model.Treatment
+	if err := db.First(&existingTreatment, treatmentID).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Treatment not found",
+			Err: err,
+		})
+		return
+	}
+
+	if err := db.Delete(&existingTreatment).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to delete treatment",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg:  "Treatment deleted successfully",
+		Data: nil,
+	})
+}
