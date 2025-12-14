@@ -72,6 +72,7 @@ func main() {
 		treatment.GET("", endpoint.ListTreatments)
 		treatment.POST("", endpoint.CreateTreatment)
 		treatment.PATCH("/:id", endpoint.UpdateTreatment)
+		treatment.DELETE("/:id", endpoint.DeleteTreatment)
 
 		auth.GET("/disease", endpoint.ListDiseases)
 		auth.POST("/disease", endpoint.CreateDisease)
