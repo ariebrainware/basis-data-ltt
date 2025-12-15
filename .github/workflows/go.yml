@@ -22,17 +22,18 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Log in to Docker Hub
+    - name: Log in to GHCR
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build and push Docker image
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA .
-        docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA
+        docker build -t ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.dev-$SHORT_SHA .
+        docker push ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.dev-$SHORT_SHA
 
     - name: Deploy container
       run: |
@@ -41,7 +42,6 @@ jobs:
           docker stop ltt-be
           docker rm ltt-be
         fi
-        # Check if all required environment variables are set
         if [ -z "${{ secrets.APITOKEN }}" ] || [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
           echo "One or more required environment variables are missing."
           exit 1
@@ -51,7 +51,6 @@ jobs:
           --env=APITOKEN=${{ secrets.APITOKEN }} \
           --env=APPENV=${{ vars.APPENV }} \
           --env=JWTSECRET=${{ secrets.JWTSECRET }} \
-          --env=APPENV=${{ vars.APPENV }} \
           --env=APPPORT=${{ vars.APPPORT }} \
           --env=GINMODE=${{ vars.GINMODE }} \
           --env=DBHOST=${{ vars.DBHOST }} \
@@ -63,7 +62,7 @@ jobs:
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
-          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.dev-$SHORT_SHA
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.dev-$SHORT_SHA
   prod_deploy:
     runs-on: [ltt-server]
     if: github.ref == 'refs/heads/main'
@@ -76,21 +75,22 @@ jobs:
       with:
         go-version: '1.24'
 
-    - name: Log in to Docker Hub
+    - name: Log in to GHCR
       uses: docker/login-action@v3
       with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Build and push Docker image
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA .
-        docker push ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
+        docker build -t ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.prod-$SHORT_SHA .
+        docker push ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.prod-$SHORT_SHA
 
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
         docker stop ltt-be || true
         docker rm ltt-be || true
-        docker run --name=ltt-be -d -p 19091:19091 --restart=always --network=baota_net --dns=1.1.1.1 --dns=8.8.8.8 --dns-search=panel.ritalincompany.com --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPENV=${{ vars.APPENV }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ${{ secrets.DOCKER_USERNAME }}/ltt-be:v1.0.prod-$SHORT_SHA
+        docker run --name=ltt-be -d -p 19091:19091 --restart=always --network=baota_net --dns=1.1.1.1 --dns=8.8.8.8 --dns-search=panel.ritalincompany.com --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPENV=${{ vars.APPENV }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.prod-$SHORT_SHA
