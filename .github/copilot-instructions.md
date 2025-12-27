@@ -16,7 +16,7 @@ A Go REST API backend for managing patient data, treatments, and therapy session
 ### Data Flow
 1. **Request** → CORS middleware validates API token → Route handler in endpoint/
 2. **Handler** → Loads DB connection from config singleton → Uses model structs with GORM queries
-3. **Response** → Standardized via `util.CallSuccess()` / `util.CallError()` functions
+3. **Response** → Standardized via `util.CallSuccessOK()` and util error helper functions
 
 ### Critical Design Decisions
 - **Singleton Config**: `config.LoadConfig()` uses `sync.Once` for thread-safe initialization (see [config/config.go](../config/config.go))
@@ -57,7 +57,7 @@ All endpoints follow this pattern (see [endpoint/authentication.go](../endpoint/
 1. Bind JSON request: `c.ShouldBindJSON(&req)`
 2. Connect DB: `config.ConnectMySQL()`
 3. Execute query with GORM
-4. Return via util helpers: `util.CallSuccess()` or `util.CallUserError()`
+4. Return via util helpers: `util.CallSuccessOK()` or `util.CallUserError()`
 
 ### Model Structs
 - Embed `gorm.Model` for automatic ID, CreatedAt, UpdatedAt, DeletedAt
@@ -100,31 +100,33 @@ Endpoints import and use model structs directly with GORM queries. No service la
 JWT validation middleware ([middleware/middleware.go](../middleware/middleware.go)) verifies tokens but does not load user context into request (add if needed).
 
 ## Testing & Debugging
+- No automated tests currently exist in the repository
 - Gin runs in configured mode (debug/release) based on `GINMODE` env var
 - SQL query logging enabled in local/debug mode; disabled in production
-- Slow query threshold: 200ms (see [config/config.go](../config/config.go#L59))
+- Slow query threshold: 200ms (see [config/config.go](../config/config.go#L76))
+- Test API endpoints manually using tools like curl, Postman, or similar
 
 ## Key Files Reference
 | File | Purpose |
 |------|---------|
-| [main.go](main.go) | Route setup, migrations, server initialization |
-| [config/config.go](config/config.go) | Singleton config & MySQL connection |
-| [middleware/middleware.go](middleware/middleware.go) | CORS + JWT token validation |
-| [endpoint/authentication.go](endpoint/authentication.go) | Login, signup, token handling |
-| [model/patient.go](model/patient.go) | Patient entity with GORM tags |
-| [util/helperfunc.go](util/helperfunc.go) | Standardized error/success responses |
+| [main.go](../main.go) | Route setup, migrations, server initialization |
+| [config/config.go](../config/config.go) | Singleton config & MySQL connection |
+| [middleware/middleware.go](../middleware/middleware.go) | CORS + JWT token validation |
+| [endpoint/authentication.go](../endpoint/authentication.go) | Login, signup, token handling |
+| [model/patient.go](../model/patient.go) | Patient entity with GORM tags |
+| [util/helperfunc.go](../util/helperfunc.go) | Standardized error/success responses |
 
 ## Common Tasks
 
 ### Adding a New Entity
-1. Create model struct in [model/](model/) with `gorm.Model` and JSON tags
+1. Create model struct in [model/](../model/) with `gorm.Model` and JSON tags
 2. Add to auto-migration list in [main.go](../main.go)
-3. Create endpoint handlers in [endpoint/](endpoint/) following existing patterns
+3. Create endpoint handlers in [endpoint/](../endpoint/) following existing patterns
 4. Register routes in main.go route groups
 5. Use util error functions for responses
 
 ### Modifying Authentication
-JWT implementation in [endpoint/token.go](endpoint/token.go); middleware validation in [middleware/middleware.go](middleware/middleware.go#L88). Token expiry and claims logic centralized in token.go.
+JWT implementation in [endpoint/token.go](../endpoint/token.go); middleware validation in [middleware/middleware.go](../middleware/middleware.go). Token expiry and claims logic centralized in token.go.
 
 ### Database Schema Changes
 Models control schema via GORM tags. Update struct → update migration list → restart server. Use `gorm.Model` for standard audit fields.
