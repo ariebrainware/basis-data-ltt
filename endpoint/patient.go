@@ -81,7 +81,7 @@ func ListPatients(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Patients retrieved",
-		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
+		Data: map[string]interface{}{"total": totalPatient, "total_fetched": len(patients), "patients": patients},
 	})
 }
 
