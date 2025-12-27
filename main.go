@@ -27,6 +27,7 @@ func main() {
 	}
 	time.Local = location
 
+	// Initialize database once
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
@@ -49,6 +50,8 @@ func main() {
 
 	// Use custom CORS middleware
 	r.Use(middleware.CORSMiddleware())
+	// Pass db to all handlers via context middleware
+	r.Use(middleware.DatabaseMiddleware(db))
 
 	// Basic HTTP handler for root path
 	r.GET("/", func(c *gin.Context) {

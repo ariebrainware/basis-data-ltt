@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -34,14 +34,9 @@ func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	return query
 }
 
-func fetchPatients(limit, offset, therapistID int, keyword, groupByDate string) ([]model.Patient, int64, error) {
+func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.Patient, int64, error) {
 	var patients []model.Patient
 	var totalPatient int64
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		return nil, 0, err
-	}
 
 	query := db.Offset(offset).Order("created_at DESC")
 	if limit > 0 {
@@ -66,7 +61,16 @@ func fetchPatients(limit, offset, therapistID int, keyword, groupByDate string) 
 func ListPatients(c *gin.Context) {
 	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
 
-	patients, totalPatient, err := fetchPatients(limit, offset, therapistID, keyword, groupByDate)
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return
+	}
+
+	patients, totalPatient, err := fetchPatients(db, limit, offset, therapistID, keyword, groupByDate)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",
@@ -77,7 +81,7 @@ func ListPatients(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Patients retrieved",
-		Data: map[string]interface{}{"total": totalPatient, "patients": patients},
+		Data: map[string]interface{}{"total": totalPatient, "total_fetched": len(patients), "patients": patients},
 	})
 }
 
@@ -113,11 +117,12 @@ func CreatePatient(c *gin.Context) {
 		})
 		return
 	}
-	db, err := config.ConnectMySQL()
-	if err != nil {
+
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -236,11 +241,11 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -277,23 +282,14 @@ func getInitials(fullName string) string {
 	return initials
 }
 
-func getPatientByID(c *gin.Context) (string, *gorm.DB, model.Patient, error) {
+func getPatientByID(c *gin.Context, db *gorm.DB) (string, model.Patient, error) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing patient ID",
 			Err: fmt.Errorf("patient ID is required"),
 		})
-		return "", nil, model.Patient{}, fmt.Errorf("patient ID is required")
-	}
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
-		})
-		return "", nil, model.Patient{}, err
+		return "", model.Patient{}, fmt.Errorf("patient ID is required")
 	}
 
 	var patient model.Patient
@@ -302,14 +298,23 @@ func getPatientByID(c *gin.Context) (string, *gorm.DB, model.Patient, error) {
 			Msg: "Patient not found",
 			Err: err,
 		})
-		return "", nil, model.Patient{}, err
+		return "", model.Patient{}, err
 	}
 
-	return id, db, patient, nil
+	return id, patient, nil
 }
 
 func DeletePatient(c *gin.Context) {
-	_, db, patient, err := getPatientByID(c)
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return
+	}
+
+	_, patient, err := getPatientByID(c, db)
 	if err != nil {
 		return
 	}
@@ -328,7 +333,16 @@ func DeletePatient(c *gin.Context) {
 }
 
 func GetPatientInfo(c *gin.Context) {
-	_, _, patient, err := getPatientByID(c)
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return
+	}
+
+	_, patient, err := getPatientByID(c, db)
 	if err != nil {
 		return
 	}

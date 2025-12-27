@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -14,11 +14,11 @@ func ListDiseases(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -55,11 +55,11 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -103,11 +103,11 @@ func UpdateDisease(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -145,11 +145,11 @@ func DeleteDisease(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -187,11 +187,11 @@ func GetDiseaseInfo(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}

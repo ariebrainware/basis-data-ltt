@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -18,10 +18,9 @@ func ValidateToken(c *gin.Context) {
 		return
 	}
 
-	// Connect to the database
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to MySQL"})
+	db := middleware.GetDB(c)
+	if db == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection not available"})
 		c.Abort()
 		return
 	}
@@ -31,7 +30,7 @@ func ValidateToken(c *gin.Context) {
 		model.Session
 		Role string `json:"role"`
 	}
-	err = db.Table("sessions").
+	err := db.Table("sessions").
 		Select("sessions.*, roles.name as role").
 		Joins("JOIN users ON sessions.user_id = users.id").
 		Joins("JOIN roles ON users.role_id = roles.id").

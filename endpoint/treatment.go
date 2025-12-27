@@ -4,18 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		return nil, 0, err
-	}
-
+func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
 	var treatments []model.ListTreatementResponse
 	var totalTreatments int64
 
@@ -55,9 +51,18 @@ func fetchTreatments(limit, offset, therapistID int, keyword, groupByDate string
 }
 
 func ListTreatments(c *gin.Context) {
-	limit, offset, keyword, therapistID, groupByDate := parseQueryParams(c)
+	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
 
-	treatments, totalTreatments, err := fetchTreatments(limit, offset, keyword, therapistID, groupByDate)
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return
+	}
+
+	treatments, totalTreatments, err := fetchTreatments(db, limit, offset, therapistID, keyword, groupByDate)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to fetch treatments",
@@ -82,11 +87,11 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to database",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -141,11 +146,11 @@ func UpdateTreatment(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to database",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -183,11 +188,11 @@ func DeleteTreatment(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to database",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
