@@ -48,6 +48,7 @@ Key variables (see README.md for full list):
 - `APPENV`: local|production (controls logging verbosity)
 - `APPPORT`: Server port (default 19091)
 - `APITOKEN`: Bearer token for API validation
+- `JWTSECRET`: Secret key for JWT token signing and password hashing (required)
 - `DBHOST`, `DBPORT`, `DBNAME`, `DBUSER`, `DBPASS`: MySQL connection
 
 ## Code Patterns & Conventions
@@ -63,6 +64,11 @@ All endpoints follow this pattern (see [endpoint/authentication.go](../endpoint/
 - Embed `gorm.Model` for automatic ID, CreatedAt, UpdatedAt, DeletedAt
 - Use struct tags for JSON serialization and GORM column mapping
 - Example: [model/patient.go](../model/patient.go) - FullName mapped to full_name column
+
+### Password Hashing
+- Passwords are hashed using HMAC-SHA256 with `JWTSECRET` as the key (see [util/password.go](../util/password.go))
+- The same `JWTSECRET` is used for JWT token signing
+- Use `util.HashPassword()` function for all password operations
 
 ### Error Handling
 Use util package error functions (see [util/helperfunc.go](../util/helperfunc.go)):
