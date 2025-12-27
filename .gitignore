@@ -2,3 +2,10 @@ mysql-data/
 .idea/
 .env
 .env.*
+
+# Build artifacts
+ltt-be
+*.exe
+*.dll
+*.so
+*.dylib
