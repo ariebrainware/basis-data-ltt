@@ -65,7 +65,7 @@ func main() {
 	})
 	// Group routes that require a valid login token
 	auth := r.Group("/")
-	auth.Use(middleware.ValidateLoginToken(db))
+	auth.Use(middleware.ValidateLoginToken())
 	{
 		auth.DELETE("/logout", endpoint.Logout)
 
