@@ -103,8 +103,17 @@ func GetDB(c *gin.Context) *gorm.DB {
 	return db.(*gorm.DB)
 }
 
-func ValidateLoginToken(db *gorm.DB) gin.HandlerFunc {
+func ValidateLoginToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		db := GetDB(c)
+		if db == nil {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Database connection not available in context",
+				Err: fmt.Errorf("database connection not available in context"),
+			})
+			c.Abort()
+			return
+		}
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
