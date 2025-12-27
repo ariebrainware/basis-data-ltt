@@ -14,11 +14,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
-
-// Global database instance
-var db *gorm.DB
 
 func main() {
 	// Load the configuration
@@ -32,7 +28,7 @@ func main() {
 	time.Local = location
 
 	// Initialize database once
-	db, err = config.ConnectMySQL()
+	db, err := config.ConnectMySQL()
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
