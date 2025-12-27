@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -33,11 +33,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -50,11 +50,12 @@ func Login(c *gin.Context) {
 			Msg: "Invalid request payload",
 			Err: fmt.Errorf("password cannot be empty"),
 		})
+		return
 	}
 
 	// Check if user exists
 	var User model.User
-	err = db.Model(&User).Where("email = ? AND password = ?", req.Email, hashedPassword).First(&User).Error
+	err := db.Model(&User).Where("email = ? AND password = ?", req.Email, hashedPassword).First(&User).Error
 	if err == gorm.ErrRecordNotFound {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "User not found, please sign up first",
@@ -73,7 +74,7 @@ func Login(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	// Create JWT token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"email": User.Email,
@@ -126,12 +127,11 @@ func Logout(c *gin.Context) {
 		return
 	}
 
-	// Connect to the database
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
@@ -178,16 +178,17 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	db, err := config.ConnectMySQL()
-	if err != nil {
+	db := middleware.GetDB(c)
+	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to connect to MySQL",
-			Err: err,
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
+
 	var existingUser *model.User
-	err = db.First(&existingUser, "email = ?", req.Email).Error
+	err := db.First(&existingUser, "email = ?", req.Email).Error
 	if err == gorm.ErrRecordNotFound {
 		fmt.Println(err)
 	}

@@ -14,7 +14,11 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+// Global database instance
+var db *gorm.DB
 
 func main() {
 	// Load the configuration
@@ -27,7 +31,8 @@ func main() {
 	}
 	time.Local = location
 
-	db, err := config.ConnectMySQL()
+	// Initialize database once
+	db, err = config.ConnectMySQL()
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
@@ -49,6 +54,8 @@ func main() {
 
 	// Use custom CORS middleware
 	r.Use(middleware.CORSMiddleware())
+	// Pass db to all handlers via context middleware
+	r.Use(middleware.DatabaseMiddleware(db))
 
 	// Basic HTTP handler for root path
 	r.GET("/", func(c *gin.Context) {
@@ -58,7 +65,7 @@ func main() {
 	})
 	// Group routes that require a valid login token
 	auth := r.Group("/")
-	auth.Use(middleware.ValidateLoginToken())
+	auth.Use(middleware.ValidateLoginToken(db))
 	{
 		auth.DELETE("/logout", endpoint.Logout)
 

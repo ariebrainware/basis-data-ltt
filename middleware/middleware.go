@@ -7,11 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+const DBKey = "db"
 
 func tokenValidator(c *gin.Context, expectedToken string) bool {
 	if c.Request.Method == http.MethodOptions {
@@ -84,7 +86,24 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-func ValidateLoginToken() gin.HandlerFunc {
+// DatabaseMiddleware injects the database connection into the context
+func DatabaseMiddleware(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set(DBKey, db)
+		c.Next()
+	}
+}
+
+// GetDB retrieves the database from the Gin context
+func GetDB(c *gin.Context) *gorm.DB {
+	db, exists := c.Get(DBKey)
+	if !exists {
+		return nil
+	}
+	return db.(*gorm.DB)
+}
+
+func ValidateLoginToken(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
@@ -92,14 +111,6 @@ func ValidateLoginToken() gin.HandlerFunc {
 				Msg: "Session token not provided",
 				Err: fmt.Errorf("session token not provided"),
 			})
-			c.Abort()
-			return
-		}
-
-		// Connect to the database
-		db, err := config.ConnectMySQL()
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to MySQL"})
 			c.Abort()
 			return
 		}
