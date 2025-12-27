@@ -51,7 +51,7 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 }
 
 func ListTreatments(c *gin.Context) {
-	limit, offset, keyword, therapistID, groupByDate := parseQueryParams(c)
+	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -62,7 +62,7 @@ func ListTreatments(c *gin.Context) {
 		return
 	}
 
-	treatments, totalTreatments, err := fetchTreatments(db, limit, offset, keyword, therapistID, groupByDate)
+	treatments, totalTreatments, err := fetchTreatments(db, limit, offset, therapistID, keyword, groupByDate)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to fetch treatments",
