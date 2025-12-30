@@ -105,10 +105,34 @@ func ListTreatments(c *gin.Context) {
 		sessionToken := c.GetHeader("session-token")
 		sessionTherapistID, err := getTherapistIDFromSession(db, sessionToken)
 		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{
-				Msg: "Failed to get therapist ID from session",
-				Err: err,
-			})
+			// Provide more specific error messages based on the root cause
+			switch {
+			case strings.Contains(err.Error(), "session token is empty"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Session token is missing in 'session-token' header",
+					Err: err,
+				})
+			case strings.Contains(err.Error(), "session not found"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Session not found or has expired",
+					Err: err,
+				})
+			case strings.Contains(err.Error(), "user not found"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "User associated with the session was not found",
+					Err: err,
+				})
+			case strings.Contains(err.Error(), "therapist not found"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Therapist associated with the user was not found",
+					Err: err,
+				})
+			default:
+				util.CallServerError(c, util.APIErrorParams{
+					Msg: "Failed to get therapist ID from session",
+					Err: err,
+				})
+			}
 			return
 		}
 		therapistID = int(sessionTherapistID)
