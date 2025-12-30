@@ -11,6 +11,32 @@ import (
 	"gorm.io/gorm"
 )
 
+func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
+	if sessionToken == "" {
+		return 0, fmt.Errorf("session token is empty")
+	}
+
+	// Get session from database
+	var session model.Session
+	if err := db.Where("session_token = ?", sessionToken).First(&session).Error; err != nil {
+		return 0, fmt.Errorf("session not found: %w", err)
+	}
+
+	// Get user from session
+	var user model.User
+	if err := db.Where("id = ?", session.UserID).First(&user).Error; err != nil {
+		return 0, fmt.Errorf("user not found: %w", err)
+	}
+
+	// Get therapist by email
+	var therapist model.Therapist
+	if err := db.Where("email = ?", user.Email).First(&therapist).Error; err != nil {
+		return 0, fmt.Errorf("therapist not found for user: %w", err)
+	}
+
+	return therapist.ID, nil
+}
+
 func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
 	var treatments []model.ListTreatementResponse
 	var totalTreatments int64
@@ -52,6 +78,7 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 
 func ListTreatments(c *gin.Context) {
 	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
+	filterByTherapist := c.Query("filter_by_therapist") == "true"
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -60,6 +87,20 @@ func ListTreatments(c *gin.Context) {
 			Err: fmt.Errorf("db is nil"),
 		})
 		return
+	}
+
+	// If filter_by_therapist is true, get therapist ID from session
+	if filterByTherapist {
+		sessionToken := c.GetHeader("session-token")
+		sessionTherapistID, err := getTherapistIDFromSession(db, sessionToken)
+		if err != nil {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to get therapist ID from session",
+				Err: err,
+			})
+			return
+		}
+		therapistID = int(sessionTherapistID)
 	}
 
 	treatments, totalTreatments, err := fetchTreatments(db, limit, offset, therapistID, keyword, groupByDate)
