@@ -3,6 +3,7 @@ package endpoint
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -10,6 +11,31 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
+	if sessionToken == "" {
+		return 0, fmt.Errorf("session token is empty")
+	}
+
+	var therapistID uint
+
+	// Single query to join sessions, users, and therapists and fetch therapist ID
+	// Includes validation: session not expired, not soft-deleted, and user has therapist role (role_id = 3)
+	err := db.Table("sessions").
+		Select("therapists.id").
+		Joins("JOIN users ON users.id = sessions.user_id").
+		Joins("JOIN therapists ON therapists.email = users.email").
+		Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.role_id = 3", sessionToken, time.Now()).
+		Scan(&therapistID).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve therapist from session: %w", err)
+	}
+	if therapistID == 0 {
+		return 0, fmt.Errorf("therapist not found for session")
+	}
+
+	return therapistID, nil
+}
 
 func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
 	var treatments []model.ListTreatementResponse
@@ -43,7 +69,20 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		return nil, 0, err
 	}
 
-	if err := db.Model(&model.Treatment{}).Count(&totalTreatments).Error; err != nil {
+	// Count total with the same filters (without limit/offset)
+	countQuery := db.Table("treatments").
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
+		Where("patients.deleted_at IS NULL")
+	if keyword != "" {
+		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+	}
+	if therapistID != 0 {
+		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
+	}
+	if groupByDate != "" {
+		countQuery = countQuery.Where("treatments.treatment_date like ?", groupByDate+"%")
+	}
+	if err := countQuery.Count(&totalTreatments).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -52,6 +91,7 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 
 func ListTreatments(c *gin.Context) {
 	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
+	filterByTherapist := c.Query("filter_by_therapist") == "true"
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -60,6 +100,44 @@ func ListTreatments(c *gin.Context) {
 			Err: fmt.Errorf("db is nil"),
 		})
 		return
+	}
+
+	// If filter_by_therapist is true, get therapist ID from session
+	if filterByTherapist {
+		sessionToken := c.GetHeader("session-token")
+		sessionTherapistID, err := getTherapistIDFromSession(db, sessionToken)
+		if err != nil {
+			// Provide more specific error messages based on the root cause
+			switch {
+			case strings.Contains(err.Error(), "session token is empty"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Session token is missing in 'session-token' header",
+					Err: err,
+				})
+			case strings.Contains(err.Error(), "session not found"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Session not found or has expired",
+					Err: err,
+				})
+			case strings.Contains(err.Error(), "user not found"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "User associated with the session was not found",
+					Err: err,
+				})
+			case strings.Contains(err.Error(), "therapist not found"):
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Therapist associated with the user was not found",
+					Err: err,
+				})
+			default:
+				util.CallServerError(c, util.APIErrorParams{
+					Msg: "Failed to get therapist ID from session",
+					Err: err,
+				})
+			}
+			return
+		}
+		therapistID = int(sessionTherapistID)
 	}
 
 	treatments, totalTreatments, err := fetchTreatments(db, limit, offset, therapistID, keyword, groupByDate)
