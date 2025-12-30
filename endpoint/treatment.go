@@ -69,7 +69,20 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		return nil, 0, err
 	}
 
-	if err := db.Model(&model.Treatment{}).Count(&totalTreatments).Error; err != nil {
+	// Count total with the same filters (without limit/offset)
+	countQuery := db.Table("treatments").
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
+		Where("patients.deleted_at IS NULL")
+	if keyword != "" {
+		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+	}
+	if therapistID != 0 {
+		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
+	}
+	if groupByDate != "" {
+		countQuery = countQuery.Where("treatments.treatment_date like ?", groupByDate+"%")
+	}
+	if err := countQuery.Count(&totalTreatments).Error; err != nil {
 		return nil, 0, err
 	}
 
