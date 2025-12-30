@@ -16,25 +16,23 @@ func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
 		return 0, fmt.Errorf("session token is empty")
 	}
 
-	// Get session from database
-	var session model.Session
-	if err := db.Where("session_token = ?", sessionToken).First(&session).Error; err != nil {
-		return 0, fmt.Errorf("session not found: %w", err)
+	var therapistID uint
+
+	// Single query to join sessions, users, and therapists and fetch therapist ID
+	err := db.Table("sessions").
+		Select("therapists.id").
+		Joins("JOIN users ON users.id = sessions.user_id").
+		Joins("JOIN therapists ON therapists.email = users.email").
+		Where("sessions.session_token = ?", sessionToken).
+		Scan(&therapistID).Error
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve therapist from session: %w", err)
+	}
+	if therapistID == 0 {
+		return 0, fmt.Errorf("therapist not found for session")
 	}
 
-	// Get user from session
-	var user model.User
-	if err := db.Where("id = ?", session.UserID).First(&user).Error; err != nil {
-		return 0, fmt.Errorf("user not found: %w", err)
-	}
-
-	// Get therapist by email
-	var therapist model.Therapist
-	if err := db.Where("email = ?", user.Email).First(&therapist).Error; err != nil {
-		return 0, fmt.Errorf("therapist not found for user: %w", err)
-	}
-
-	return therapist.ID, nil
+	return therapistID, nil
 }
 
 func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
