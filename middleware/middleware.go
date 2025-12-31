@@ -112,7 +112,11 @@ func GetUserID(c *gin.Context) (uint, bool) {
 	if !exists {
 		return 0, false
 	}
-	return userID.(uint), true
+	id, ok := userID.(uint)
+	if !ok {
+		return 0, false
+	}
+	return id, true
 }
 
 // GetRoleID retrieves the role ID from the Gin context
@@ -196,8 +200,18 @@ func ValidateLoginToken() gin.HandlerFunc {
 			Take(&result).Error
 		if err != nil {
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Session not found",
-				Err: fmt.Errorf("session not found"),
+				Msg: "Invalid or expired session token",
+				Err: fmt.Errorf("failed to validate session: %w", err),
+			})
+			c.Abort()
+			return
+		}
+
+		// If no matching session was found, treat as unauthorized
+		if result.UserID == 0 {
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Invalid or expired session token",
+				Err: fmt.Errorf("no active session found for provided token"),
 			})
 			c.Abort()
 			return

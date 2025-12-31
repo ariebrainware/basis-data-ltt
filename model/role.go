@@ -6,6 +6,13 @@ import (
 	"gorm.io/gorm"
 )
 
+// Role ID constants
+const (
+	RoleAdmin     uint32 = 1
+	RoleUser      uint32 = 2
+	RoleTherapist uint32 = 3
+)
+
 type Role struct {
 	gorm.Model
 	ID   uint32 `gorm:"primary_key;auto_increment" json:"id"`

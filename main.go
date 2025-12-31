@@ -66,9 +66,9 @@ func main() {
 		// Logout is available to all authenticated users
 		auth.DELETE("/logout", endpoint.Logout)
 
-		// Patient routes - accessible by Admin (1) only
+		// Patient routes - accessible by Admin only
 		patient := auth.Group("/patient")
-		patient.Use(middleware.RequireRole(1)) // Admin only
+		patient.Use(middleware.RequireRole(model.RoleAdmin))
 		{
 			patient.GET("", endpoint.ListPatients)
 			patient.GET("/:id", endpoint.GetPatientInfo)
@@ -76,9 +76,9 @@ func main() {
 			patient.DELETE("/:id", endpoint.DeletePatient)
 		}
 
-		// Treatment routes - accessible by Admin (1) and Therapist (3)
+		// Treatment routes - accessible by Admin and Therapist
 		treatment := auth.Group("/treatment")
-		treatment.Use(middleware.RequireRole(1, 3)) // Admin and Therapist
+		treatment.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
 		{
 			treatment.GET("", endpoint.ListTreatments)
 			treatment.POST("", endpoint.CreateTreatment)
@@ -86,9 +86,9 @@ func main() {
 			treatment.DELETE("/:id", endpoint.DeleteTreatment)
 		}
 
-		// Disease routes - accessible by Admin (1) only
+		// Disease routes - accessible by Admin only
 		disease := auth.Group("/disease")
-		disease.Use(middleware.RequireRole(1)) // Admin only
+		disease.Use(middleware.RequireRole(model.RoleAdmin))
 		{
 			disease.GET("", endpoint.ListDiseases)
 			disease.POST("", endpoint.CreateDisease)
@@ -97,9 +97,9 @@ func main() {
 			disease.DELETE("/:id", endpoint.DeleteDisease)
 		}
 
-		// Therapist routes - accessible by Admin (1) only
+		// Therapist routes - accessible by Admin only
 		therapist := auth.Group("/therapist")
-		therapist.Use(middleware.RequireRole(1)) // Admin only
+		therapist.Use(middleware.RequireRole(model.RoleAdmin))
 		{
 			therapist.GET("", endpoint.ListTherapist)
 			therapist.GET("/:id", endpoint.GetTherapistInfo)
