@@ -63,33 +63,51 @@ func main() {
 	auth := r.Group("/")
 	auth.Use(middleware.ValidateLoginToken())
 	{
+		// Logout is available to all authenticated users
 		auth.DELETE("/logout", endpoint.Logout)
 
+		// Patient routes - accessible by Admin only
 		patient := auth.Group("/patient")
-		patient.GET("", endpoint.ListPatients)
-		patient.GET("/:id", endpoint.GetPatientInfo)
-		patient.PATCH("/:id", endpoint.UpdatePatient)
-		patient.DELETE("/:id", endpoint.DeletePatient)
+		patient.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			patient.GET("", endpoint.ListPatients)
+			patient.GET("/:id", endpoint.GetPatientInfo)
+			patient.PATCH("/:id", endpoint.UpdatePatient)
+			patient.DELETE("/:id", endpoint.DeletePatient)
+		}
 
-		treatment := patient.Group("/treatment")
-		treatment.GET("", endpoint.ListTreatments)
-		treatment.POST("", endpoint.CreateTreatment)
-		treatment.PATCH("/:id", endpoint.UpdateTreatment)
-		treatment.DELETE("/:id", endpoint.DeleteTreatment)
+		// Treatment routes - accessible by Admin and Therapist
+		treatment := auth.Group("/treatment")
+		treatment.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
+		{
+			treatment.GET("", endpoint.ListTreatments)
+			treatment.POST("", endpoint.CreateTreatment)
+			treatment.PATCH("/:id", endpoint.UpdateTreatment)
+			treatment.DELETE("/:id", endpoint.DeleteTreatment)
+		}
 
-		auth.GET("/disease", endpoint.ListDiseases)
-		auth.POST("/disease", endpoint.CreateDisease)
-		auth.GET("/disease/:id", endpoint.GetDiseaseInfo)
-		auth.PATCH("/disease/:id", endpoint.UpdateDisease)
-		auth.DELETE("/disease/:id", endpoint.DeleteDisease)
+		// Disease routes - accessible by Admin only
+		disease := auth.Group("/disease")
+		disease.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			disease.GET("", endpoint.ListDiseases)
+			disease.POST("", endpoint.CreateDisease)
+			disease.GET("/:id", endpoint.GetDiseaseInfo)
+			disease.PATCH("/:id", endpoint.UpdateDisease)
+			disease.DELETE("/:id", endpoint.DeleteDisease)
+		}
 
-		therapist := auth.Group("therapist")
-		therapist.GET("", endpoint.ListTherapist)
-		therapist.POST("", endpoint.CreateTherapist)
-		therapist.GET("/:id", endpoint.GetTherapistInfo)
-		therapist.PATCH("/:id", endpoint.UpdateTherapist)
-		therapist.DELETE("/:id", endpoint.DeleteTherapist)
-		therapist.PUT("/:id", endpoint.TherapistApproval)
+		// Therapist routes - accessible by Admin only
+		therapist := auth.Group("/therapist")
+		therapist.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			therapist.GET("", endpoint.ListTherapist)
+			therapist.GET("/:id", endpoint.GetTherapistInfo)
+			therapist.POST("", endpoint.CreateTherapist)
+			therapist.PATCH("/:id", endpoint.UpdateTherapist)
+			therapist.DELETE("/:id", endpoint.DeleteTherapist)
+			therapist.PUT("/:id", endpoint.TherapistApproval)
+		}
 	}
 
 	// the exception for create patient so it can be accessed without login
