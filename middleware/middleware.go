@@ -188,7 +188,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 		err := db.Table("sessions").
 			Select("sessions.user_id, users.role_id").
 			Joins("JOIN users ON users.id = sessions.user_id").
-			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL", sessionToken, time.Now()).
+			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.deleted_at IS NULL", sessionToken, time.Now()).
 			Scan(&result).Error
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session not found"})
