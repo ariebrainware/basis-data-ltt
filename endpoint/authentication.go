@@ -18,8 +18,9 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
-	Role  string `json:"role"`
+	Token  string `json:"token"`
+	Role   string `json:"role"`
+	UserID uint   `json:"user-id"`
 }
 
 func Login(c *gin.Context) {
@@ -111,7 +112,7 @@ func Login(c *gin.Context) {
 	// Return the token in a JSON response
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Login successful",
-		Data: LoginResponse{Token: tokenString, Role: role.Name},
+		Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: User.ID},
 	})
 }
 
