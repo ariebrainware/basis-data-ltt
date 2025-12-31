@@ -195,7 +195,10 @@ func ValidateLoginToken() gin.HandlerFunc {
 			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.deleted_at IS NULL", sessionToken, time.Now()).
 			Take(&result).Error
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session not found"})
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Session not found",
+				Err: fmt.Errorf("session not found"),
+			})
 			c.Abort()
 			return
 		}
