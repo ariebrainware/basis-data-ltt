@@ -66,16 +66,16 @@ func main() {
 		// Logout is available to all authenticated users
 		auth.DELETE("/logout", endpoint.Logout)
 
-		// Patient routes - accessible by Admin (1) and Therapist (3)
+		// Patient routes - accessible by Admin (1) only
 		patient := auth.Group("/patient")
-		patient.Use(middleware.RequireRole(1, 3)) // Admin and Therapist
+		patient.Use(middleware.RequireRole(1)) // Admin only
 		{
 			patient.GET("", endpoint.ListPatients)
 			patient.GET("/:id", endpoint.GetPatientInfo)
 			patient.PATCH("/:id", endpoint.UpdatePatient)
 			patient.DELETE("/:id", endpoint.DeletePatient)
 
-			// Treatment routes - accessible by Admin (1) and Therapist (3)
+			// Treatment routes - accessible by Admin (1) only
 			treatment := patient.Group("/treatment")
 			{
 				treatment.GET("", endpoint.ListTreatments)
@@ -96,20 +96,16 @@ func main() {
 			disease.DELETE("/:id", endpoint.DeleteDisease)
 		}
 
-		// Therapist routes - accessible by Admin (1) and Therapist (3)
+		// Therapist routes - accessible by Admin (1) only
 		therapist := auth.Group("/therapist")
+		therapist.Use(middleware.RequireRole(1)) // Admin only
 		{
-			// List and get therapist info - accessible by Admin and Therapist
-			therapist.GET("", middleware.RequireRole(1, 3), endpoint.ListTherapist)
-			therapist.GET("/:id", middleware.RequireRole(1, 3), endpoint.GetTherapistInfo)
-			
-			// Create, update, delete therapist - Admin only
-			therapist.POST("", middleware.RequireRole(1), endpoint.CreateTherapist)
-			therapist.PATCH("/:id", middleware.RequireRole(1), endpoint.UpdateTherapist)
-			therapist.DELETE("/:id", middleware.RequireRole(1), endpoint.DeleteTherapist)
-			
-			// Therapist approval - Admin only
-			therapist.PUT("/:id", middleware.RequireRole(1), endpoint.TherapistApproval)
+			therapist.GET("", endpoint.ListTherapist)
+			therapist.GET("/:id", endpoint.GetTherapistInfo)
+			therapist.POST("", endpoint.CreateTherapist)
+			therapist.PATCH("/:id", endpoint.UpdateTherapist)
+			therapist.DELETE("/:id", endpoint.DeleteTherapist)
+			therapist.PUT("/:id", endpoint.TherapistApproval)
 		}
 	}
 
