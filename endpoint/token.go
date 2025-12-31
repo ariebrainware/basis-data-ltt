@@ -16,6 +16,7 @@ import (
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Security     SessionToken
 // @Success      200 {object} util.APIResponse "Valid session token"
 // @Failure      401 {object} util.APIResponse "Invalid or expired session token"

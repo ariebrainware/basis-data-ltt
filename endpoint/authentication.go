@@ -29,6 +29,7 @@ type LoginResponse struct {
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        request body LoginRequest true "Login credentials"
 // @Success      200 {object} util.APIResponse{data=LoginResponse} "Login successful"
 // @Failure      400 {object} util.APIResponse "Invalid request payload"
@@ -133,6 +134,7 @@ func Login(c *gin.Context) {
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Security     SessionToken
 // @Success      200 {object} util.APIResponse "Logout successful"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
@@ -197,6 +199,7 @@ type SignupRequest struct {
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        request body SignupRequest true "Signup details"
 // @Success      200 {object} util.APIResponse{data=string} "Signup successful"
 // @Failure      400 {object} util.APIResponse "Invalid request or email already exists"
