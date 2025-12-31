@@ -20,7 +20,7 @@ type LoginRequest struct {
 type LoginResponse struct {
 	Token  string `json:"token"`
 	Role   string `json:"role"`
-	UserID uint   `json:"user-id"`
+	UserID uint   `json:"user_id"`
 }
 
 func Login(c *gin.Context) {
