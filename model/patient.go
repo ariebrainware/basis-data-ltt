@@ -6,7 +6,6 @@ import "gorm.io/gorm"
 // @Description Patient information
 type Patient struct {
 	gorm.Model
-	ID             uint   `json:"id" example:"1"`
 	FullName       string `json:"full_name" gorm:"column:full_name" example:"John Doe"`
 	Password       string `json:"password" gorm:"column:password" example:"hashed_password"`
 	Gender         string `json:"gender" gorm:"column:gender" example:"Male"`
