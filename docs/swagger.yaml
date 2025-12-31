@@ -1,0 +1,1300 @@
+basePath: /
+definitions:
+  endpoint.LoginRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: password123
+        type: string
+    type: object
+  endpoint.LoginResponse:
+    properties:
+      role:
+        example: Admin
+        type: string
+      token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user_id:
+        example: 1
+        type: integer
+    type: object
+  endpoint.SignupRequest:
+    properties:
+      email:
+        example: john@example.com
+        type: string
+      name:
+        example: John Doe
+        type: string
+      password:
+        example: password123
+        type: string
+    type: object
+  endpoint.createDiseaseRequest:
+    properties:
+      description:
+        example: A metabolic disease
+        type: string
+      name:
+        example: Diabetes
+        type: string
+    type: object
+  endpoint.createPatientRequest:
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      age:
+        example: 30
+        type: integer
+      email:
+        example: john@example.com
+        type: string
+      full_name:
+        example: John Doe
+        type: string
+      gender:
+        example: Male
+        type: string
+      health_history:
+        example:
+        - Diabetes
+        - Hypertension
+        items:
+          type: string
+        type: array
+      job:
+        example: Engineer
+        type: string
+      password:
+        example: password123
+        type: string
+      patient_code:
+        example: J001
+        type: string
+      phone_number:
+        example:
+        - "081234567890"
+        - "081234567891"
+        items:
+          type: string
+        type: array
+      surgery_history:
+        example: Appendectomy 2020
+        type: string
+    type: object
+  endpoint.createTherapistRequest:
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      date_of_birth:
+        example: "1980-01-01"
+        type: string
+      email:
+        example: dr.john@example.com
+        type: string
+      full_name:
+        example: Dr. John Smith
+        type: string
+      height:
+        example: 175
+        type: integer
+      is_approved:
+        example: false
+        type: boolean
+      nik:
+        example: "1234567890123456"
+        type: string
+      password:
+        example: password123
+        type: string
+      phone_number:
+        example: "081234567890"
+        type: string
+      role:
+        example: Physical Therapist
+        type: string
+      weight:
+        example: 70
+        type: integer
+    type: object
+  gorm.DeletedAt:
+    properties:
+      time:
+        type: string
+      valid:
+        description: Valid is true if Time is not NULL
+        type: boolean
+    type: object
+  model.Disease:
+    description: Disease information
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      description:
+        example: A metabolic disease
+        type: string
+      id:
+        example: 1
+        type: integer
+      name:
+        example: Diabetes
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  model.Patient:
+    description: Patient information
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      age:
+        example: 30
+        type: integer
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      email:
+        example: john@example.com
+        type: string
+      full_name:
+        example: John Doe
+        type: string
+      gender:
+        example: Male
+        type: string
+      health_history:
+        example: Diabetes,Hypertension
+        type: string
+      id:
+        example: 1
+        type: integer
+      job:
+        example: Engineer
+        type: string
+      password:
+        example: hashed_password
+        type: string
+      patient_code:
+        example: J001
+        type: string
+      phone_number:
+        example: "081234567890"
+        type: string
+      surgery_history:
+        example: Appendectomy 2020
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  model.Therapist:
+    description: Therapist information
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      createdAt:
+        type: string
+      date_of_birth:
+        example: "1980-01-01"
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      email:
+        example: dr.john@example.com
+        type: string
+      full_name:
+        example: Dr. John Smith
+        type: string
+      height:
+        example: 175
+        type: integer
+      id:
+        example: 1
+        type: integer
+      is_approved:
+        example: false
+        type: boolean
+      nik:
+        example: "1234567890123456"
+        type: string
+      password:
+        example: hashed_password
+        type: string
+      phone_number:
+        example: "081234567890"
+        type: string
+      role:
+        example: Physical Therapist
+        type: string
+      updatedAt:
+        type: string
+      weight:
+        example: 70
+        type: integer
+    type: object
+  model.TreatementRequest:
+    description: Treatment request information
+    properties:
+      issues:
+        example: Back pain
+        type: string
+      next_visit:
+        example: "2025-01-22"
+        type: string
+      patient_code:
+        example: J001
+        type: string
+      remarks:
+        example: Patient showed improvement
+        type: string
+      therapist_id:
+        example: 1
+        type: integer
+      treatment:
+        example:
+        - Massage therapy
+        - Exercise
+        items:
+          type: string
+        type: array
+      treatment_date:
+        example: "2025-01-15"
+        type: string
+    type: object
+  model.Treatment:
+    description: Treatment information
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        example: 1
+        type: integer
+      issues:
+        example: Back pain
+        type: string
+      next_visit:
+        example: "2025-01-22"
+        type: string
+      patient_code:
+        example: J001
+        type: string
+      remarks:
+        example: Patient showed improvement
+        type: string
+      therapist_id:
+        example: 1
+        type: integer
+      treatment:
+        example: Massage therapy,Exercise
+        type: string
+      treatment_date:
+        example: "2025-01-15"
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  util.APIResponse:
+    properties:
+      data: {}
+      error:
+        type: string
+      msg:
+        type: string
+      success:
+        type: boolean
+    type: object
+host: localhost:19091
+info:
+  contact:
+    email: support@ariebrainware.com
+    name: Arie Brainware
+  description: |-
+    REST API for managing patient data, treatments, and therapy sessions
+    This API provides endpoints for patient management, disease tracking, treatment records, and therapist management.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: LTT Backend API
+  version: "1.0"
+paths:
+  /disease:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of diseases
+      parameters:
+      - default: 10
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Diseases retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Disease'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all diseases
+      tags:
+      - Disease
+    post:
+      consumes:
+      - application/json
+      description: Add a new disease to the system
+      parameters:
+      - description: Disease information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.createDiseaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disease created
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Disease'
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new disease
+      tags:
+      - Disease
+  /disease/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a disease by ID
+      parameters:
+      - description: Disease ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disease deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Disease not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete a disease
+      tags:
+      - Disease
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific disease
+      parameters:
+      - description: Disease ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disease retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Disease'
+              type: object
+        "400":
+          description: Disease not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get disease information
+      tags:
+      - Disease
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing disease's information
+      parameters:
+      - description: Disease ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated disease information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.createDiseaseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Disease updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Disease'
+              type: object
+        "400":
+          description: Invalid request or disease not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update disease information
+      tags:
+      - Disease
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/endpoint.LoginResponse'
+              type: object
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: User login
+      tags:
+      - Authentication
+  /logout:
+    delete:
+      consumes:
+      - application/json
+      description: Invalidate the user session token
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout successful
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Session not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: User logout
+      tags:
+      - Authentication
+  /patient:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of patients with optional filtering
+      parameters:
+      - description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Search keyword for patient name, code, address, or phone
+        in: query
+        name: keyword
+        type: string
+      - description: Filter by date range (last_2_days, last_3_months, last_6_months)
+        in: query
+        name: group_by_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Patients retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all patients
+      tags:
+      - Patient
+    post:
+      consumes:
+      - application/json
+      description: Register a new patient (public endpoint - no authentication required)
+      parameters:
+      - description: Patient information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.createPatientRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Patient created
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or patient already exists
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      summary: Create a new patient
+      tags:
+      - Patient
+  /patient/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a patient by ID
+      parameters:
+      - description: Patient ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Patient deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Patient not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete a patient
+      tags:
+      - Patient
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific patient
+      parameters:
+      - description: Patient ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Patient retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Patient'
+              type: object
+        "400":
+          description: Patient not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get patient information
+      tags:
+      - Patient
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing patient's information
+      parameters:
+      - description: Patient ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated patient information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Patient'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Patient updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Patient'
+              type: object
+        "400":
+          description: Invalid request or patient not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update patient information
+      tags:
+      - Patient
+  /signup:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: Signup details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.SignupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Signup successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: Invalid request or email already exists
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      summary: User signup
+      tags:
+      - Authentication
+  /therapist:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of therapists with optional filtering
+      parameters:
+      - description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Search keyword for therapist name or NIK
+        in: query
+        name: keyword
+        type: string
+      - description: Filter by date range (last_2_days, last_3_months, last_6_months)
+        in: query
+        name: group_by_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Therapist retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all therapists
+      tags:
+      - Therapist
+    post:
+      consumes:
+      - application/json
+      description: Register a new therapist in the system
+      parameters:
+      - description: Therapist information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.createTherapistRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Therapist created
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or therapist already exists
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new therapist
+      tags:
+      - Therapist
+  /therapist/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a therapist by ID
+      parameters:
+      - description: Therapist ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Therapist deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Therapist not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete a therapist
+      tags:
+      - Therapist
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific therapist
+      parameters:
+      - description: Therapist ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Therapist retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Therapist'
+              type: object
+        "400":
+          description: Therapist not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get therapist information
+      tags:
+      - Therapist
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing therapist's information (excluding approval
+        status)
+      parameters:
+      - description: Therapist ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated therapist information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Therapist'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Therapist updated
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or therapist not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update therapist information
+      tags:
+      - Therapist
+    put:
+      consumes:
+      - application/json
+      description: Approve a therapist account for system access
+      parameters:
+      - description: Therapist ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Therapist approval data (is_approved must be true)
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Therapist'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Therapist updated
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or approval error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Approve a therapist
+      tags:
+      - Therapist
+  /token/validate:
+    get:
+      consumes:
+      - application/json
+      description: Validate if the session token is valid and not expired
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Valid session token
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Invalid or expired session token
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Validate session token
+      tags:
+      - Authentication
+  /treatment:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of treatments with optional filtering by therapist,
+        keyword, and date
+      parameters:
+      - description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by therapist ID
+        in: query
+        name: therapist_id
+        type: integer
+      - description: Search keyword for patient name or patient code
+        in: query
+        name: keyword
+        type: string
+      - description: Filter by specific date (YYYY-MM-DD format)
+        in: query
+        name: group_by_date
+        type: string
+      - description: Filter by logged-in therapist
+        in: query
+        name: filter_by_therapist
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Treatments fetched successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Invalid request or session error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all treatments
+      tags:
+      - Treatment
+    post:
+      consumes:
+      - application/json
+      description: Add a new treatment record
+      parameters:
+      - description: Treatment information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.TreatementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Treatment created successfully
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or duplicate treatment
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new treatment
+      tags:
+      - Treatment
+  /treatment/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a treatment record by ID
+      parameters:
+      - description: Treatment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Treatment deleted successfully
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Treatment not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete a treatment
+      tags:
+      - Treatment
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing treatment record
+      parameters:
+      - description: Treatment ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated treatment information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Treatment'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Treatment updated successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Treatment'
+              type: object
+        "400":
+          description: Invalid request or treatment not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update treatment information
+      tags:
+      - Treatment
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+  SessionToken:
+    description: Session token for authenticated requests
+    in: header
+    name: session-token
+    type: apiKey
+swagger: "2.0"

@@ -58,6 +58,22 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 	return patients, totalPatient, nil
 }
 
+// ListPatients godoc
+// @Summary      List all patients
+// @Description  Get a paginated list of patients with optional filtering
+// @Tags         Patient
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        limit query int false "Limit number of results"
+// @Param        offset query int false "Offset for pagination"
+// @Param        keyword query string false "Search keyword for patient name, code, address, or phone"
+// @Param        group_by_date query string false "Filter by date range (last_2_days, last_3_months, last_6_months)"
+// @Success      200 {object} util.APIResponse{data=object} "Patients retrieved"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /patient [get]
 func ListPatients(c *gin.Context) {
 	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
 
@@ -86,19 +102,30 @@ func ListPatients(c *gin.Context) {
 }
 
 type createPatientRequest struct {
-	FullName       string   `json:"full_name"`
-	Gender         string   `json:"gender"`
-	Age            int      `json:"age"`
-	Job            string   `json:"job"`
-	Address        string   `json:"address"`
-	PhoneNumber    []string `json:"phone_number"`
-	HealthHistory  []string `json:"health_history"`
-	SurgeryHistory string   `json:"surgery_history"`
-	PatientCode    string   `json:"patient_code"`
-	Password       string   `json:"password,omitempty"`
-	Email          string   `json:"email,omitempty"`
+	FullName       string   `json:"full_name" example:"John Doe"`
+	Gender         string   `json:"gender" example:"Male"`
+	Age            int      `json:"age" example:"30"`
+	Job            string   `json:"job" example:"Engineer"`
+	Address        string   `json:"address" example:"123 Main St"`
+	PhoneNumber    []string `json:"phone_number" example:"081234567890,081234567891"`
+	HealthHistory  []string `json:"health_history" example:"Diabetes,Hypertension"`
+	SurgeryHistory string   `json:"surgery_history" example:"Appendectomy 2020"`
+	PatientCode    string   `json:"patient_code" example:"J001"`
+	Password       string   `json:"password,omitempty" example:"password123"`
+	Email          string   `json:"email,omitempty" example:"john@example.com"`
 }
 
+// CreatePatient godoc
+// @Summary      Create a new patient
+// @Description  Register a new patient (public endpoint - no authentication required)
+// @Tags         Patient
+// @Accept       json
+// @Produce      json
+// @Param        request body createPatientRequest true "Patient information"
+// @Success      200 {object} util.APIResponse "Patient created"
+// @Failure      400 {object} util.APIResponse "Invalid request or patient already exists"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /patient [post]
 func CreatePatient(c *gin.Context) {
 	patientRequest := createPatientRequest{}
 
@@ -222,6 +249,21 @@ func CreatePatient(c *gin.Context) {
 	})
 }
 
+// UpdatePatient godoc
+// @Summary      Update patient information
+// @Description  Update an existing patient's information
+// @Tags         Patient
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Patient ID"
+// @Param        request body model.Patient true "Updated patient information"
+// @Success      200 {object} util.APIResponse{data=model.Patient} "Patient updated"
+// @Failure      400 {object} util.APIResponse "Invalid request or patient not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /patient/{id} [patch]
 func UpdatePatient(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
@@ -304,6 +346,20 @@ func getPatientByID(c *gin.Context, db *gorm.DB) (string, model.Patient, error) 
 	return id, patient, nil
 }
 
+// DeletePatient godoc
+// @Summary      Delete a patient
+// @Description  Soft delete a patient by ID
+// @Tags         Patient
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Patient ID"
+// @Success      200 {object} util.APIResponse "Patient deleted"
+// @Failure      400 {object} util.APIResponse "Patient not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /patient/{id} [delete]
 func DeletePatient(c *gin.Context) {
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -332,6 +388,20 @@ func DeletePatient(c *gin.Context) {
 	})
 }
 
+// GetPatientInfo godoc
+// @Summary      Get patient information
+// @Description  Get detailed information about a specific patient
+// @Tags         Patient
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Patient ID"
+// @Success      200 {object} util.APIResponse{data=model.Patient} "Patient retrieved"
+// @Failure      400 {object} util.APIResponse "Patient not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /patient/{id} [get]
 func GetPatientInfo(c *gin.Context) {
 	db := middleware.GetDB(c)
 	if db == nil {

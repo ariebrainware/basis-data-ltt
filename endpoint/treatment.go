@@ -89,6 +89,25 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 	return treatments, totalTreatments, nil
 }
 
+// ListTreatments godoc
+// @Summary      List all treatments
+// @Description  Get a paginated list of treatments with optional filtering by therapist, keyword, and date
+// @Tags         Treatment
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        limit query int false "Limit number of results"
+// @Param        offset query int false "Offset for pagination"
+// @Param        therapist_id query int false "Filter by therapist ID"
+// @Param        keyword query string false "Search keyword for patient name or patient code"
+// @Param        group_by_date query string false "Filter by specific date (YYYY-MM-DD format)"
+// @Param        filter_by_therapist query boolean false "Filter by logged-in therapist"
+// @Success      200 {object} util.APIResponse{data=object} "Treatments fetched successfully"
+// @Failure      400 {object} util.APIResponse "Invalid request or session error"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /treatment [get]
 func ListTreatments(c *gin.Context) {
 	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
 	filterByTherapist := c.Query("filter_by_therapist") == "true"
@@ -155,6 +174,20 @@ func ListTreatments(c *gin.Context) {
 	})
 }
 
+// CreateTreatment godoc
+// @Summary      Create a new treatment
+// @Description  Add a new treatment record
+// @Tags         Treatment
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        request body model.TreatementRequest true "Treatment information"
+// @Success      200 {object} util.APIResponse "Treatment created successfully"
+// @Failure      400 {object} util.APIResponse "Invalid request or duplicate treatment"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /treatment [post]
 func CreateTreatment(c *gin.Context) {
 	createTreatmentRequest := model.TreatementRequest{}
 	if err := c.ShouldBindJSON(&createTreatmentRequest); err != nil {
@@ -205,6 +238,21 @@ func CreateTreatment(c *gin.Context) {
 	})
 }
 
+// UpdateTreatment godoc
+// @Summary      Update treatment information
+// @Description  Update an existing treatment record
+// @Tags         Treatment
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Treatment ID"
+// @Param        request body model.Treatment true "Updated treatment information"
+// @Success      200 {object} util.APIResponse{data=model.Treatment} "Treatment updated successfully"
+// @Failure      400 {object} util.APIResponse "Invalid request or treatment not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /treatment/{id} [patch]
 func UpdateTreatment(c *gin.Context) {
 	treatmentID := c.Param("id")
 	if treatmentID == "" {
@@ -256,6 +304,20 @@ func UpdateTreatment(c *gin.Context) {
 	})
 }
 
+// DeleteTreatment godoc
+// @Summary      Delete a treatment
+// @Description  Soft delete a treatment record by ID
+// @Tags         Treatment
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Treatment ID"
+// @Success      200 {object} util.APIResponse "Treatment deleted successfully"
+// @Failure      400 {object} util.APIResponse "Treatment not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /treatment/{id} [delete]
 func DeleteTreatment(c *gin.Context) {
 	treatmentID := c.Param("id")
 	if treatmentID == "" {

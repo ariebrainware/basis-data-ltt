@@ -33,10 +33,28 @@ var once sync.Once
 // LoadConfig loads the environment variables from a .env file, and returns a singleton Config instance.
 func LoadConfig() *Config {
 	once.Do(func() {
-		// Only load environment variables from .env when running in local mode.
-		if os.Getenv("APPENV") == "local" {
-			if err := godotenv.Load(); err != nil {
-				log.Printf("Error loading .env file: %v", err)
+		// Load environment variables based on APPENV
+		appEnv := os.Getenv("APPENV")
+		if appEnv == "" {
+			appEnv = "local"
+		}
+
+		var envFile string
+		switch appEnv {
+		case "local":
+			envFile = ".env"
+		case "development":
+			envFile = ".env.dev2"
+		case "production":
+			// Production uses system environment variables
+			envFile = ""
+		default:
+			envFile = ".env"
+		}
+
+		if envFile != "" {
+			if err := godotenv.Load(envFile); err != nil {
+				log.Printf("Error loading %s file: %v", envFile, err)
 			}
 		}
 

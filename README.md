@@ -5,6 +5,7 @@ This document summarize the setup, available routes, and core functionalities pr
 ## Table of Contents
 - [Overview](#overview)
 - [Setup](#setup)
+- [API Documentation](#api-documentation)
 - [Routes](#routes)
 - [Functionality](#functionality)
 
@@ -63,13 +64,96 @@ This project is a backend service written in Go. It is designed to manage basis 
   go run main.go
   ```
 
+## API Documentation
+
+This project uses Swagger/OpenAPI for API documentation. Once the server is running, you can access the interactive API documentation at:
+
+```
+http://localhost:19091/swagger/index.html
+```
+
+**Note:** The Swagger UI is publicly accessible and does not require authentication to view the documentation. However, to test the API endpoints directly from Swagger UI, you will need to authenticate by clicking the "Authorize" button and providing the required tokens.
+
+### Swagger UI Features
+
+The Swagger UI provides:
+- **Interactive API Testing**: Try out API endpoints directly from the browser
+- **Complete Endpoint Documentation**: All endpoints with request/response schemas
+- **Authentication Support**: Built-in support for Bearer token and session token authentication
+- **Request/Response Examples**: Sample payloads for all endpoints
+
+### Updating API Documentation
+
+When you make changes to the API endpoints, regenerate the Swagger documentation using:
+
+```bash
+# Install swag CLI (one-time setup)
+go install github.com/swaggo/swag/cmd/swag@latest
+
+# Generate/update documentation
+swag init --parseDependency --parseInternal
+```
+
+The documentation is generated from Go annotations in the code. After updating, the changes will be reflected in the Swagger UI.
+
 ## Routes
 
 Below is an outline of the REST API endpoints provided:
 
+**Note:** For complete and interactive API documentation, please visit the [Swagger UI](http://localhost:19091/swagger/index.html) when the server is running.
+
+### Authentication Endpoints
+
+- **POST /login** - User login with email and password
+- **POST /signup** - Register a new user account
+- **DELETE /logout** - Invalidate user session (requires authentication)
+- **GET /token/validate** - Validate session token
+
+### Patient Endpoints (Admin only, except POST /patient)
+
+- **GET /patient** - List all patients with pagination and filtering
+- **POST /patient** - Create a new patient (public endpoint)
+- **GET /patient/{id}** - Get patient details by ID
+- **PATCH /patient/{id}** - Update patient information
+- **DELETE /patient/{id}** - Delete a patient
+
+### Disease Endpoints (Admin only)
+
+- **GET /disease** - List all diseases with pagination
+- **POST /disease** - Create a new disease
+- **GET /disease/{id}** - Get disease details by ID
+- **PATCH /disease/{id}** - Update disease information
+- **DELETE /disease/{id}** - Delete a disease
+
+### Treatment Endpoints (Admin and Therapist)
+
+- **GET /treatment** - List all treatments with filtering options
+- **POST /treatment** - Create a new treatment record
+- **PATCH /treatment/{id}** - Update treatment information
+- **DELETE /treatment/{id}** - Delete a treatment record
+
+### Therapist Endpoints (Admin only)
+
+- **GET /therapist** - List all therapists with pagination and filtering
+- **POST /therapist** - Register a new therapist
+- **GET /therapist/{id}** - Get therapist details by ID
+- **PATCH /therapist/{id}** - Update therapist information
+- **PUT /therapist/{id}** - Approve a therapist account
+- **DELETE /therapist/{id}** - Delete a therapist
+
+### Legacy Route Documentation
+
 ### GET /
 - **Description:** Health check or landing route.
 - **Response:** Simple status message confirming the service is operational.
+
+### GET /swagger/*
+- **Description:** Swagger API documentation UI
+- **Response:** Interactive API documentation interface
+
+---
+
+**Note:** The legacy routes below are deprecated. Please refer to the Swagger documentation for the current API structure.
 
 ### GET /api/resource
 - **Description:** Retrieve a list of resources.

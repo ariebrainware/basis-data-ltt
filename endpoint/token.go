@@ -10,6 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ValidateToken godoc
+// @Summary      Validate session token
+// @Description  Validate if the session token is valid and not expired
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Success      200 {object} util.APIResponse "Valid session token"
+// @Failure      401 {object} util.APIResponse "Invalid or expired session token"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /token/validate [get]
 func ValidateToken(c *gin.Context) {
 	sessionToken := c.GetHeader("session-token")
 	if sessionToken == "" {
