@@ -371,6 +371,11 @@ const docTemplate = `{
         },
         "/login": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Authenticate user with email and password",
                 "consumes": [
                     "application/json"
@@ -430,6 +435,9 @@ const docTemplate = `{
         "/logout": {
             "delete": {
                 "security": [
+                    {
+                        "BearerAuth": []
+                    },
                     {
                         "SessionToken": []
                     }
@@ -803,6 +811,11 @@ const docTemplate = `{
         },
         "/signup": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Register a new user account",
                 "consumes": [
                     "application/json"
@@ -1257,6 +1270,9 @@ const docTemplate = `{
         "/token/validate": {
             "get": {
                 "security": [
+                    {
+                        "BearerAuth": []
+                    },
                     {
                         "SessionToken": []
                     }

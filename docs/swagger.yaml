@@ -567,6 +567,8 @@ paths:
           description: Server error
           schema:
             $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
       summary: User login
       tags:
       - Authentication
@@ -595,6 +597,7 @@ paths:
           schema:
             $ref: '#/definitions/util.APIResponse'
       security:
+      - BearerAuth: []
       - SessionToken: []
       summary: User logout
       tags:
@@ -830,6 +833,8 @@ paths:
           description: Server error
           schema:
             $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
       summary: User signup
       tags:
       - Authentication
@@ -1097,6 +1102,7 @@ paths:
           schema:
             $ref: '#/definitions/util.APIResponse'
       security:
+      - BearerAuth: []
       - SessionToken: []
       summary: Validate session token
       tags:

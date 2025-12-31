@@ -365,6 +365,11 @@
         },
         "/login": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Authenticate user with email and password",
                 "consumes": [
                     "application/json"
@@ -424,6 +429,9 @@
         "/logout": {
             "delete": {
                 "security": [
+                    {
+                        "BearerAuth": []
+                    },
                     {
                         "SessionToken": []
                     }
@@ -797,6 +805,11 @@
         },
         "/signup": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Register a new user account",
                 "consumes": [
                     "application/json"
@@ -1251,6 +1264,9 @@
         "/token/validate": {
             "get": {
                 "security": [
+                    {
+                        "BearerAuth": []
+                    },
                     {
                         "SessionToken": []
                     }
