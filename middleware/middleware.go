@@ -121,7 +121,11 @@ func GetRoleID(c *gin.Context) (uint32, bool) {
 	if !exists {
 		return 0, false
 	}
-	return roleID.(uint32), true
+	id, ok := roleID.(uint32)
+	if !ok {
+		return 0, false
+	}
+	return id, true
 }
 
 // RequireRole creates a middleware that checks if the user has one of the specified roles
