@@ -80,6 +80,12 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		// Skip token validation for Swagger documentation routes
+		if strings.HasPrefix(c.Request.URL.Path, "/swagger/") {
+			c.Next()
+			return
+		}
+
 		// Call tokenValidator after handling preflight.
 		if !tokenValidator(c, fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))) {
 			return

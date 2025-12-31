@@ -159,11 +159,13 @@ curl -X GET http://localhost:19091/patient \
 
 2. **Access Swagger UI**
    - Open browser: `http://localhost:19091/swagger/index.html`
+   - The Swagger UI is publicly accessible and does not require authentication
+   - View all endpoints, request/response schemas, and API documentation
 
 3. **Test Authentication**
    - Use the `/signup` endpoint to create an account
    - Use the `/login` endpoint to get tokens
-   - Click "Authorize" in Swagger UI and enter tokens
+   - Click "Authorize" in Swagger UI and enter tokens to test protected endpoints
 
 4. **Explore Endpoints**
    - Try out endpoints directly from Swagger UI

@@ -72,6 +72,8 @@ This project uses Swagger/OpenAPI for API documentation. Once the server is runn
 http://localhost:19091/swagger/index.html
 ```
 
+**Note:** The Swagger UI is publicly accessible and does not require authentication to view the documentation. However, to test the API endpoints directly from Swagger UI, you will need to authenticate by clicking the "Authorize" button and providing the required tokens.
+
 ### Swagger UI Features
 
 The Swagger UI provides:
