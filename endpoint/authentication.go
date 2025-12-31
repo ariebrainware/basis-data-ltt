@@ -13,16 +13,27 @@ import (
 )
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email    string `json:"email" example:"user@example.com"`
+	Password string `json:"password" example:"password123"`
 }
 
 type LoginResponse struct {
-	Token  string `json:"token"`
-	Role   string `json:"role"`
-	UserID uint   `json:"user_id"`
+	Token  string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	Role   string `json:"role" example:"Admin"`
+	UserID uint   `json:"user_id" example:"1"`
 }
 
+// Login godoc
+// @Summary      User login
+// @Description  Authenticate user with email and password
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        request body LoginRequest true "Login credentials"
+// @Success      200 {object} util.APIResponse{data=LoginResponse} "Login successful"
+// @Failure      400 {object} util.APIResponse "Invalid request payload"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /login [post]
 func Login(c *gin.Context) {
 	var req LoginRequest
 
@@ -116,6 +127,18 @@ func Login(c *gin.Context) {
 	})
 }
 
+// Logout godoc
+// @Summary      User logout
+// @Description  Invalidate the user session token
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Security     SessionToken
+// @Success      200 {object} util.APIResponse "Logout successful"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      400 {object} util.APIResponse "Session not found"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /logout [delete]
 func Logout(c *gin.Context) {
 	// Extract the session-token from the request header
 	sessionToken := c.GetHeader("session-token")
@@ -163,11 +186,22 @@ func Logout(c *gin.Context) {
 }
 
 type SignupRequest struct {
-	Name     string `json:"name"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Name     string `json:"name" example:"John Doe"`
+	Email    string `json:"email" example:"john@example.com"`
+	Password string `json:"password" example:"password123"`
 }
 
+// Signup godoc
+// @Summary      User signup
+// @Description  Register a new user account
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Param        request body SignupRequest true "Signup details"
+// @Success      200 {object} util.APIResponse{data=string} "Signup successful"
+// @Failure      400 {object} util.APIResponse "Invalid request or email already exists"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /signup [post]
 func Signup(c *gin.Context) {
 	var req SignupRequest
 

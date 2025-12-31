@@ -10,11 +10,38 @@ import (
 	_ "time/tzdata"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
+	_ "github.com/ariebrainware/basis-data-ltt/docs"
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+// @title           LTT Backend API
+// @version         1.0
+// @description     REST API for managing patient data, treatments, and therapy sessions
+// @description     This API provides endpoints for patient management, disease tracking, treatment records, and therapist management.
+
+// @contact.name   Arie Brainware
+// @contact.email  support@ariebrainware.com
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:19091
+// @BasePath  /
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
+// @securityDefinitions.apikey SessionToken
+// @in header
+// @name session-token
+// @description Session token for authenticated requests
 
 func main() {
 	// Load the configuration
@@ -59,6 +86,9 @@ func main() {
 			"message": fmt.Sprintf("Welcome to %s!", cfg.AppName),
 		})
 	})
+
+	// Swagger documentation route
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	// Group routes that require a valid login token
 	auth := r.Group("/")
 	auth.Use(middleware.ValidateLoginToken())

@@ -34,6 +34,22 @@ func fetchTherapist(db *gorm.DB, limit, offset int, keyword, groupByDate string)
 	return therapist, totalTherapist, nil
 }
 
+// ListTherapist godoc
+// @Summary      List all therapists
+// @Description  Get a paginated list of therapists with optional filtering
+// @Tags         Therapist
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        limit query int false "Limit number of results"
+// @Param        offset query int false "Offset for pagination"
+// @Param        keyword query string false "Search keyword for therapist name or NIK"
+// @Param        group_by_date query string false "Filter by date range (last_2_days, last_3_months, last_6_months)"
+// @Success      200 {object} util.APIResponse{data=object} "Therapist retrieved"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /therapist [get]
 func ListTherapist(c *gin.Context) {
 	limit, offset, _, keyword, groupByDate := parseQueryParams(c)
 
@@ -83,6 +99,20 @@ func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, err
 	return id, therapist, nil
 }
 
+// GetTherapistInfo godoc
+// @Summary      Get therapist information
+// @Description  Get detailed information about a specific therapist
+// @Tags         Therapist
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Therapist ID"
+// @Success      200 {object} util.APIResponse{data=model.Therapist} "Therapist retrieved"
+// @Failure      400 {object} util.APIResponse "Therapist not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /therapist/{id} [get]
 func GetTherapistInfo(c *gin.Context) {
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -105,17 +135,17 @@ func GetTherapistInfo(c *gin.Context) {
 }
 
 type createTherapistRequest struct {
-	FullName    string `json:"full_name"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	PhoneNumber string `json:"phone_number"`
-	Address     string `json:"address"`
-	DateOfBirth string `json:"date_of_birth"`
-	NIK         string `json:"nik"`
-	Weight      int    `json:"weight"`
-	Height      int    `json:"height"`
-	Role        string `json:"role"`
-	IsApproved  bool   `json:"is_approved"`
+	FullName    string `json:"full_name" example:"Dr. John Smith"`
+	Email       string `json:"email" example:"dr.john@example.com"`
+	Password    string `json:"password" example:"password123"`
+	PhoneNumber string `json:"phone_number" example:"081234567890"`
+	Address     string `json:"address" example:"123 Main St"`
+	DateOfBirth string `json:"date_of_birth" example:"1980-01-01"`
+	NIK         string `json:"nik" example:"1234567890123456"`
+	Weight      int    `json:"weight" example:"70"`
+	Height      int    `json:"height" example:"175"`
+	Role        string `json:"role" example:"Physical Therapist"`
+	IsApproved  bool   `json:"is_approved" example:"false"`
 }
 
 func validateTherapistRequest(req createTherapistRequest) error {
@@ -174,6 +204,20 @@ func createTherapistInDB(db *gorm.DB, req createTherapistRequest) error {
 	})
 }
 
+// CreateTherapist godoc
+// @Summary      Create a new therapist
+// @Description  Register a new therapist in the system
+// @Tags         Therapist
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        request body createTherapistRequest true "Therapist information"
+// @Success      200 {object} util.APIResponse "Therapist created"
+// @Failure      400 {object} util.APIResponse "Invalid request or therapist already exists"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /therapist [post]
 func CreateTherapist(c *gin.Context) {
 	therapistRequest := createTherapistRequest{}
 
@@ -216,6 +260,21 @@ func CreateTherapist(c *gin.Context) {
 	})
 }
 
+// UpdateTherapist godoc
+// @Summary      Update therapist information
+// @Description  Update an existing therapist's information (excluding approval status)
+// @Tags         Therapist
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Therapist ID"
+// @Param        request body model.Therapist true "Updated therapist information"
+// @Success      200 {object} util.APIResponse "Therapist updated"
+// @Failure      400 {object} util.APIResponse "Invalid request or therapist not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /therapist/{id} [patch]
 func UpdateTherapist(c *gin.Context) {
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -242,6 +301,21 @@ func UpdateTherapist(c *gin.Context) {
 	handleTherapistUpdate(c, db, id, therapist)
 }
 
+// TherapistApproval godoc
+// @Summary      Approve a therapist
+// @Description  Approve a therapist account for system access
+// @Tags         Therapist
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Therapist ID"
+// @Param        request body model.Therapist true "Therapist approval data (is_approved must be true)"
+// @Success      200 {object} util.APIResponse "Therapist updated"
+// @Failure      400 {object} util.APIResponse "Invalid request or approval error"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /therapist/{id} [put]
 func TherapistApproval(c *gin.Context) {
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -322,6 +396,20 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 	return id, therapist, nil
 }
 
+// DeleteTherapist godoc
+// @Summary      Delete a therapist
+// @Description  Soft delete a therapist by ID
+// @Tags         Therapist
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        id path string true "Therapist ID"
+// @Success      200 {object} util.APIResponse "Therapist deleted"
+// @Failure      400 {object} util.APIResponse "Therapist not found"
+// @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /therapist/{id} [delete]
 func DeleteTherapist(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
