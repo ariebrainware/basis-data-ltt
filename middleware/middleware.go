@@ -7,13 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-const DBKey = "db"
+const (
+	DBKey     = "db"
+	UserIDKey = "user_id"
+	RoleIDKey = "role_id"
+)
 
 func tokenValidator(c *gin.Context, expectedToken string) bool {
 	if c.Request.Method == http.MethodOptions {
@@ -103,6 +106,59 @@ func GetDB(c *gin.Context) *gorm.DB {
 	return db.(*gorm.DB)
 }
 
+// GetUserID retrieves the user ID from the Gin context
+func GetUserID(c *gin.Context) (uint, bool) {
+	userID, exists := c.Get(UserIDKey)
+	if !exists {
+		return 0, false
+	}
+	return userID.(uint), true
+}
+
+// GetRoleID retrieves the role ID from the Gin context
+func GetRoleID(c *gin.Context) (uint32, bool) {
+	roleID, exists := c.Get(RoleIDKey)
+	if !exists {
+		return 0, false
+	}
+	return roleID.(uint32), true
+}
+
+// RequireRole creates a middleware that checks if the user has one of the specified roles
+func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		roleID, exists := GetRoleID(c)
+		if !exists {
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Role information not available",
+				Err: fmt.Errorf("role information not available in context"),
+			})
+			c.Abort()
+			return
+		}
+
+		// Check if user's role is in the allowed roles
+		roleAllowed := false
+		for _, allowedRole := range allowedRoles {
+			if roleID == allowedRole {
+				roleAllowed = true
+				break
+			}
+		}
+
+		if !roleAllowed {
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Insufficient permissions to access this resource",
+				Err: fmt.Errorf("user role %d not authorized", roleID),
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func ValidateLoginToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		db := GetDB(c)
@@ -124,13 +180,25 @@ func ValidateLoginToken() gin.HandlerFunc {
 			return
 		}
 
-		// Find the session record in the database based on sessionToken
-		var session model.Session
-		if err := db.Where("session_token = ? AND expires_at > ? AND deleted_at IS NULL", sessionToken, time.Now()).First(&session).Error; err != nil {
+		// Find the session record and join with users to get role_id
+		var result struct {
+			UserID uint
+			RoleID uint32
+		}
+		err := db.Table("sessions").
+			Select("sessions.user_id, users.role_id").
+			Joins("JOIN users ON users.id = sessions.user_id").
+			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL", sessionToken, time.Now()).
+			Scan(&result).Error
+		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session not found"})
 			c.Abort()
 			return
 		}
+
+		// Store user_id and role_id in context for use in handlers
+		c.Set(UserIDKey, result.UserID)
+		c.Set(RoleIDKey, result.RoleID)
 		c.Next()
 	}
 }
