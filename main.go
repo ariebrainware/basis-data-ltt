@@ -74,15 +74,16 @@ func main() {
 			patient.GET("/:id", endpoint.GetPatientInfo)
 			patient.PATCH("/:id", endpoint.UpdatePatient)
 			patient.DELETE("/:id", endpoint.DeletePatient)
+		}
 
-			// Treatment routes - accessible by Admin (1) only
-			treatment := patient.Group("/treatment")
-			{
-				treatment.GET("", endpoint.ListTreatments)
-				treatment.POST("", endpoint.CreateTreatment)
-				treatment.PATCH("/:id", endpoint.UpdateTreatment)
-				treatment.DELETE("/:id", endpoint.DeleteTreatment)
-			}
+		// Treatment routes - accessible by Admin (1) and Therapist (3)
+		treatment := auth.Group("/treatment")
+		treatment.Use(middleware.RequireRole(1, 3)) // Admin and Therapist
+		{
+			treatment.GET("", endpoint.ListTreatments)
+			treatment.POST("", endpoint.CreateTreatment)
+			treatment.PATCH("/:id", endpoint.UpdateTreatment)
+			treatment.DELETE("/:id", endpoint.DeleteTreatment)
 		}
 
 		// Disease routes - accessible by Admin (1) only
