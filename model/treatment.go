@@ -8,7 +8,6 @@ import (
 // @Description Treatment information
 type Treatment struct {
 	gorm.Model
-	ID            uint   `json:"id" example:"1"`
 	TreatmentDate string `json:"treatment_date" gorm:"not null" example:"2025-01-15"`
 	PatientCode   string `json:"patient_code" gorm:"not null" example:"J001"`
 	TherapistID   uint   `json:"therapist_id" gorm:"not null" example:"1"`

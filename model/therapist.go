@@ -6,7 +6,6 @@ import "gorm.io/gorm"
 // @Description Therapist information
 type Therapist struct {
 	gorm.Model
-	ID          uint   `json:"id" example:"1"`
 	FullName    string `json:"full_name" gorm:"column:full_name" example:"Dr. John Smith"`
 	Email       string `json:"email" gorm:"column:email" example:"dr.john@example.com"`
 	Password    string `json:"password" gorm:"column:password" example:"hashed_password"`
