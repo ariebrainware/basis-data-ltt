@@ -16,15 +16,16 @@ import (
 
 // Config holds the application's configuration values.
 type Config struct {
-	AppName string `json:"appname"`
-	AppEnv  string `json:"appenv"`
-	AppPort uint16 `json:"appport"`
-	GinMode string `json:"ginmode"`
-	DBHost  string `json:"dbhost"`
-	DBPort  uint16 `json:"dbport"`
-	DBName  string `json:"dbname"`
-	DBUSER  string `json:"dbuser"`
-	DBPass  string `json:"dbpass"`
+	AppName         string `json:"appname"`
+	AppEnv          string `json:"appenv"`
+	AppPort         uint16 `json:"appport"`
+	GinMode         string `json:"ginmode"`
+	ShutdownTimeout int    `json:"shutdowntimeout"`
+	DBHost          string `json:"dbhost"`
+	DBPort          uint16 `json:"dbport"`
+	DBName          string `json:"dbname"`
+	DBUSER          string `json:"dbuser"`
+	DBPass          string `json:"dbpass"`
 }
 
 var config *Config
@@ -60,18 +61,23 @@ func LoadConfig() *Config {
 
 		appPort, _ := strconv.ParseUint(os.Getenv("APPPORT"), 10, 16)
 		dbPort, _ := strconv.ParseUint(os.Getenv("DBPORT"), 10, 16)
+		shutdownTimeout, _ := strconv.Atoi(os.Getenv("SHUTDOWNTIMEOUT"))
+		if shutdownTimeout == 0 {
+			shutdownTimeout = 5 // Default to 5 seconds if not specified
+		}
 
 		// Initialize the Config struct with values from environment variables.
 		config = &Config{
-			AppName: os.Getenv("APPNAME"),
-			AppEnv:  os.Getenv("APPENV"),
-			AppPort: uint16(appPort),
-			GinMode: os.Getenv("GINMODE"),
-			DBHost:  os.Getenv("DBHOST"),
-			DBPort:  uint16(dbPort),
-			DBName:  os.Getenv("DBNAME"),
-			DBUSER:  os.Getenv("DBUSER"),
-			DBPass:  os.Getenv("DBPASS"),
+			AppName:         os.Getenv("APPNAME"),
+			AppEnv:          os.Getenv("APPENV"),
+			AppPort:         uint16(appPort),
+			GinMode:         os.Getenv("GINMODE"),
+			ShutdownTimeout: shutdownTimeout,
+			DBHost:          os.Getenv("DBHOST"),
+			DBPort:          uint16(dbPort),
+			DBName:          os.Getenv("DBNAME"),
+			DBUSER:          os.Getenv("DBUSER"),
+			DBPass:          os.Getenv("DBPASS"),
 		}
 	})
 	return config
