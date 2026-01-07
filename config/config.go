@@ -61,9 +61,12 @@ func LoadConfig() *Config {
 
 		appPort, _ := strconv.ParseUint(os.Getenv("APPPORT"), 10, 16)
 		dbPort, _ := strconv.ParseUint(os.Getenv("DBPORT"), 10, 16)
-		shutdownTimeout, _ := strconv.Atoi(os.Getenv("SHUTDOWNTIMEOUT"))
-		if shutdownTimeout == 0 {
-			shutdownTimeout = 5 // Default to 5 seconds if not specified
+		shutdownTimeout, err := strconv.Atoi(os.Getenv("SHUTDOWNTIMEOUT"))
+		if err != nil && os.Getenv("SHUTDOWNTIMEOUT") != "" {
+			log.Printf("Invalid SHUTDOWNTIMEOUT value, using default (5 seconds): %v", err)
+		}
+		if shutdownTimeout <= 0 {
+			shutdownTimeout = 5 // Default to 5 seconds if not specified or invalid
 		}
 
 		// Initialize the Config struct with values from environment variables.
