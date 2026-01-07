@@ -22,7 +22,9 @@ func parseQueryParams(c *gin.Context) (int, int, int, string, string) {
 	return limit, offset, therapistID, keyword, groupByDate
 }
 
-func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
+// applyCreatedAtFilter applies a created_at filter for supported ranges.
+// Supported values for groupByDate: "last_2_days", "last_3_months", "last_6_months".
+func applyCreatedAtFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	switch groupByDate {
 	case "last_2_days":
 		query = query.Where("created_at >= ?", time.Now().AddDate(0, 0, -2))
@@ -30,6 +32,11 @@ func applyGroupByDateFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 		query = query.Where("created_at >= ?", time.Now().AddDate(0, -3, 0))
 	case "last_6_months":
 		query = query.Where("created_at >= ?", time.Now().AddDate(0, -6, 0))
+	default:
+		// If an unknown non-empty value is provided, log it for debugging.
+		if groupByDate != "" {
+			fmt.Printf("applyCreatedAtFilter: unknown group_by_date value: %s\n", groupByDate)
+		}
 	}
 	return query
 }
@@ -48,7 +55,7 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 	if keyword != "" {
 		query = query.Where("full_name LIKE ? OR patient_code LIKE ? OR address LIKE ? OR phone_number LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
 	}
-	query = applyGroupByDateFilter(query, groupByDate)
+	query = applyCreatedAtFilter(query, groupByDate)
 
 	if err := query.Find(&patients).Error; err != nil {
 		return nil, 0, err
