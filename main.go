@@ -2,9 +2,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "time/tzdata"
@@ -147,9 +151,42 @@ func main() {
 	r.POST("/signup", endpoint.Signup)
 	r.GET("/token/validate", endpoint.ValidateToken)
 
-	// Start server on specified port
+	// Start server on specified port with graceful shutdown
 	address := fmt.Sprintf(":%d", cfg.AppPort)
-	if err := r.Run(address); err != nil {
-		log.Fatalf("error starting server: %v", err)
+	srv := &http.Server{
+		Addr:    address,
+		Handler: r,
 	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("error starting server: %v", err)
+		}
+	}()
+
+	log.Printf("Server is listening on %s", address)
+
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutdown signal received, shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.ShutdownTimeout)*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	// Close DB connection pool
+	sqlDB, err := db.DB()
+	if err == nil {
+		if err := sqlDB.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	} else {
+		log.Printf("Failed to get raw DB from GORM: %v", err)
+	}
+
+	log.Println("Server exiting")
 }
