@@ -24,3 +24,10 @@ func HashPassword(password string) (hashedPassword string) {
 	hashedPassword = hex.EncodeToString(h.Sum(nil))
 	return
 }
+
+// SetJWTSecret allows tests or runtime code to update the JWT secret used
+// for both token signing and password hashing.
+func SetJWTSecret(secret string) {
+	JWTSecret = secret
+	JWTSecretByte = []byte(secret)
+}
