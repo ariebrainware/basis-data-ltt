@@ -3,11 +3,13 @@ package endpoint
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // ListDiseases godoc
@@ -92,8 +94,34 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
+	// Normalize and validate name
+	name := strings.TrimSpace(diseaseRequest.Name)
+	if name == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body: name is required",
+			Err: fmt.Errorf("name is required"),
+		})
+		return
+	}
+
+	// Check for existing disease with same (case-insensitive) name
+	var existing model.Disease
+	if err := db.Where("LOWER(name) = ?", strings.ToLower(name)).First(&existing).Error; err == nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Disease with similar name already exists",
+			Err: fmt.Errorf("disease already exists"),
+		})
+		return
+	} else if err != nil && err != gorm.ErrRecordNotFound {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to check existing diseases",
+			Err: err,
+		})
+		return
+	}
+
 	disease := model.Disease{
-		Name:        diseaseRequest.Name,
+		Name:        name,
 		Description: diseaseRequest.Description,
 	}
 	if err := db.Create(&disease).Error; err != nil {
