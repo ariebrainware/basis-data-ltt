@@ -52,16 +52,28 @@ func TestIntegrationFlow(t *testing.T) {
 		t.Fatalf("failed to connect test DB: %v", err)
 	}
 
+	// Define test models that need to be migrated and cleaned up
+	testModels := []interface{}{
+		&model.Patient{},
+		&model.Disease{},
+		&model.User{},
+		&model.Session{},
+		&model.Therapist{},
+		&model.Role{},
+		&model.Treatment{},
+		&model.PatientCode{},
+	}
+
 	// Clean up database state at the end of the test
 	t.Cleanup(func() {
 		// Drop all tables to ensure clean state for next test run
-		if err := db.Migrator().DropTable(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}); err != nil {
+		if err := db.Migrator().DropTable(testModels...); err != nil {
 			t.Logf("Warning: failed to drop tables during cleanup: %v", err)
 		}
 	})
 
 	// Auto migrate models used in tests
-	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}); err != nil {
+	if err := db.AutoMigrate(testModels...); err != nil {
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 
