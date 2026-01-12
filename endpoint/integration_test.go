@@ -63,7 +63,7 @@ func TestIntegrationFlow(t *testing.T) {
 	}
 
 	// Ensure there's an initial patient code entry for initials 'P' used by "Patient One"
-	if err := db.Create(&model.PatientCode{Alphabet: "P", Number: 0, Code: "P0"}).Error; err != nil {
+	if err := db.Create(&model.PatientCode{Alphabet: "P", Number: 1, Code: "P1"}).Error; err != nil {
 		t.Fatalf("failed to seed patient code: %v", err)
 	}
 
