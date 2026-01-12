@@ -5,7 +5,6 @@ import "testing"
 func TestHashPasswordDeterministic(t *testing.T) {
 	SetJWTSecret("secret1")
 	h1 := HashPassword("password")
-	SetJWTSecret("secret1")
 	h2 := HashPassword("password")
 	if h1 != h2 {
 		t.Fatalf("expected same hash for same secret, got %s vs %s", h1, h2)
