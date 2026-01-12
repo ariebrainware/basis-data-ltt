@@ -45,10 +45,6 @@ func SetJWTSecret(secret string) {
 func GetJWTSecretByte() []byte {
 	jwtMutex.RLock()
 	defer jwtMutex.RUnlock()
-	// Handle nil case explicitly
-	if JWTSecretByte == nil {
-		return []byte{}
-	}
 	// Return a copy to prevent external modifications
 	secretCopy := make([]byte, len(JWTSecretByte))
 	copy(secretCopy, JWTSecretByte)
