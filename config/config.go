@@ -95,20 +95,15 @@ func ConnectMySQL() (*gorm.DB, error) {
 	// For tests, use an in-memory SQLite DB to avoid needing an external MySQL instance.
 	if cfg.AppEnv == "test" {
 		dsn := "file::memory:?cache=shared"
-		gormConfig := &gorm.Config{}
-		if cfg.AppEnv == "production" {
-			gormConfig.Logger = logger.Default.LogMode(logger.Silent)
-		} else {
-			gormConfig = &gorm.Config{
-				Logger: logger.New(
-					log.New(os.Stdout, "\r\n", log.LstdFlags),
-					logger.Config{
-						SlowThreshold: 200 * time.Millisecond,
-						LogLevel:      logger.Info,
-						Colorful:      true,
-					},
-				),
-			}
+		gormConfig := &gorm.Config{
+			Logger: logger.New(
+				log.New(os.Stdout, "\r\n", log.LstdFlags),
+				logger.Config{
+					SlowThreshold: 200 * time.Millisecond,
+					LogLevel:      logger.Info,
+					Colorful:      true,
+				},
+			),
 		}
 		db, err := gorm.Open(sqlite.Open(dsn), gormConfig)
 		if err != nil {
