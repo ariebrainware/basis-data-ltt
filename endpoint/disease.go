@@ -27,7 +27,7 @@ import (
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /disease [get]
 func ListDiseases(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
 	db := middleware.GetDB(c)
