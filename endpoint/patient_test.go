@@ -21,9 +21,15 @@ func TestGetInitials(t *testing.T) {
 }
 
 func TestFetchPatientsDateFilter(t *testing.T) {
-	os.Setenv("APPENV", "test")
-	os.Setenv("JWTSECRET", "test-secret")
+	t.Setenv("APPENV", "test")
+	t.Setenv("JWTSECRET", "test-secret")
+
+	// preserve and restore global JWT secret used by util
+	prevSecret := os.Getenv("JWTSECRET")
 	util.SetJWTSecret("test-secret")
+	t.Cleanup(func() {
+		util.SetJWTSecret(prevSecret)
+	})
 
 	// connect to in-memory DB
 	db, err := config.ConnectMySQL()
