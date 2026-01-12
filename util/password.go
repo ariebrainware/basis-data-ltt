@@ -10,7 +10,6 @@ import (
 
 var (
 	jwtSecretValue = getEnv("JWTSECRET", "")
-	jwtSecret      = jwtSecretValue
 	jwtSecretByte  = []byte(jwtSecretValue)
 	jwtMutex       sync.RWMutex
 )
@@ -38,7 +37,6 @@ func HashPassword(password string) (hashedPassword string) {
 func SetJWTSecret(secret string) {
 	jwtMutex.Lock()
 	defer jwtMutex.Unlock()
-	jwtSecret = secret
 	jwtSecretByte = []byte(secret)
 }
 
