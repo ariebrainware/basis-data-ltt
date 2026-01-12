@@ -95,7 +95,7 @@ func Login(c *gin.Context) {
 		"role":  User.RoleID,
 	})
 
-	tokenString, err := token.SignedString(util.JWTSecretByte)
+	tokenString, err := token.SignedString(util.GetJWTSecretByte())
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Could not generate token",
@@ -268,7 +268,7 @@ func Signup(c *gin.Context) {
 		"role_id": newUser.RoleID,
 	})
 
-	tokenString, err := token.SignedString(util.JWTSecretByte)
+	tokenString, err := token.SignedString(util.GetJWTSecretByte())
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Could not generate token",

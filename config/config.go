@@ -10,6 +10,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -91,6 +92,35 @@ func LoadConfig() *Config {
 func ConnectMySQL() (*gorm.DB, error) {
 
 	cfg := LoadConfig()
+	// For tests, use an in-memory SQLite DB to avoid needing an external MySQL instance.
+	if cfg.AppEnv == "test" {
+		dsn := "file::memory:?cache=shared"
+		gormConfig := &gorm.Config{
+			Logger: logger.New(
+				log.New(os.Stdout, "\r\n", log.LstdFlags),
+				logger.Config{
+					SlowThreshold: 200 * time.Millisecond,
+					LogLevel:      logger.Info,
+					Colorful:      true,
+				},
+			),
+		}
+		db, err := gorm.Open(sqlite.Open(dsn), gormConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		sqlDB, err := db.DB()
+		if err != nil {
+			return nil, err
+		}
+
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetMaxOpenConns(100)
+		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+
+		return db, nil
+	}
 	// Build the Data Source Name (DSN) using the configuration values.
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
 	gormConfig := &gorm.Config{}

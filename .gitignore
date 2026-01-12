@@ -9,3 +9,7 @@ ltt-be
 *.dll
 *.so
 *.dylib
+
+# Test coverage files
+coverage.out
+*.out
