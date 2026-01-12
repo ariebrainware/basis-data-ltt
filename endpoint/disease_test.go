@@ -7,6 +7,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
+	"gorm.io/gorm"
 )
 
 func TestDiseaseCodenameUniqueness(t *testing.T) {
@@ -32,7 +33,7 @@ func TestDiseaseCodenameUniqueness(t *testing.T) {
 	}
 
 	// clean table
-	db.Where("1 = 1").Delete(&model.Disease{})
+	db.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&model.Disease{})
 
 	// Create first disease with codename
 	disease1 := model.Disease{
