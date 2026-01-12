@@ -55,7 +55,9 @@ func TestIntegrationFlow(t *testing.T) {
 	// Clean up database state at the end of the test
 	t.Cleanup(func() {
 		// Drop all tables to ensure clean state for next test run
-		db.Migrator().DropTable(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{})
+		if err := db.Migrator().DropTable(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}); err != nil {
+			t.Logf("Warning: failed to drop tables during cleanup: %v", err)
+		}
 	})
 
 	// Auto migrate models used in tests

@@ -23,10 +23,7 @@ func getEnv(key, fallback string) string {
 }
 
 func HashPassword(password string) (hashedPassword string) {
-	jwtMutex.RLock()
-	secretByte := JWTSecretByte
-	jwtMutex.RUnlock()
-	
+	secretByte := GetJWTSecretByte()
 	h := hmac.New(sha256.New, secretByte)
 	h.Write([]byte(password))
 	hashedPassword = hex.EncodeToString(h.Sum(nil))
