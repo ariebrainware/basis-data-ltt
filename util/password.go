@@ -9,9 +9,10 @@ import (
 )
 
 var (
-	JWTSecret     = getEnv("JWTSECRET", "")
-	JWTSecretByte = []byte(getEnv("JWTSECRET", ""))
-	jwtMutex      sync.RWMutex
+	jwtSecretValue = getEnv("JWTSECRET", "")
+	JWTSecret      = jwtSecretValue
+	JWTSecretByte  = []byte(jwtSecretValue)
+	jwtMutex       sync.RWMutex
 )
 
 func getEnv(key, fallback string) string {

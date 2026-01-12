@@ -68,7 +68,7 @@ func TestIntegrationFlow(t *testing.T) {
 	t.Cleanup(func() {
 		// Drop all tables to ensure clean state for next test run
 		if err := db.Migrator().DropTable(testModels...); err != nil {
-			t.Logf("Warning: failed to drop tables during cleanup: %v", err)
+			t.Errorf("Failed to drop tables during cleanup: %v", err)
 		}
 	})
 
