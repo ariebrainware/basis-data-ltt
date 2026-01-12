@@ -10,8 +10,8 @@ import (
 
 var (
 	jwtSecretValue = getEnv("JWTSECRET", "")
-	JWTSecret      = jwtSecretValue
-	JWTSecretByte  = []byte(jwtSecretValue)
+	jwtSecret      = jwtSecretValue
+	jwtSecretByte  = []byte(jwtSecretValue)
 	jwtMutex       sync.RWMutex
 )
 
@@ -38,16 +38,14 @@ func HashPassword(password string) (hashedPassword string) {
 func SetJWTSecret(secret string) {
 	jwtMutex.Lock()
 	defer jwtMutex.Unlock()
-	JWTSecret = secret
-	JWTSecretByte = []byte(secret)
+	jwtSecret = secret
+	jwtSecretByte = []byte(secret)
 }
 
 // GetJWTSecretByte returns a copy of the current JWT secret bytes in a thread-safe manner.
 func GetJWTSecretByte() []byte {
 	jwtMutex.RLock()
 	defer jwtMutex.RUnlock()
-	// Return a copy to prevent external modifications
-	secretCopy := make([]byte, len(JWTSecretByte))
-	copy(secretCopy, JWTSecretByte)
-	return secretCopy
+	// Return a copy to prevent external modifications using idiomatic Go pattern
+	return append([]byte(nil), jwtSecretByte...)
 }
