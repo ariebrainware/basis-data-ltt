@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
@@ -38,11 +37,11 @@ func doRequest(r http.Handler, method, path string, body []byte, headers map[str
 }
 
 func TestIntegrationFlow(t *testing.T) {
-	// Set environment for test run
-	os.Setenv("APPENV", "test")
-	os.Setenv("JWTSECRET", "test-secret-123")
-	os.Setenv("APITOKEN", "test-api-token")
-	os.Setenv("GINMODE", "release")
+	// Set environment for test run using t.Setenv for test isolation
+	t.Setenv("APPENV", "test")
+	t.Setenv("JWTSECRET", "test-secret-123")
+	t.Setenv("APITOKEN", "test-api-token")
+	t.Setenv("GINMODE", "release")
 
 	// Ensure util uses the test secret
 	util.SetJWTSecret("test-secret-123")
@@ -52,6 +51,12 @@ func TestIntegrationFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
 	}
+
+	// Clean up database state at the end of the test
+	t.Cleanup(func() {
+		// Drop all tables to ensure clean state for next test run
+		db.Migrator().DropTable(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{})
+	})
 
 	// Auto migrate models used in tests
 	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}); err != nil {
