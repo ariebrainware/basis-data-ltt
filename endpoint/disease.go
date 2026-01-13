@@ -106,7 +106,7 @@ func CreateDisease(c *gin.Context) {
 	}
 
 	// Normalize and validate codename
-	codename := strings.TrimSpace(diseaseRequest.Codename)
+	codename := strings.ToLower(strings.TrimSpace(diseaseRequest.Codename))
 	if codename == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body: codename is required",
@@ -218,6 +218,16 @@ func UpdateDisease(c *gin.Context) {
 			Err: err,
 		})
 		return
+	}
+
+	// Normalize codename if provided
+	if diseaseRequest.Codename != "" {
+		diseaseRequest.Codename = strings.ToLower(strings.TrimSpace(diseaseRequest.Codename))
+	}
+
+	// Normalize name if provided
+	if diseaseRequest.Name != "" {
+		diseaseRequest.Name = strings.TrimSpace(diseaseRequest.Name)
 	}
 
 	if err := db.Model(&existingDisease).Updates(diseaseRequest).Error; err != nil {
