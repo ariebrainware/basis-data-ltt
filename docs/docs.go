@@ -1654,6 +1654,10 @@ const docTemplate = `{
         "endpoint.createDiseaseRequest": {
             "type": "object",
             "properties": {
+                "codename": {
+                    "type": "string",
+                    "example": "diabetes"
+                },
                 "description": {
                     "type": "string",
                     "example": "A metabolic disease"
@@ -1790,6 +1794,10 @@ const docTemplate = `{
             "description": "Disease information",
             "type": "object",
             "properties": {
+                "codename": {
+                    "type": "string",
+                    "example": "diabetes"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -1801,8 +1809,7 @@ const docTemplate = `{
                     "example": "A metabolic disease"
                 },
                 "id": {
-                    "type": "integer",
-                    "example": 1
+                    "type": "integer"
                 },
                 "name": {
                     "type": "string",
@@ -1848,8 +1855,7 @@ const docTemplate = `{
                     "example": "Diabetes,Hypertension"
                 },
                 "id": {
-                    "type": "integer",
-                    "example": 1
+                    "type": "integer"
                 },
                 "job": {
                     "type": "string",
@@ -1907,8 +1913,7 @@ const docTemplate = `{
                     "example": 175
                 },
                 "id": {
-                    "type": "integer",
-                    "example": 1
+                    "type": "integer"
                 },
                 "is_approved": {
                     "type": "boolean",
@@ -1990,8 +1995,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/gorm.DeletedAt"
                 },
                 "id": {
-                    "type": "integer",
-                    "example": 1
+                    "type": "integer"
                 },
                 "issues": {
                     "type": "string",

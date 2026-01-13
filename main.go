@@ -63,6 +63,30 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
+	// If the diseases table already exists, there may be rows with empty
+	// `codename` values which will cause a unique-index creation to fail
+	// (duplicate entry '' for unique index). To avoid that, first alter the
+	// column to allow NULLs and convert empty strings to NULL, then run
+	// AutoMigrate which will (re)create indexes safely.
+	if db.Migrator().HasTable(&model.Disease{}) {
+		// Make column nullable to allow converting empty strings to NULL.
+		if err := db.Exec("ALTER TABLE diseases MODIFY codename varchar(191) NULL").Error; err != nil {
+			log.Printf("Warning: failed to alter diseases.codename to NULL-able: %v", err)
+		} else {
+			log.Println("Converted diseases.codename to allow NULLs (if applicable)")
+		}
+
+		// Convert any existing empty-string codename values to NULL so they
+		// won't violate the unique index constraint (MySQL treats NULLs as
+		// distinct, allowing multiple NULLs).
+		if err := db.Exec("UPDATE diseases SET codename = NULL WHERE codename = ''").Error; err != nil {
+			log.Printf("Warning: failed to nullify empty codename values: %v", err)
+		} else {
+			log.Println("Nullified empty codename values in diseases table (if any)")
+		}
+	}
+
+	// Proceed with auto-migration for all models
 	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{})
 	if err != nil {
 		log.Fatalf("Error migrating database: %v", err)

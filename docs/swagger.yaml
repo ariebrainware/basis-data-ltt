@@ -35,6 +35,9 @@ definitions:
     type: object
   endpoint.createDiseaseRequest:
     properties:
+      codename:
+        example: diabetes
+        type: string
       description:
         example: A metabolic disease
         type: string
@@ -133,6 +136,9 @@ definitions:
   model.Disease:
     description: Disease information
     properties:
+      codename:
+        example: diabetes
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -141,7 +147,6 @@ definitions:
         example: A metabolic disease
         type: string
       id:
-        example: 1
         type: integer
       name:
         example: Diabetes
@@ -175,7 +180,6 @@ definitions:
         example: Diabetes,Hypertension
         type: string
       id:
-        example: 1
         type: integer
       job:
         example: Engineer
@@ -218,7 +222,6 @@ definitions:
         example: 175
         type: integer
       id:
-        example: 1
         type: integer
       is_approved:
         example: false
@@ -278,7 +281,6 @@ definitions:
       deletedAt:
         $ref: '#/definitions/gorm.DeletedAt'
       id:
-        example: 1
         type: integer
       issues:
         example: Back pain

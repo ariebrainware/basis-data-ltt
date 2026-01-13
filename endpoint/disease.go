@@ -56,6 +56,7 @@ func ListDiseases(c *gin.Context) {
 
 type createDiseaseRequest struct {
 	Name        string `json:"name" example:"Diabetes"`
+	Codename    string `json:"codename" example:"diabetes"`
 	Description string `json:"description" example:"A metabolic disease"`
 }
 
@@ -104,6 +105,16 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
+	// Normalize and validate codename
+	codename := strings.ToLower(strings.TrimSpace(diseaseRequest.Codename))
+	if codename == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body: codename is required",
+			Err: fmt.Errorf("codename is required"),
+		})
+		return
+	}
+
 	// Check for existing disease with same (case-insensitive) name
 	var existing model.Disease
 	if err := db.Where("LOWER(name) = ?", strings.ToLower(name)).First(&existing).Error; err == nil {
@@ -120,8 +131,25 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
+	// Check for existing disease with same codename (case-insensitive)
+	var existingCodename model.Disease
+	if err := db.Where("LOWER(codename) = ?", strings.ToLower(codename)).First(&existingCodename).Error; err == nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Disease with this codename already exists",
+			Err: fmt.Errorf("codename already exists"),
+		})
+		return
+	} else if err != nil && err != gorm.ErrRecordNotFound {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to check existing codenames",
+			Err: err,
+		})
+		return
+	}
+
 	disease := model.Disease{
 		Name:        name,
+		Codename:    codename,
 		Description: diseaseRequest.Description,
 	}
 	if err := db.Create(&disease).Error; err != nil {
@@ -190,6 +218,16 @@ func UpdateDisease(c *gin.Context) {
 			Err: err,
 		})
 		return
+	}
+
+	// Normalize codename if provided
+	if diseaseRequest.Codename != "" {
+		diseaseRequest.Codename = strings.ToLower(strings.TrimSpace(diseaseRequest.Codename))
+	}
+
+	// Normalize name if provided
+	if diseaseRequest.Name != "" {
+		diseaseRequest.Name = strings.TrimSpace(diseaseRequest.Name)
 	}
 
 	if err := db.Model(&existingDisease).Updates(diseaseRequest).Error; err != nil {
