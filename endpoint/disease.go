@@ -131,9 +131,9 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
-	// Check for existing disease with same codename
+	// Check for existing disease with same codename (case-insensitive)
 	var existingCodename model.Disease
-	if err := db.Where("codename = ?", codename).First(&existingCodename).Error; err == nil {
+	if err := db.Where("LOWER(codename) = ?", strings.ToLower(codename)).First(&existingCodename).Error; err == nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Disease with this codename already exists",
 			Err: fmt.Errorf("codename already exists"),
