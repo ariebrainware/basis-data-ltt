@@ -27,6 +27,8 @@ ARG DBNAME
 ARG DBUSER
 ARG DBPASS
 ARG JWTSECRET
+ARG REDIS_HOST
+ARG REDIS_PORT
 
 # Optionally, set them as environment variables inside the image
 ENV APPNAME=$APPNAME \
@@ -39,7 +41,9 @@ ENV APPNAME=$APPNAME \
     DBNAME=$DBNAME \
     DBUSER=$DBUSER \
     DBPASS=$DBPASS \
-    JWTSECRET=$JWTSECRET
+    JWTSECRET=$JWTSECRET \
+    REDIS_HOST=$REDIS_HOST \
+    REDIS_PORT=$REDIS_PORT
     
 # Set timezone to UTC+7.
 RUN apk add --no-cache tzdata && \
