@@ -1,9 +1,11 @@
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -121,6 +123,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// Also store session in Redis for fast validation (key: session:<token> -> "userID:roleID")
+	if rdb := config.GetRedisClient(); rdb != nil {
+		exp := time.Until(session.ExpiresAt)
+		val := fmt.Sprintf("%d:%d", session.UserID, role.ID)
+		_ = rdb.Set(context.Background(), fmt.Sprintf("session:%s", tokenString), val, exp).Err()
+	}
+
 	// Return the token in a JSON response
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Login successful",
@@ -179,6 +188,11 @@ func Logout(c *gin.Context) {
 			Err: err,
 		})
 		return
+	}
+
+	// Also delete session from Redis if available
+	if rdb := config.GetRedisClient(); rdb != nil {
+		_ = rdb.Del(context.Background(), fmt.Sprintf("session:%s", sessionToken)).Err()
 	}
 
 	// Respond with a success message

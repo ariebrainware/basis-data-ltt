@@ -1,12 +1,15 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -194,7 +197,26 @@ func ValidateLoginToken() gin.HandlerFunc {
 			return
 		}
 
-		// Find the session record and join with users to get role_id
+		// First try Redis for fast session validation: key session:<token> -> "userID:roleID"
+		if rdb := config.GetRedisClient(); rdb != nil {
+			val, err := rdb.Get(context.Background(), fmt.Sprintf("session:%s", sessionToken)).Result()
+			if err == nil {
+				parts := strings.Split(val, ":")
+				if len(parts) == 2 {
+					uid, _ := strconv.ParseUint(parts[0], 10, 64)
+					rid, _ := strconv.ParseUint(parts[1], 10, 32)
+					if uid != 0 {
+						c.Set(UserIDKey, uint(uid))
+						c.Set(RoleIDKey, uint32(rid))
+						c.Next()
+						return
+					}
+				}
+			}
+			// any Redis error or missing key -> fallback to DB
+		}
+
+		// Fallback to DB lookup when Redis doesn't have the session
 		var result struct {
 			UserID uint
 			RoleID uint32
@@ -213,7 +235,6 @@ func ValidateLoginToken() gin.HandlerFunc {
 			return
 		}
 
-		// If no matching session was found, treat as unauthorized
 		if result.UserID == 0 {
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Invalid or expired session token",

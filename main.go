@@ -63,6 +63,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
+
+	// Initialize Redis (optional, warn on failure)
+	if _, err := config.ConnectRedis(); err != nil {
+		log.Printf("Warning: could not connect to Redis: %v", err)
+	} else {
+		log.Println("Redis initialization complete")
+	}
 	// If the diseases table already exists, there may be rows with empty
 	// `codename` values which will cause a unique-index creation to fail
 	// (duplicate entry '' for unique index). To avoid that, first alter the
