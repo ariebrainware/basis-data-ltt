@@ -12,6 +12,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// applyCreatedAtFilterForTreatments applies a created_at filter for supported ranges on treatment_date.
+// Supported values: "last_2_days", "last_3_months", "last_6_months".
+func applyCreatedAtFilterForTreatments(query *gorm.DB, groupByDate string) *gorm.DB {
+	switch groupByDate {
+	case "last_2_days":
+		query = query.Where("treatments.treatment_date >= ?", time.Now().AddDate(0, 0, -2))
+	case "last_3_months":
+		query = query.Where("treatments.treatment_date >= ?", time.Now().AddDate(0, -3, 0))
+	case "last_6_months":
+		query = query.Where("treatments.treatment_date >= ?", time.Now().AddDate(0, -6, 0))
+	}
+	return query
+}
+
 func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
 	if sessionToken == "" {
 		return 0, fmt.Errorf("session token is empty")
@@ -62,7 +76,15 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		query = query.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		query = query.Where("treatments.treatment_date like ?", groupByDate+"%")
+		// Validate groupByDate against whitelist to prevent SQL injection
+		validDates := map[string]bool{
+			"last_2_days":   true,
+			"last_3_months": true,
+			"last_6_months": true,
+		}
+		if validDates[groupByDate] {
+			query = applyCreatedAtFilter(query, groupByDate)
+		}
 	}
 
 	if err := query.Find(&treatments).Error; err != nil {
@@ -80,7 +102,15 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		countQuery = countQuery.Where("treatments.treatment_date like ?", groupByDate+"%")
+		// Validate groupByDate against whitelist to prevent SQL injection
+		validDates := map[string]bool{
+			"last_2_days":   true,
+			"last_3_months": true,
+			"last_6_months": true,
+		}
+		if validDates[groupByDate] {
+			countQuery = applyCreatedAtFilterForTreatments(countQuery, groupByDate)
+		}
 	}
 	if err := countQuery.Count(&totalTreatments).Error; err != nil {
 		return nil, 0, err
