@@ -185,8 +185,12 @@ func main() {
 	// Start server on specified port with graceful shutdown
 	address := fmt.Sprintf(":%d", cfg.AppPort)
 	srv := &http.Server{
-		Addr:    address,
-		Handler: r,
+		Addr:              address,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {

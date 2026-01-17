@@ -55,6 +55,12 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 	var treatments []model.ListTreatementResponse
 	var totalTreatments int64
 
+	// Load Jakarta timezone once for date parsing
+	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load timezone: %v", err)
+	}
+
 	query := db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
@@ -67,7 +73,8 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+		kw := "%" + keyword + "%"
+		query = query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
 
 	} else {
 		query = query.Order("treatments.created_at DESC")
@@ -76,14 +83,21 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		query = query.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		// Validate groupByDate against whitelist to prevent SQL injection
-		validDates := map[string]bool{
-			"last_2_days":   true,
-			"last_3_months": true,
-			"last_6_months": true,
-		}
-		if validDates[groupByDate] {
-			query = applyCreatedAtFilter(query, groupByDate)
+		// Support either an explicit date (YYYY-MM-DD) or predefined ranges
+		if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
+			// Filter treatments that fall within the specified date (inclusive start, exclusive next day)
+			end := start.Add(24 * time.Hour)
+			query = query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
+		} else {
+			// Validate groupByDate against whitelist to prevent SQL injection for range values
+			validDates := map[string]bool{
+				"last_2_days":   true,
+				"last_3_months": true,
+				"last_6_months": true,
+			}
+			if validDates[groupByDate] {
+				query = applyCreatedAtFilterForTreatments(query, groupByDate)
+			}
 		}
 	}
 
@@ -96,20 +110,25 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
 		Where("patients.deleted_at IS NULL")
 	if keyword != "" {
-		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+		kw := "%" + keyword + "%"
+		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
 	}
 	if therapistID != 0 {
 		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		// Validate groupByDate against whitelist to prevent SQL injection
-		validDates := map[string]bool{
-			"last_2_days":   true,
-			"last_3_months": true,
-			"last_6_months": true,
-		}
-		if validDates[groupByDate] {
-			countQuery = applyCreatedAtFilterForTreatments(countQuery, groupByDate)
+		if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
+			end := start.Add(24 * time.Hour)
+			countQuery = countQuery.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
+		} else {
+			validDates := map[string]bool{
+				"last_2_days":   true,
+				"last_3_months": true,
+				"last_6_months": true,
+			}
+			if validDates[groupByDate] {
+				countQuery = applyCreatedAtFilterForTreatments(countQuery, groupByDate)
+			}
 		}
 	}
 	if err := countQuery.Count(&totalTreatments).Error; err != nil {
@@ -184,6 +203,19 @@ func ListTreatments(c *gin.Context) {
 					Err: err,
 				})
 			}
+			return
+		}
+		// Safely convert `uint` to `int` after checking platform-dependent
+		// max int to avoid accidental overflows flagged by static analysis.
+		// Compute the platform max int as an unsigned value to avoid
+		// converting a potentially negative int to uint (which static
+		// analyzers flag). Compare against that unsigned max instead.
+		maxUint := ^uint(0) >> 1
+		if sessionTherapistID > maxUint {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Therapist ID value out of range",
+				Err: fmt.Errorf("therapist id overflow: %d", sessionTherapistID),
+			})
 			return
 		}
 		therapistID = int(sessionTherapistID)

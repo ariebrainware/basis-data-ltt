@@ -53,7 +53,8 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Where("full_name LIKE ? OR patient_code LIKE ? OR address LIKE ? OR phone_number LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+		kw := "%" + keyword + "%"
+		query = query.Where("full_name LIKE ? OR patient_code LIKE ? OR address LIKE ? OR phone_number LIKE ?", kw, kw, kw, kw)
 	}
 	query = applyCreatedAtFilter(query, groupByDate)
 
@@ -166,7 +167,9 @@ func CreatePatient(c *gin.Context) {
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 		// Check if username and phone already registered
-		if err := tx.Where("full_name = ? AND (phone_number = ? OR phone_number IN ?)", patientRequest.FullName, strings.Join(patientRequest.PhoneNumber, ","), patientRequest.PhoneNumber).First(&existingPatient).Error; err != nil {
+		// Use parameterized IN query with the slice directly to avoid
+		// concatenating values into SQL and to let GORM bind parameters safely.
+		if err := tx.Where("full_name = ? AND phone_number IN ?", patientRequest.FullName, patientRequest.PhoneNumber).First(&existingPatient).Error; err != nil {
 			if err != gorm.ErrRecordNotFound {
 				return fmt.Errorf("database error: %v", err)
 			} // else continue to create new patient

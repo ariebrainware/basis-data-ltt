@@ -22,7 +22,8 @@ func fetchTherapist(db *gorm.DB, limit, offset int, keyword, groupByDate string)
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Where("full_name LIKE ? OR NIK LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		kw := "%" + keyword + "%"
+		query = query.Where("full_name LIKE ? OR NIK LIKE ?", kw, kw)
 	}
 	query = applyCreatedAtFilter(query, groupByDate)
 
