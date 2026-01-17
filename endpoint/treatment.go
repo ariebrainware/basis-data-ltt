@@ -77,10 +77,10 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 	}
 	if groupByDate != "" {
 		// Support either an explicit date (YYYY-MM-DD) or predefined ranges
-		if d, err := time.Parse("2006-01-02", groupByDate); err == nil {
+		jakartaLoc, _ := time.LoadLocation("Asia/Jakarta")
+		if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
 			// Filter treatments that fall within the specified date (inclusive start, exclusive next day)
-			start := d
-			end := d.Add(24 * time.Hour)
+			end := start.Add(24 * time.Hour)
 			query = query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
 		} else {
 			// Validate groupByDate against whitelist to prevent SQL injection for range values
@@ -110,9 +110,9 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		if d, err := time.Parse("2006-01-02", groupByDate); err == nil {
-			start := d
-			end := d.Add(24 * time.Hour)
+		jakartaLoc, _ := time.LoadLocation("Asia/Jakarta")
+		if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
+			end := start.Add(24 * time.Hour)
 			countQuery = countQuery.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
 		} else {
 			validDates := map[string]bool{
