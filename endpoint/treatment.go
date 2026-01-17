@@ -73,7 +73,8 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+		kw := "%" + keyword + "%"
+		query = query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
 
 	} else {
 		query = query.Order("treatments.created_at DESC")
@@ -109,7 +110,8 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
 		Where("patients.deleted_at IS NULL")
 	if keyword != "" {
-		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", "%"+keyword+"%", keyword)
+		kw := "%" + keyword + "%"
+		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
 	}
 	if therapistID != 0 {
 		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)

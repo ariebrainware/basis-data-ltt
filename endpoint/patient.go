@@ -53,7 +53,8 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 		query = query.Offset(offset)
 	}
 	if keyword != "" {
-		query = query.Where("full_name LIKE ? OR patient_code LIKE ? OR address LIKE ? OR phone_number LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
+		kw := "%" + keyword + "%"
+		query = query.Where("full_name LIKE ? OR patient_code LIKE ? OR address LIKE ? OR phone_number LIKE ?", kw, kw, kw, kw)
 	}
 	query = applyCreatedAtFilter(query, groupByDate)
 
