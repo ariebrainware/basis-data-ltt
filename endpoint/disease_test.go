@@ -116,8 +116,8 @@ func TestDiseaseCodenameNormalization(t *testing.T) {
 	if err := db.First(&found, disease.ID).Error; err != nil {
 		t.Fatalf("query disease: %v", err)
 	}
-	
-	// Note: This test verifies model behavior. API-level normalization 
+
+	// Note: This test verifies model behavior. API-level normalization
 	// is tested through integration tests with actual endpoint calls.
 	if found.Codename != "DIABETES" {
 		t.Logf("Info: Codename stored as '%s' (normalization handled at API layer)", found.Codename)

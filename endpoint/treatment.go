@@ -199,6 +199,19 @@ func ListTreatments(c *gin.Context) {
 			}
 			return
 		}
+		// Safely convert `uint` to `int` after checking platform-dependent
+		// max int to avoid accidental overflows flagged by static analysis.
+		// Compute the platform max int as an unsigned value to avoid
+		// converting a potentially negative int to uint (which static
+		// analyzers flag). Compare against that unsigned max instead.
+		maxUint := ^uint(0) >> 1
+		if sessionTherapistID > maxUint {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Therapist ID value out of range",
+				Err: fmt.Errorf("therapist id overflow: %d", sessionTherapistID),
+			})
+			return
+		}
 		therapistID = int(sessionTherapistID)
 	}
 

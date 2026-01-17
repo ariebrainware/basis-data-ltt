@@ -1,0 +1,84 @@
+name: CI — Security Checks
+
+on:
+  push:
+    branches: ["main", "master", "develop", "127-fix-dashboard-mixed-up-todays-treatment"]
+  pull_request:
+    branches: ["main", "master", "develop"]
+
+jobs:
+  security:
+    name: Security and Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          cache: 'gopath'
+
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ${{ github.workspace }}/go/pkg/mod
+            ${{ github.workspace }}/.cache/golangci
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Verify gofmt
+        run: |
+          bad=$(gofmt -l . | wc -l)
+          if [ "$bad" -ne "0" ]; then
+            echo "gofmt found unformatted files:" && gofmt -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run unit tests
+        run: go test ./...
+
+      - name: Install golangci-lint
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: |
+          echo "Running golangci-lint..."
+          $GOPATH/bin/golangci-lint run --out-format json ./... > golangci-report.json || true
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run gosec (JSON output)
+        run: |
+          echo "Running gosec..."
+          $GOPATH/bin/gosec -fmt=json -out=gosec.json ./... || true
+          $GOPATH/bin/gosec -fmt=summary ./... || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            gosec.json
+            golangci-report.json
+
+      - name: Basic SQL-concat grep check
+        # This is a best-effort check to catch suspicious string concatenation
+        run: |
+          set -e
+          # Look for Exec/Raw/Where with a '+' (simple heuristic)
+          if grep -R --exclude-dir=.git -nE "(Exec\(|Raw\(|\.Where\()(.+\+)" .; then
+            echo "Potential string-concatenated SQL/parameters detected. Please review the matches above.";
+            exit 1;
+          fi
+          echo "No obvious string-concatenated SQL found by heuristic grep."
