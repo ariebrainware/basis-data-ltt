@@ -76,14 +76,22 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		query = query.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		// Validate groupByDate against whitelist to prevent SQL injection
-		validDates := map[string]bool{
-			"last_2_days":   true,
-			"last_3_months": true,
-			"last_6_months": true,
-		}
-		if validDates[groupByDate] {
-			query = applyCreatedAtFilter(query, groupByDate)
+		// Support either an explicit date (YYYY-MM-DD) or predefined ranges
+		if d, err := time.Parse("2006-01-02", groupByDate); err == nil {
+			// Filter treatments that fall within the specified date (inclusive start, exclusive next day)
+			start := d
+			end := d.Add(24 * time.Hour)
+			query = query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
+		} else {
+			// Validate groupByDate against whitelist to prevent SQL injection for range values
+			validDates := map[string]bool{
+				"last_2_days":   true,
+				"last_3_months": true,
+				"last_6_months": true,
+			}
+			if validDates[groupByDate] {
+				query = applyCreatedAtFilterForTreatments(query, groupByDate)
+			}
 		}
 	}
 
@@ -102,14 +110,19 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
 	}
 	if groupByDate != "" {
-		// Validate groupByDate against whitelist to prevent SQL injection
-		validDates := map[string]bool{
-			"last_2_days":   true,
-			"last_3_months": true,
-			"last_6_months": true,
-		}
-		if validDates[groupByDate] {
-			countQuery = applyCreatedAtFilterForTreatments(countQuery, groupByDate)
+		if d, err := time.Parse("2006-01-02", groupByDate); err == nil {
+			start := d
+			end := d.Add(24 * time.Hour)
+			countQuery = countQuery.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
+		} else {
+			validDates := map[string]bool{
+				"last_2_days":   true,
+				"last_3_months": true,
+				"last_6_months": true,
+			}
+			if validDates[groupByDate] {
+				countQuery = applyCreatedAtFilterForTreatments(countQuery, groupByDate)
+			}
 		}
 	}
 	if err := countQuery.Count(&totalTreatments).Error; err != nil {
