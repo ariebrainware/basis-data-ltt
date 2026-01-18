@@ -24,4 +24,4 @@ dockers:
 release:
   github:
     owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
-    name: "{{ .Env.GITHUB_REPOSITORY }}"
+    name: "{{ index (split .Env.GITHUB_REPOSITORY \"/\") 1 }}"
