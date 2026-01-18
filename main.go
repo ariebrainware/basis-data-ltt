@@ -24,7 +24,7 @@ import (
 )
 
 // @title           LTT Backend API
-// @version         1.5.1
+// @version         v1.6.0
 // @description     REST API for managing patient data, treatments, and therapy sessions
 // @description     This API provides endpoints for patient management, disease tracking, treatment records, and therapist management.
 
