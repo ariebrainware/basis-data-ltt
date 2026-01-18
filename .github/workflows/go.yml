@@ -32,21 +32,21 @@ jobs:
     - name: Build and push Docker image
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker build -t ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.dev-$SHORT_SHA .
-        docker push ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.dev-$SHORT_SHA
+        docker build -t ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA .
+        docker push ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
 
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        if [ "$(docker ps -aq -f name=ltt-be)" ]; then
-          docker stop ltt-be
-          docker rm ltt-be
+        if [ "$(docker ps -aq -f name=basis-data-ltt)" ]; then
+          docker stop basis-data-ltt
+          docker rm basis-data-ltt
         fi
         if [ -z "${{ secrets.APITOKEN }}" ] || [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
           echo "One or more required environment variables are missing."
           exit 1
         fi
-        docker run --name=ltt-be -d -p 19091:19091 \
+        docker run --name=basis-data-ltt -d -p 19091:19091 \
           --env=APPNAME=${{ vars.APPNAME }} \
           --env=APITOKEN=${{ secrets.APITOKEN }} \
           --env=APPENV=${{ vars.APPENV }} \
@@ -62,7 +62,7 @@ jobs:
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
-          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.dev-$SHORT_SHA
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
   prod_deploy:
     runs-on: [ltt-server]
     if: github.ref == 'refs/heads/main'
@@ -85,12 +85,12 @@ jobs:
     - name: Build and push Docker image
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker build -t ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.prod-$SHORT_SHA .
-        docker push ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.prod-$SHORT_SHA
+        docker build -t ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA .
+        docker push ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA
 
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
-        docker stop ltt-be || true
-        docker rm ltt-be || true
-        docker run --name=ltt-be -d -p 19091:19091 --restart=always --network=baota_net --dns=1.1.1.1 --dns=8.8.8.8 --dns-search=panel.ritalincompany.com --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPENV=${{ vars.APPENV }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/ltt-be:v1.0.prod-$SHORT_SHA
+        docker stop basis-data-ltt || true
+        docker rm basis-data-ltt || true
+        docker run --name=basis-data-ltt -d -p 19091:19091 --restart=always --network=baota_net --dns=1.1.1.1 --dns=8.8.8.8 --dns-search=panel.ritalincompany.com --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPENV=${{ vars.APPENV }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA

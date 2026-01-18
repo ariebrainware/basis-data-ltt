@@ -32,10 +32,10 @@ A Go REST API backend for managing patient data, treatments, and therapy session
 go run main.go
 
 # Build binary
-go build -o ltt-be
+go build -o basis-data-ltt
 
 # Run Docker container
-docker build -t ltt-be . && docker run -p 19091:19091 ltt-be
+docker build -t basis-data-ltt . && docker run -p 19091:19091 basis-data-ltt
 ```
 
 ### Database

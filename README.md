@@ -38,7 +38,7 @@ This project is a backend service written in Go. It is designed to manage basis 
 - Create and configure any necessary environment variables. For example, a `.env` file can be used to set database connections and server ports.
 - Sample environment variables:
   ```
-    APPNAME=ltt-be
+    APPNAME=basis-data-ltt
     APITOKEN=ed25519key
     APPENV=local
     APPPORT=19091
