@@ -1,0 +1,27 @@
+project_name: basis-data-ltt
+
+builds:
+  - id: default
+    env:
+      CGO_ENABLED: "0"
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+
+archives:
+  - format: tar.gz
+    files:
+      - README.md
+
+dockers:
+  - image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/basis-data-ltt:{{ .Tag }}"
+    dockerfile: Dockerfile
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: "{{ index (split .Env.GITHUB_REPOSITORY \"/\") 1 }}"
