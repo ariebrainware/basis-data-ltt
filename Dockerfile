@@ -1,8 +1,32 @@
+FROM golang:1.24-alpine AS builder
+LABEL maintainer="Arie Brainware"
+
+WORKDIR /src
+
+# Install build deps
+RUN apk add --no-cache git ca-certificates
+
+# Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source and build the binary
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags "-s -w" -o /basis-data-ltt ./
+
 FROM alpine:latest
 LABEL maintainer="Arie Brainware"
+
 WORKDIR /app
 
-# Declare build args (optional at image build time)
+# Set timezone to Jakarta
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
+    echo "Asia/Jakarta" > /etc/timezone && \
+    apk del tzdata
+
+# Runtime environment variables (can be set at docker build or run time)
 ARG APPNAME
 ARG APITOKEN
 ARG APPENV
@@ -17,7 +41,6 @@ ARG JWTSECRET
 ARG REDIS_HOST
 ARG REDIS_PORT
 
-# Optionally, set them as environment variables inside the image
 ENV APPNAME=$APPNAME \
     APITOKEN=$APITOKEN \
     APPENV=$APPENV \
@@ -32,15 +55,8 @@ ENV APPNAME=$APPNAME \
     REDIS_HOST=$REDIS_HOST \
     REDIS_PORT=$REDIS_PORT
 
-# Set timezone to Jakarta
-RUN apk add --no-cache tzdata && \
-    cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
-    echo "Asia/Jakarta" > /etc/timezone && \
-    apk del tzdata
-
-# Copy the prebuilt binary produced by goreleaser into the image.
-# Goreleaser provides the binary in the Docker build context as 'basis-data-ltt'.
-COPY basis-data-ltt ./basis-data-ltt
+# Copy binary from builder
+COPY --from=builder /basis-data-ltt ./basis-data-ltt
 RUN chmod +x ./basis-data-ltt
 
 EXPOSE 19091
