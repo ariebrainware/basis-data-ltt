@@ -1,10 +1,13 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.24-bullseye AS builder
 LABEL maintainer="Arie Brainware"
 
 WORKDIR /src
 
 # Install build deps
-RUN apk add --no-cache git ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 
 # Cache dependencies
 COPY go.mod go.sum ./
