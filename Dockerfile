@@ -20,11 +20,9 @@ LABEL maintainer="Arie Brainware"
 
 WORKDIR /app
 
-# Set timezone to Jakarta
-RUN apk add --no-cache tzdata && \
-    cp /usr/share/zoneinfo/Asia/Jakarta /etc/localtime && \
-    echo "Asia/Jakarta" > /etc/timezone && \
-    apk del tzdata
+# Timezone: rely on Go's embedded tzdata (import _ "time/tzdata").
+# Avoid installing tzdata in Alpine to prevent network/package repo errors.
+ENV TZ=Asia/Jakarta
 
 # Runtime environment variables (can be set at docker build or run time)
 ARG APPNAME
