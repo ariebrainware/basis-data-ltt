@@ -11,7 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Cache dependencies
 COPY go.mod go.sum ./
-RUN go mod download
+# If a vendor directory is present in the repo, prefer it and skip network fetches.
+# Otherwise attempt to download modules (may fail if builder has no network).
+RUN if [ -d ./vendor ]; then \
+            echo "Using vendor directory, skipping go mod download"; \
+        else \
+            echo "No vendor dir found — attempting go mod download"; \
+            go mod download; \
+        fi
 
 # Copy source and build the binary
 COPY . .
