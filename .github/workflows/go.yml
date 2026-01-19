@@ -62,7 +62,7 @@ jobs:
           echo "One or more required environment variables are missing."
           exit 1
         fi
-        docker run --name=basis-data-ltt -d -p 19091:19091 \
+        docker run --name=basis-data-ltt -d -p 19091:19091 --network=baota_net \
           --env=APPNAME=${{ vars.APPNAME }} \
           --env=APITOKEN=${{ secrets.APITOKEN }} \
           --env=APPENV=${{ vars.APPENV }} \
@@ -78,7 +78,11 @@ jobs:
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
-          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} \
+          --env=REDIS_ADDR=${{ vars.REDIS_ADDR }} \
+          --env=REDIS_PASS=${{ secrets.REDIS_PASS }} \
+          --env=REDIS_DB=${{ vars.REDIS_DB }} \
+          ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
   prod_deploy:
     runs-on: [evolto3-be-runner]
     timeout-minutes: 15
@@ -140,6 +144,9 @@ jobs:
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
           --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} \
+          --env=REDIS_ADDR=${{ vars.REDIS_ADDR }} \
+          --env=REDIS_PASS=${{ secrets.REDIS_PASS }} \
+          --env=REDIS_DB=${{ vars.REDIS_DB }} \
           ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA
 
   publish:
