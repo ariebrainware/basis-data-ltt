@@ -22,8 +22,14 @@ RUN if [ -d ./vendor ]; then \
 
 # Copy source and build the binary
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags "-s -w" -o /basis-data-ltt ./
+# If `vendor/` exists, build using vendored modules to avoid network fetches.
+RUN if [ -d ./vendor ]; then \
+            echo "Building with vendor modules"; \
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -ldflags "-s -w" -o /basis-data-ltt ./; \
+        else \
+            echo "No vendor directory — building with normal module download"; \
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o /basis-data-ltt ./; \
+        fi
 
 FROM alpine:latest
 LABEL maintainer="Arie Brainware"
