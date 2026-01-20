@@ -203,7 +203,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 			if err == nil {
 				parts := strings.Split(val, ":")
 				if len(parts) == 2 {
-					uid, errUID := strconv.ParseUint(parts[0], 10, 0)  // parse using native uint size
+					uid, errUID := strconv.ParseUint(parts[0], 10, 0) // parse using native uint size
 					rid, errRID := strconv.ParseUint(parts[1], 10, 32)
 					if errUID == nil && errRID == nil && uid != 0 {
 						c.Set(UserIDKey, uint(uid))
