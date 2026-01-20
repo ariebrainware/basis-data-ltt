@@ -203,9 +203,9 @@ func ValidateLoginToken() gin.HandlerFunc {
 			if err == nil {
 				parts := strings.Split(val, ":")
 				if len(parts) == 2 {
-					uid, _ := strconv.ParseUint(parts[0], 10, 64)
-					rid, _ := strconv.ParseUint(parts[1], 10, 32)
-					if uid != 0 {
+					uid, errUID := strconv.ParseUint(parts[0], 10, 0)  // parse using native uint size
+					rid, errRID := strconv.ParseUint(parts[1], 10, 32)
+					if errUID == nil && errRID == nil && uid != 0 {
 						c.Set(UserIDKey, uint(uid))
 						c.Set(RoleIDKey, uint32(rid))
 						c.Next()
@@ -213,7 +213,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 					}
 				}
 			}
-			// any Redis error or missing key -> fallback to DB
+			// any Redis error, malformed value, or missing key -> fallback to DB
 		}
 
 		// Fallback to DB lookup when Redis doesn't have the session
