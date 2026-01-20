@@ -64,3 +64,16 @@ func ConnectRedis() (*redis.Client, error) {
 func GetRedisClient() *redis.Client {
 	return redisClient
 }
+
+// SetRedisClientForTest sets the Redis client for testing purposes.
+// This should only be used in test code.
+func SetRedisClientForTest(client *redis.Client) {
+	redisClient = client
+}
+
+// ResetRedisClientForTest resets the Redis client singleton for testing purposes.
+// This should only be used in test code.
+func ResetRedisClientForTest() {
+	redisClient = nil
+	redisOnce = sync.Once{}
+}
