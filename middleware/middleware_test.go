@@ -142,7 +142,6 @@ func TestValidateLoginToken_RedisSuccessfulParse(t *testing.T) {
 	// Create mock Redis client
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
-	defer config.SetRedisClientForTest(nil)
 	config.SetRedisClientForTest(rdb)
 	
 	// Set up mock expectations
@@ -192,7 +191,6 @@ func TestValidateLoginToken_RedisMalformedValue_NonNumeric(t *testing.T) {
 	// Create mock Redis client
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
-	defer config.SetRedisClientForTest(nil)
 	config.SetRedisClientForTest(rdb)
 	
 	// Set up mock expectations - Redis returns malformed data
@@ -268,7 +266,6 @@ func TestValidateLoginToken_RedisInvalidFormat_MissingColon(t *testing.T) {
 	// Create mock Redis client
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
-	defer config.SetRedisClientForTest(nil)
 	config.SetRedisClientForTest(rdb)
 	
 	// Set up mock expectations - Redis returns invalid format
@@ -336,7 +333,6 @@ func TestValidateLoginToken_RedisZeroUserID(t *testing.T) {
 	// Create mock Redis client
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
-	defer config.SetRedisClientForTest(nil)
 	config.SetRedisClientForTest(rdb)
 	
 	// Set up mock expectations - Redis returns zero user ID
@@ -404,7 +400,6 @@ func TestValidateLoginToken_RedisRoleIDParseError(t *testing.T) {
 	// Create mock Redis client
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
-	defer config.SetRedisClientForTest(nil)
 	config.SetRedisClientForTest(rdb)
 	
 	// Set up mock expectations - Redis returns non-numeric role ID
@@ -599,7 +594,6 @@ func TestValidateLoginToken_RedisKeyNotFound_DBFallback(t *testing.T) {
 	// Create mock Redis client
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
-	defer config.SetRedisClientForTest(nil)
 	config.SetRedisClientForTest(rdb)
 	
 	// Set up mock expectations - Redis returns key not found error
