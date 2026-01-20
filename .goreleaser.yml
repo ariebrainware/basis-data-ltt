@@ -16,7 +16,7 @@ archives:
   - files:
       - README.md
 
-dockers_v2:
+dockers:
   - image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/basis-data-ltt:{{ .Tag }}"
     dockerfile: Dockerfile.release
