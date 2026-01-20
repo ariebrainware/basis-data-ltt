@@ -13,14 +13,13 @@ builds:
       - -s -w
 
 archives:
-  - format: tar.gz
-    files:
+  - files:
       - README.md
 
-dockers:
+dockers_v2:
   - image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/basis-data-ltt:{{ .Tag }}"
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.release
 
 release:
   github:
