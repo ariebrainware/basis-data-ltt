@@ -18,6 +18,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
+	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -50,6 +51,14 @@ import (
 func main() {
 	// Load the configuration
 	cfg := config.LoadConfig()
+
+	// Initialize JWT secret from environment and validate it.
+	util.InitJWTSecretFromEnv()
+	if cfg.AppEnv != "test" {
+		if err := util.ValidateJWTSecret(); err != nil {
+			log.Fatalf("%v", err)
+		}
+	}
 
 	// Set the timezone to Asia/Jakarta
 	location, err := time.LoadLocation("Asia/Jakarta")
