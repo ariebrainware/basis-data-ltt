@@ -150,7 +150,7 @@ jobs:
           ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: [evolto3-be-runner]
     permissions:
       contents: write
       packages: write

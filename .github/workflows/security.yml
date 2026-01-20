@@ -9,7 +9,7 @@ on:
 jobs:
   security:
     name: Security and Quality Checks
-    runs-on: ubuntu-latest
+    runs-on: [evolto3-be-runner]
     permissions:
       contents: read
 
