@@ -1,10 +1,10 @@
 package model
 
 import (
-"testing"
+	"testing"
 
-"gorm.io/driver/sqlite"
-"gorm.io/gorm"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 func TestSeedRolesCreatesRoles(t *testing.T) {
