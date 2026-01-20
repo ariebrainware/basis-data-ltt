@@ -4,14 +4,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"sync"
 )
 
 var (
-	jwtSecretValue = getEnv("JWTSECRET", "")
-	jwtSecretByte  = []byte(jwtSecretValue)
-	jwtMutex       sync.RWMutex
+	jwtSecretByte []byte
+	jwtMutex      sync.RWMutex
 )
 
 func getEnv(key, fallback string) string {
@@ -20,6 +20,22 @@ func getEnv(key, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+// InitJWTSecretFromEnv initializes the in-memory JWT secret from the `JWTSECRET` environment variable.
+// Call this early in application startup (e.g. in main) to ensure the secret is set.
+func InitJWTSecretFromEnv() {
+	SetJWTSecret(getEnv("JWTSECRET", ""))
+}
+
+// ValidateJWTSecret returns an error when the JWT secret is empty.
+// The caller can decide whether to treat an empty secret as fatal (recommended for non-test envs).
+func ValidateJWTSecret() error {
+	secret := GetJWTSecretByte()
+	if len(secret) == 0 {
+		return fmt.Errorf("JWTSECRET is not configured")
+	}
+	return nil
 }
 
 func HashPassword(password string) (hashedPassword string) {
