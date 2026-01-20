@@ -14,7 +14,7 @@ func TestSeedRolesCreatesRoles(t *testing.T) {
 	}
 
 	if err := db.AutoMigrate(&Role{}); err != nil {
-		t.Fatalf("failed to aut migrate: %v", err)
+		t.Fatalf("failed to auto migrate: %v", err)
 	}
 
 	if err := SeedRoles(db); err != nil {

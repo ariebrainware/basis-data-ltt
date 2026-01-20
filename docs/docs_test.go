@@ -1,8 +1,8 @@
 package docs
 
 import (
-	"strings"
 	"testing"
+	"strings"
 )
 
 func TestSwaggerInfoBasic(t *testing.T) {
