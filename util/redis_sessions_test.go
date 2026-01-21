@@ -10,6 +10,19 @@ import (
 	"github.com/go-redis/redismock/v9"
 )
 
+// removeSessionLuaScript is the Lua script used in RemoveSessionTokenFromUserSet
+// to atomically remove a token and delete the set if empty.
+const removeSessionLuaScript = `
+		local removed = redis.call('SREM', KEYS[1], ARGV[1])
+		if removed > 0 then
+			local count = redis.call('SCARD', KEYS[1])
+			if count == 0 then
+				redis.call('DEL', KEYS[1])
+			end
+		end
+		return removed
+	`
+
 func TestAddSessionToUserSet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
@@ -52,20 +65,8 @@ func TestRemoveSessionTokenFromUserSet_TokenRemovedCorrectly(t *testing.T) {
 	token := "test-token-123"
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	// Lua script that removes the token and checks if set is empty
-	script := `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
-
 	// Expect Eval to be called with the script, and return 1 (token removed)
-	mock.ExpectEval(script, []string{userSetKey}, token).SetVal(int64(1))
+	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(1))
 
 	err := RemoveSessionTokenFromUserSet(userID, token)
 	if err != nil {
@@ -86,19 +87,8 @@ func TestRemoveSessionTokenFromUserSet_EmptySetDeleted(t *testing.T) {
 	token := "last-token"
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	script := `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
-
 	// The Lua script will remove the token and delete the set
-	mock.ExpectEval(script, []string{userSetKey}, token).SetVal(int64(1))
+	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(1))
 
 	err := RemoveSessionTokenFromUserSet(userID, token)
 	if err != nil {
@@ -119,19 +109,8 @@ func TestRemoveSessionTokenFromUserSet_NonEmptySetPersists(t *testing.T) {
 	token := "token-to-remove"
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	script := `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
-
 	// The Lua script will remove the token but NOT delete the set (count > 0)
-	mock.ExpectEval(script, []string{userSetKey}, token).SetVal(int64(1))
+	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(1))
 
 	err := RemoveSessionTokenFromUserSet(userID, token)
 	if err != nil {
@@ -152,19 +131,8 @@ func TestRemoveSessionTokenFromUserSet_TokenNotFound(t *testing.T) {
 	token := "nonexistent-token"
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	script := `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
-
 	// Lua script returns 0 (token not found)
-	mock.ExpectEval(script, []string{userSetKey}, token).SetVal(int64(0))
+	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(0))
 
 	err := RemoveSessionTokenFromUserSet(userID, token)
 	if err != nil {
@@ -201,20 +169,9 @@ func TestRemoveSessionTokenFromUserSet_ConcurrentRemoval(t *testing.T) {
 	token2 := "token-2"
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	script := `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
-
 	// Expect two concurrent Eval calls (order may vary due to concurrency)
-	mock.ExpectEval(script, []string{userSetKey}, token1).SetVal(int64(1))
-	mock.ExpectEval(script, []string{userSetKey}, token2).SetVal(int64(1))
+	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token1).SetVal(int64(1))
+	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token2).SetVal(int64(1))
 
 	var wg sync.WaitGroup
 	wg.Add(2)
