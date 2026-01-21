@@ -15,7 +15,7 @@ import (
 // migration, and table cleanup. It returns a *gorm.DB instance for use in tests.
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	
+
 	t.Setenv("APPENV", "test")
 	t.Setenv("JWTSECRET", "test-secret")
 
