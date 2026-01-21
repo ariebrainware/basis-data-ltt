@@ -1,9 +1,11 @@
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
+	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -104,6 +106,23 @@ func UpdateUser(c *gin.Context) {
 	if err := db.Save(&user).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
 		return
+	}
+
+	// If password changed, invalidate all sessions for this user (DB + Redis)
+	if req.Password != "" {
+		// delete sessions in DB
+		_ = db.Where("user_id = ?", user.ID).Delete(&model.Session{}).Error
+		// delete sessions in Redis
+		if rdb := config.GetRedisClient(); rdb != nil {
+			ctx := context.Background()
+			userSetKey := fmt.Sprintf("user_sessions:%d", user.ID)
+			if members, err := rdb.SMembers(ctx, userSetKey).Result(); err == nil {
+				for _, tok := range members {
+					_ = rdb.Del(ctx, fmt.Sprintf("session:%s", tok)).Err()
+				}
+			}
+			_ = rdb.Del(ctx, userSetKey).Err()
+		}
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
@@ -438,6 +457,18 @@ func DeleteUser(c *gin.Context) {
 		}
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to delete user", Err: err})
 		return
+	}
+
+	// Also remove any Redis session keys for this user (best-effort)
+	if rdb := config.GetRedisClient(); rdb != nil {
+		ctx := context.Background()
+		userSetKey := fmt.Sprintf("user_sessions:%d", uid)
+		if members, err := rdb.SMembers(ctx, userSetKey).Result(); err == nil {
+			for _, tok := range members {
+				_ = rdb.Del(ctx, fmt.Sprintf("session:%s", tok)).Err()
+			}
+		}
+		_ = rdb.Del(ctx, userSetKey).Err()
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User deleted"})
