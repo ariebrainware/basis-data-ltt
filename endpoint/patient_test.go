@@ -246,21 +246,33 @@ func TestFetchPatientsDefaultSort(t *testing.T) {
 	// clean table
 	db.Where("1 = 1").Delete(&model.Patient{})
 
-	// create patients with staggered creation times
-	time.Sleep(10 * time.Millisecond)
-	oldest := model.Patient{FullName: "Oldest Patient", PatientCode: "O001", PhoneNumber: "111"}
+	// create patients with explicit creation times
+	now := time.Now()
+	oldest := model.Patient{
+		Model:       gorm.Model{CreatedAt: now.Add(-2 * time.Hour)},
+		FullName:    "Oldest Patient",
+		PatientCode: "O001",
+		PhoneNumber: "111",
+	}
+	middle := model.Patient{
+		Model:       gorm.Model{CreatedAt: now.Add(-1 * time.Hour)},
+		FullName:    "Middle Patient",
+		PatientCode: "M001",
+		PhoneNumber: "222",
+	}
+	newest := model.Patient{
+		Model:       gorm.Model{CreatedAt: now},
+		FullName:    "Newest Patient",
+		PatientCode: "N001",
+		PhoneNumber: "333",
+	}
+
 	if err := db.Create(&oldest).Error; err != nil {
 		t.Fatalf("create oldest: %v", err)
 	}
-
-	time.Sleep(10 * time.Millisecond)
-	middle := model.Patient{FullName: "Middle Patient", PatientCode: "M001", PhoneNumber: "222"}
 	if err := db.Create(&middle).Error; err != nil {
 		t.Fatalf("create middle: %v", err)
 	}
-
-	time.Sleep(10 * time.Millisecond)
-	newest := model.Patient{FullName: "Newest Patient", PatientCode: "N001", PhoneNumber: "333"}
 	if err := db.Create(&newest).Error; err != nil {
 		t.Fatalf("create newest: %v", err)
 	}
