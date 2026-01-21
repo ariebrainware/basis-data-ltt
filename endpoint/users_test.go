@@ -68,9 +68,9 @@ func TestUserEndpoints(t *testing.T) {
 		userAdmin.Use(middleware.RequireRole(model.RoleAdmin))
 		{
 			userAdmin.GET("", endpoint.ListUsers)
-			userAdmin.GET(":id", endpoint.GetUserInfo)
-			userAdmin.PATCH(":id", endpoint.UpdateUserByID)
-			userAdmin.DELETE(":id", endpoint.DeleteUser)
+			userAdmin.GET("/:id", endpoint.GetUserInfo)
+			userAdmin.PATCH("/:id", endpoint.UpdateUserByID)
+			userAdmin.DELETE("/:id", endpoint.DeleteUser)
 		}
 	}
 
