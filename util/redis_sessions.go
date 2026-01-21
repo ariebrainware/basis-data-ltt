@@ -46,6 +46,7 @@ func InvalidateUserSessions(userID uint) error {
 	ctx := context.Background()
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 	members, err := rdb.SMembers(ctx, userSetKey).Result()
+	// redis.Nil indicates the key doesn't exist (no active sessions), which is a valid scenario
 	if err != nil && err != redis.Nil {
 		return err
 	}
