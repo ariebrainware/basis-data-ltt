@@ -42,6 +42,15 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// Validate that at least one field is being updated
+	if req.Name == "" && req.Email == "" && req.Password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "At least one field (name, email, or password) must be provided",
+			Err: fmt.Errorf("no fields to update"),
+		})
+		return
+	}
+
 	db := middleware.GetDB(c)
 	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -190,6 +199,15 @@ func AdminUpdateUser(c *gin.Context) {
 	var req UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request payload", Err: err})
+		return
+	}
+
+	// Validate that at least one field is being updated
+	if req.Name == "" && req.Email == "" && req.Password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "At least one field (name, email, or password) must be provided",
+			Err: fmt.Errorf("no fields to update"),
+		})
 		return
 	}
 
