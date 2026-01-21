@@ -51,6 +51,15 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// Validate that at least one field is being updated
+	if req.Name == "" && req.Email == "" && req.Password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "At least one field (name, email, or password) must be provided",
+			Err: fmt.Errorf("no fields to update"),
+		})
+		return
+	}
+
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
 		util.CallUserNotAuthorized(c, util.APIErrorParams{
@@ -67,15 +76,6 @@ func UpdateUser(c *gin.Context) {
 			return
 		}
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
-		return
-	}
-
-	// Validate that at least one field is being updated
-	if req.Name == "" && req.Email == "" && req.Password == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "At least one field (name, email, or password) must be provided",
-			Err: fmt.Errorf("no fields to update"),
-		})
 		return
 	}
 
@@ -202,6 +202,15 @@ func AdminUpdateUser(c *gin.Context) {
 		return
 	}
 
+	// Validate that at least one field is being updated
+	if req.Name == "" && req.Email == "" && req.Password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "At least one field (name, email, or password) must be provided",
+			Err: fmt.Errorf("no fields to update"),
+		})
+		return
+	}
+
 	db := middleware.GetDB(c)
 	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Database connection not available", Err: fmt.Errorf("db is nil")})
@@ -215,15 +224,6 @@ func AdminUpdateUser(c *gin.Context) {
 			return
 		}
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
-		return
-	}
-
-	// Validate that at least one field is being updated
-	if req.Name == "" && req.Email == "" && req.Password == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "At least one field (name, email, or password) must be provided",
-			Err: fmt.Errorf("no fields to update"),
-		})
 		return
 	}
 
