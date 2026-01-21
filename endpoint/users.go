@@ -70,6 +70,15 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// Validate that at least one field is being updated
+	if req.Name == "" && req.Email == "" && req.Password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "At least one field (name, email, or password) must be provided",
+			Err: fmt.Errorf("no fields to update"),
+		})
+		return
+	}
+
 	// If email provided and different, ensure uniqueness
 	if req.Email != "" && req.Email != user.Email {
 		var count int64
@@ -204,6 +213,15 @@ func AdminUpdateUser(c *gin.Context) {
 			return
 		}
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
+		return
+	}
+
+	// Validate that at least one field is being updated
+	if req.Name == "" && req.Email == "" && req.Password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "At least one field (name, email, or password) must be provided",
+			Err: fmt.Errorf("no fields to update"),
+		})
 		return
 	}
 
