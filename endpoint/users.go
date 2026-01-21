@@ -240,8 +240,8 @@ func AdminUpdateUser(c *gin.Context) {
 // parseIDParam parses the "id" path parameter into a uint and returns an error if invalid.
 func parseIDParam(c *gin.Context) (uint, error) {
 	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil || id == 0 {
+	id, err := strconv.ParseInt(idStr, 10, 32)
+	if err != nil || id <= 0 {
 		return 0, fmt.Errorf("invalid id")
 	}
 	return uint(id), nil
