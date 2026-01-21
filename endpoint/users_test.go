@@ -237,4 +237,145 @@ func TestUserEndpoints(t *testing.T) {
 	if rr.Code == http.StatusOK {
 		t.Fatalf("expecting not found after delete but got 200: %s", rr.Body.String())
 	}
+
+	// 13) Signup a third user for email update testing
+	signupBody3 := map[string]string{"name": "Test User 3", "email": "user3@example.com", "password": "user3pass"}
+	b, _ = json.Marshal(signupBody3)
+	rr, err = doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	if err != nil {
+		t.Fatalf("signup user3 failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("signup user3 non-200: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// 14) Login third user
+	loginBody3 := map[string]string{"email": "user3@example.com", "password": "user3pass"}
+	b, _ = json.Marshal(loginBody3)
+	rr, err = doRequest(r, "POST", "/login", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	if err != nil {
+		t.Fatalf("login user3 failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("login user3 non-200: %d %s", rr.Code, rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode login3 resp failed: %v", err)
+	}
+	var user3Data struct {
+		Token  string `json:"token"`
+		Role   string `json:"role"`
+		UserID uint   `json:"user_id"`
+	}
+	if err := json.Unmarshal(resp.Data, &user3Data); err != nil {
+		t.Fatalf("parse login3 data failed: %v", err)
+	}
+
+	// 15) Test UpdateUser with email update - should succeed with unique email
+	emailUpdate := map[string]string{"email": "user3-updated@example.com"}
+	b, _ = json.Marshal(emailUpdate)
+	rr, err = doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": user3Data.Token})
+	if err != nil {
+		t.Fatalf("email update failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("email update non-200: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// 16) Verify email was updated in database
+	var user3Updated model.User
+	if err := db.First(&user3Updated, user3Data.UserID).Error; err != nil {
+		t.Fatalf("failed to query user3 after email update: %v", err)
+	}
+	if user3Updated.Email != "user3-updated@example.com" {
+		t.Fatalf("expected email to be user3-updated@example.com; got %s", user3Updated.Email)
+	}
+
+	// 17) Test UpdateUser with duplicate email - should fail with uniqueness constraint
+	duplicateEmailUpdate := map[string]string{"email": "admin@example.com"} // admin's email
+	b, _ = json.Marshal(duplicateEmailUpdate)
+	rr, err = doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": user3Data.Token})
+	if err != nil {
+		t.Fatalf("duplicate email update request failed: %v", err)
+	}
+	if rr.Code == http.StatusOK {
+		t.Fatalf("expected duplicate email update to fail but got 200: %s", rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode duplicate email resp failed: %v", err)
+	}
+	if resp.Msg != "Email already exists" {
+		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
+	}
+
+	// 18) Signup a fourth user for admin email update testing
+	signupBody4 := map[string]string{"name": "Test User 4", "email": "user4@example.com", "password": "user4pass"}
+	b, _ = json.Marshal(signupBody4)
+	rr, err = doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	if err != nil {
+		t.Fatalf("signup user4 failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("signup user4 non-200: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// 19) Login fourth user to get ID
+	loginBody4 := map[string]string{"email": "user4@example.com", "password": "user4pass"}
+	b, _ = json.Marshal(loginBody4)
+	rr, err = doRequest(r, "POST", "/login", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	if err != nil {
+		t.Fatalf("login user4 failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("login user4 non-200: %d %s", rr.Code, rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode login4 resp failed: %v", err)
+	}
+	var user4Data struct {
+		Token  string `json:"token"`
+		Role   string `json:"role"`
+		UserID uint   `json:"user_id"`
+	}
+	if err := json.Unmarshal(resp.Data, &user4Data); err != nil {
+		t.Fatalf("parse login4 data failed: %v", err)
+	}
+
+	// 20) Admin: UpdateUserByID with email update - should succeed with unique email
+	user4Path := "/user/" + strconv.Itoa(int(user4Data.UserID))
+	adminEmailUpdate := map[string]string{"email": "user4-admin-updated@example.com"}
+	b, _ = json.Marshal(adminEmailUpdate)
+	rr, err = doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+	if err != nil {
+		t.Fatalf("admin email update failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("admin email update non-200: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// 21) Verify email was updated in database by admin
+	var user4Updated model.User
+	if err := db.First(&user4Updated, user4Data.UserID).Error; err != nil {
+		t.Fatalf("failed to query user4 after admin email update: %v", err)
+	}
+	if user4Updated.Email != "user4-admin-updated@example.com" {
+		t.Fatalf("expected email to be user4-admin-updated@example.com; got %s", user4Updated.Email)
+	}
+
+	// 22) Admin: UpdateUserByID with duplicate email - should fail with uniqueness constraint
+	adminDuplicateEmailUpdate := map[string]string{"email": "admin@example.com"} // admin's own email
+	b, _ = json.Marshal(adminDuplicateEmailUpdate)
+	rr, err = doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+	if err != nil {
+		t.Fatalf("admin duplicate email update request failed: %v", err)
+	}
+	if rr.Code == http.StatusOK {
+		t.Fatalf("expected admin duplicate email update to fail but got 200: %s", rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode admin duplicate email resp failed: %v", err)
+	}
+	if resp.Msg != "Email already exists" {
+		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
+	}
 }
