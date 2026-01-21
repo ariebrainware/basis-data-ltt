@@ -3,7 +3,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/redis/go-redis/v9"
@@ -12,7 +11,7 @@ import (
 // AddSessionToUserSet adds the session token to the per-user Redis set.
 // The set has no TTL and persists until explicitly cleaned up via
 // RemoveSessionTokenFromUserSet or InvalidateUserSessions.
-func AddSessionToUserSet(userID uint, token string, exp time.Duration) error {
+func AddSessionToUserSet(userID uint, token string) error {
 	rdb := config.GetRedisClient()
 	if rdb == nil {
 		return nil
