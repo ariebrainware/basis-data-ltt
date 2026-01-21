@@ -18,6 +18,7 @@ permissions:
 jobs:
   dev_deploy:
     runs-on: [evolto3-be-runner]
+    timeout-minutes: 15
     if: github.ref == 'refs/heads/dev'
     steps:
     - name: Checkout code
@@ -44,6 +45,15 @@ jobs:
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
+        echo "Listing local docker images before pull"
+        docker images || true
+        echo "Attempting to pull image from GHCR"
+        docker pull ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
+        PULL_EXIT=$?
+        if [ $PULL_EXIT -ne 0 ]; then
+          echo "Failed to pull image (exit $PULL_EXIT). Check GHCR auth or image visibility."
+          exit $PULL_EXIT
+        fi
         if [ "$(docker ps -aq -f name=basis-data-ltt)" ]; then
           docker stop basis-data-ltt
           docker rm basis-data-ltt
@@ -52,7 +62,7 @@ jobs:
           echo "One or more required environment variables are missing."
           exit 1
         fi
-        docker run --name=basis-data-ltt -d -p 19091:19091 \
+        docker run --name=basis-data-ltt -d -p 19091:19091 --network=baota_net \
           --env=APPNAME=${{ vars.APPNAME }} \
           --env=APITOKEN=${{ secrets.APITOKEN }} \
           --env=APPENV=${{ vars.APPENV }} \
@@ -68,9 +78,14 @@ jobs:
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
           --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
-          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} \
+          --env=REDIS_ADDR=${{ vars.REDIS_ADDR }} \
+          --env=REDIS_PASS=${{ secrets.REDIS_PASS }} \
+          --env=REDIS_DB=${{ vars.REDIS_DB }} \
+          ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.dev-$SHORT_SHA
   prod_deploy:
     runs-on: [evolto3-be-runner]
+    timeout-minutes: 15
     if: github.ref == 'refs/heads/main'
     steps:
     - name: Checkout code
@@ -97,12 +112,45 @@ jobs:
     - name: Deploy container
       run: |
         SHORT_SHA=${GITHUB_SHA:0:7}
+        echo "Listing local docker images before pull"
+        docker images || true
+        echo "Attempting to pull image from GHCR"
+        docker pull ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA
+        PULL_EXIT=$?
+        if [ $PULL_EXIT -ne 0 ]; then
+          echo "Failed to pull image (exit $PULL_EXIT). Check GHCR auth or image visibility."
+          exit $PULL_EXIT
+        fi
         docker stop basis-data-ltt || true
         docker rm basis-data-ltt || true
-        docker run --name=basis-data-ltt -d -p 19091:19091 --restart=always --network=baota_net --dns=1.1.1.1 --dns=8.8.8.8 --dns-search=panel.ritalincompany.com --env=APPNAME=${{ vars.APPNAME }} --env=APITOKEN=${{ secrets.APITOKEN }} --env=APPENV=${{ vars.APPENV }} --env=APPPORT=${{ vars.APPPORT }} --env=GINMODE=${{ vars.GINMODE }} --env=DBHOST=${{ vars.DBHOST }} --env=DBPORT=${{ vars.DBPORT }} --env=DBNAME=${{ vars.DBNAME }} --env=DBUSER=${{ secrets.DBUSER }} --env=DBPASS=${{ secrets.DBPASS }} --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA
+        if [ -z "${{ secrets.APITOKEN }}" ] || [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
+          echo "One or more required environment variables are missing."
+          exit 1
+        fi
+        docker run --name=basis-data-ltt -d -p 19091:19091 --restart=always --network=baota_net \
+          --env=APPNAME=${{ vars.APPNAME }} \
+          --env=APITOKEN=${{ secrets.APITOKEN }} \
+          --env=APPENV=${{ vars.APPENV }} \
+          --env=JWTSECRET=${{ secrets.JWTSECRET }} \
+          --env=APPPORT=${{ vars.APPPORT }} \
+          --env=GINMODE=${{ vars.GINMODE }} \
+          --env=DBHOST=${{ vars.DBHOST }} \
+          --env=DBPORT=${{ vars.DBPORT }} \
+          --env=DBNAME=${{ vars.DBNAME }} \
+          --env=DBUSER=${{ secrets.DBUSER }} \
+          --env=DBPASS=${{ secrets.DBPASS }} \
+          --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} \
+          --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
+          --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
+          --env=CORSALLOWCREDENTIALS=${{ vars.CORSALLOWCREDENTIALS }} \
+          --env=CORSCONTENTTYPE=${{ vars.CORSCONTENTTYPE }} \
+          --env=REDIS_ADDR=${{ vars.REDIS_ADDR }} \
+          --env=REDIS_PASS=${{ secrets.REDIS_PASS }} \
+          --env=REDIS_DB=${{ vars.REDIS_DB }} \
+          ghcr.io/${{ github.repository_owner }}/basis-data-ltt:v1.0.prod-$SHORT_SHA
 
   publish:
-    runs-on: ubuntu-latest
+    runs-on: [evolto3-be-runner]
     permissions:
       contents: write
       packages: write
