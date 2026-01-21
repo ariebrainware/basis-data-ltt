@@ -238,3 +238,439 @@ func TestUserEndpoints(t *testing.T) {
 		t.Fatalf("expecting not found after delete but got 200: %s", rr.Body.String())
 	}
 }
+
+// TestListUsersPaginationAndSearch tests ListUsers pagination and search functionality
+func TestListUsersPaginationAndSearch(t *testing.T) {
+	t.Setenv("APPENV", "test")
+	t.Setenv("JWTSECRET", "test-secret-123")
+	t.Setenv("APITOKEN", "test-api-token")
+	t.Setenv("GINMODE", "release")
+
+	util.SetJWTSecret("test-secret-123")
+
+	cfg := config.LoadConfig()
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		t.Fatalf("failed to connect test DB: %v", err)
+	}
+
+	testModels := []interface{}{
+		&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{},
+	}
+
+	t.Cleanup(func() {
+		if err := db.Migrator().DropTable(testModels...); err != nil {
+			t.Errorf("Failed to drop tables during cleanup: %v", err)
+		}
+	})
+
+	if err := db.AutoMigrate(testModels...); err != nil {
+		t.Fatalf("auto migrate failed: %v", err)
+	}
+
+	if err := model.SeedRoles(db); err != nil {
+		t.Fatalf("seeding roles failed: %v", err)
+	}
+
+	gin.SetMode(cfg.GinMode)
+	r := gin.Default()
+	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.DatabaseMiddleware(db))
+
+	// Public routes
+	r.POST("/signup", endpoint.Signup)
+	r.POST("/login", endpoint.Login)
+
+	// Protected routes
+	auth := r.Group("/")
+	auth.Use(middleware.ValidateLoginToken())
+	{
+		userAdmin := auth.Group("/user")
+		userAdmin.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			userAdmin.GET("", endpoint.ListUsers)
+		}
+	}
+
+	// Create admin user
+	signupBody := map[string]string{"name": "Admin User", "email": "admin@example.com", "password": "adminpass"}
+	b, _ := json.Marshal(signupBody)
+	rr, err := doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	if err != nil {
+		t.Fatalf("signup admin failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("signup admin returned non-200: %d %s", rr.Code, rr.Body.String())
+	}
+
+	// Login admin
+	loginBody := map[string]string{"email": "admin@example.com", "password": "adminpass"}
+	b, _ = json.Marshal(loginBody)
+	rr, err = doRequest(r, "POST", "/login", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	if err != nil {
+		t.Fatalf("login admin failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("login admin non-200: %d %s", rr.Code, rr.Body.String())
+	}
+	
+	var resp apiResp
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode login resp failed: %v", err)
+	}
+	var adminData struct {
+		Token  string `json:"token"`
+		Role   string `json:"role"`
+		UserID uint   `json:"user_id"`
+	}
+	if err := json.Unmarshal(resp.Data, &adminData); err != nil {
+		t.Fatalf("parse login data failed: %v", err)
+	}
+
+	// Create additional test users
+	testUsers := []map[string]string{
+		{"name": "Alice Johnson", "email": "alice@example.com", "password": "pass123"},
+		{"name": "Bob Smith", "email": "bob@example.com", "password": "pass123"},
+		{"name": "Charlie Brown", "email": "charlie@example.com", "password": "pass123"},
+		{"name": "David Wilson", "email": "david@example.com", "password": "pass123"},
+		{"name": "Eve Davis", "email": "eve@example.com", "password": "pass123"},
+	}
+
+	for _, user := range testUsers {
+		b, _ := json.Marshal(user)
+		rr, err := doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+		if err != nil {
+			t.Fatalf("signup %s failed: %v", user["email"], err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("signup %s returned non-200: %d %s", user["email"], rr.Code, rr.Body.String())
+		}
+	}
+
+	// Test 1: List all users without pagination
+	t.Run("ListAllUsersNoPagination", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		total := int(data["total"].(float64))
+		if total != 6 { // Admin + 5 test users
+			t.Errorf("expected 6 total users, got %d", total)
+		}
+	})
+
+	// Test 2: List users with limit parameter
+	t.Run("ListUsersWithLimit", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?limit=3", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with limit failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with limit returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 3 {
+			t.Errorf("expected 3 fetched users, got %d", totalFetched)
+		}
+	})
+
+	// Test 3: List users with offset parameter
+	t.Run("ListUsersWithOffset", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?offset=2", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with offset failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with offset returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 4 { // Should skip first 2 users, return remaining 4
+			t.Errorf("expected 4 fetched users, got %d", totalFetched)
+		}
+	})
+
+	// Test 4: List users with both limit and offset
+	t.Run("ListUsersWithLimitAndOffset", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?limit=2&offset=1", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with limit and offset failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with limit and offset returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 2 {
+			t.Errorf("expected 2 fetched users, got %d", totalFetched)
+		}
+	})
+
+	// Test 5: List users with keyword search
+	t.Run("ListUsersWithKeywordSearch", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?keyword=alice", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with keyword failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with keyword returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		total := int(data["total"].(float64))
+		if total != 1 { // Only Alice Johnson should match
+			t.Errorf("expected 1 user matching 'alice', got %d", total)
+		}
+	})
+
+	// Test 6: List users with keyword search by email
+	t.Run("ListUsersWithKeywordSearchByEmail", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?keyword=bob@example", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with email keyword failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with email keyword returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		total := int(data["total"].(float64))
+		if total != 1 { // Only Bob Smith should match
+			t.Errorf("expected 1 user matching 'bob@example', got %d", total)
+		}
+	})
+
+	// Test 7: List users with keyword and pagination
+	t.Run("ListUsersWithKeywordAndPagination", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?keyword=example&limit=2&offset=1", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with keyword and pagination failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with keyword and pagination returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 2 {
+			t.Errorf("expected 2 fetched users, got %d", totalFetched)
+		}
+
+		total := int(data["total"].(float64))
+		if total != 6 { // All users have 'example' in their email
+			t.Errorf("expected 6 total users matching 'example', got %d", total)
+		}
+	})
+
+	// Test 8: Edge case - negative limit (should be ignored)
+	t.Run("ListUsersWithNegativeLimit", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?limit=-5", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with negative limit failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with negative limit returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		// Negative limit should be ignored, all users should be returned
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 6 {
+			t.Errorf("expected all 6 users (negative limit ignored), got %d", totalFetched)
+		}
+	})
+
+	// Test 9: Edge case - negative offset (should be ignored)
+	t.Run("ListUsersWithNegativeOffset", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?offset=-3", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with negative offset failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with negative offset returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		// Negative offset should be ignored, all users should be returned
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 6 {
+			t.Errorf("expected all 6 users (negative offset ignored), got %d", totalFetched)
+		}
+	})
+
+	// Test 10: Edge case - very large limit
+	t.Run("ListUsersWithVeryLargeLimit", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?limit=10000", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with large limit failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with large limit returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		// Should return all available users (6 in total)
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 6 {
+			t.Errorf("expected 6 users (all available), got %d", totalFetched)
+		}
+	})
+
+	// Test 11: Edge case - empty keyword search (should return all users)
+	t.Run("ListUsersWithEmptyKeyword", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?keyword=", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with empty keyword failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with empty keyword returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		// Empty keyword should return all users
+		total := int(data["total"].(float64))
+		if total != 6 {
+			t.Errorf("expected 6 users (empty keyword returns all), got %d", total)
+		}
+	})
+
+	// Test 12: Edge case - keyword with no matches
+	t.Run("ListUsersWithKeywordNoMatches", func(t *testing.T) {
+		rr, err := doRequest(r, "GET", "/user?keyword=nonexistent", nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminData.Token})
+		if err != nil {
+			t.Fatalf("list users with no-match keyword failed: %v", err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("list users with no-match keyword returned non-200: %d %s", rr.Code, rr.Body.String())
+		}
+
+		var resp apiResp
+		if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode response failed: %v", err)
+		}
+
+		var data map[string]interface{}
+		if err := json.Unmarshal(resp.Data, &data); err != nil {
+			t.Fatalf("parse data failed: %v", err)
+		}
+
+		// No matches should return 0 users
+		total := int(data["total"].(float64))
+		if total != 0 {
+			t.Errorf("expected 0 users (no matches), got %d", total)
+		}
+
+		totalFetched := int(data["total_fetched"].(float64))
+		if totalFetched != 0 {
+			t.Errorf("expected 0 fetched users (no matches), got %d", totalFetched)
+		}
+	})
+}
