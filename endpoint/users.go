@@ -42,20 +42,20 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
-		return
-	}
-
 	// Validate that at least one field is being updated
 	if req.Name == "" && req.Email == "" && req.Password == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "At least one field (name, email, or password) must be provided",
 			Err: fmt.Errorf("no fields to update"),
+		})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
 		})
 		return
 	}
