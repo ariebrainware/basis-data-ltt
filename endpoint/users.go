@@ -181,7 +181,7 @@ func ListUsers(c *gin.Context) {
 func AdminUpdateUser(c *gin.Context) {
 	uid, err := parseIDParam(c)
 	if err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid user id", Err: err})
+		util.CallUserError(c, util.APIErrorParams{Msg: err.Error(), Err: err})
 		return
 	}
 
@@ -241,8 +241,11 @@ func AdminUpdateUser(c *gin.Context) {
 func parseIDParam(c *gin.Context) (uint, error) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseInt(idStr, 10, 32)
-	if err != nil || id <= 0 {
-		return 0, fmt.Errorf("invalid id")
+	if err != nil {
+		return 0, fmt.Errorf("user ID must be a valid integer")
+	}
+	if id <= 0 {
+		return 0, fmt.Errorf("user ID must be a positive integer")
 	}
 	return uint(id), nil
 }
@@ -274,7 +277,7 @@ func emailExists(db *gorm.DB, email string, excludeID uint) (bool, error) {
 func GetUserInfo(c *gin.Context) {
 	uid, err := parseIDParam(c)
 	if err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid user id", Err: err})
+		util.CallUserError(c, util.APIErrorParams{Msg: err.Error(), Err: err})
 		return
 	}
 
@@ -320,7 +323,7 @@ func UpdateUserByID(c *gin.Context) {
 func DeleteUser(c *gin.Context) {
 	uid, err := parseIDParam(c)
 	if err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid user id", Err: err})
+		util.CallUserError(c, util.APIErrorParams{Msg: err.Error(), Err: err})
 		return
 	}
 
