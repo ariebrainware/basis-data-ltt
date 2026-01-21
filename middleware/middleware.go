@@ -203,13 +203,30 @@ func ValidateLoginToken() gin.HandlerFunc {
 			if err == nil {
 				parts := strings.Split(val, ":")
 				if len(parts) == 2 {
-					uid, errUID := strconv.ParseUint(parts[0], 10, 0) // parse using native uint size
-					rid, errRID := strconv.ParseUint(parts[1], 10, 32)
-					if errUID == nil && errRID == nil && uid != 0 {
-						c.Set(UserIDKey, uint(uid))
-						c.Set(RoleIDKey, uint32(rid))
-						c.Next()
-						return
+					// Parse user ID and role ID from Redis value. Parse to uint64
+					// and perform explicit bounds checks before converting to
+					// narrower types to avoid integer overflow vulnerabilities.
+					uid64, errUID := strconv.ParseUint(parts[0], 10, 64)
+					rid64, errRID := strconv.ParseUint(parts[1], 10, 32)
+
+					// Fail fast on parse errors.
+					if errUID != nil || errRID != nil {
+						// malformed value -> fallback to DB validation.
+					} else {
+						// Ensure uid is non-zero.
+						if uid64 == 0 {
+							// invalid user id -> fallback to DB validation.
+						} else {
+							// Verify uid64 fits into native `uint` on this platform.
+							var maxUint uint64 = uint64(^uint(0))
+							if uid64 <= maxUint {
+								c.Set(UserIDKey, uint(uid64))
+								c.Set(RoleIDKey, uint32(rid64))
+								c.Next()
+								return
+							}
+							// If uid is out of range, fallthrough to DB validation.
+						}
 					}
 				}
 			}
