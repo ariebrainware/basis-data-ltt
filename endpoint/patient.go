@@ -13,13 +13,15 @@ import (
 	"gorm.io/gorm"
 )
 
-func parseQueryParams(c *gin.Context) (int, int, int, string, string) {
+func parseQueryParams(c *gin.Context) (int, int, int, string, string, string, string) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 	therapistID, _ := strconv.Atoi(c.Query("therapist_id"))
 	keyword := c.Query("keyword")
 	groupByDate := c.Query("group_by_date")
-	return limit, offset, therapistID, keyword, groupByDate
+	sortBy := c.Query("sort")                       // supported values: full_name, patient_code
+	sortDir := strings.ToLower(c.Query("sort_dir")) // supported values: asc, desc
+	return limit, offset, therapistID, keyword, groupByDate, sortBy, sortDir
 }
 
 // applyCreatedAtFilter applies a created_at filter for supported ranges.
@@ -41,11 +43,27 @@ func applyCreatedAtFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	return query
 }
 
-func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.Patient, int64, error) {
+func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate, sortBy, sortDir string) ([]model.Patient, int64, error) {
 	var patients []model.Patient
 	var totalPatient int64
+	query := db
 
-	query := db.Offset(offset).Order("created_at DESC")
+	// Determine order direction safely (only allow asc/desc)
+	orderDir := "ASC"
+	if strings.ToLower(sortDir) == "desc" {
+		orderDir = "DESC"
+	}
+
+	// Apply sorting: if front-end requests sorting, use that; otherwise default to created_at DESC
+	switch sortBy {
+	case "full_name":
+		query = query.Order(fmt.Sprintf("patients.full_name %s", orderDir))
+	case "patient_code":
+		query = query.Order(fmt.Sprintf("patients.patient_code %s", orderDir))
+	default:
+		query = query.Order("patients.created_at DESC")
+	}
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
@@ -78,12 +96,14 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 // @Param        offset query int false "Offset for pagination"
 // @Param        keyword query string false "Search keyword for patient name, code, address, or phone"
 // @Param        group_by_date query string false "Filter by date range (last_2_days, last_3_months, last_6_months)"
+// @Param        sort query string false "Optional sort field: full_name|patient_code"
+// @Param        sort_dir query string false "Optional sort direction: asc|desc"
 // @Success      200 {object} util.APIResponse{data=object} "Patients retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /patient [get]
 func ListPatients(c *gin.Context) {
-	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
+	limit, offset, therapistID, keyword, groupByDate, sortBy, sortDir := parseQueryParams(c)
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -94,7 +114,7 @@ func ListPatients(c *gin.Context) {
 		return
 	}
 
-	patients, totalPatient, err := fetchPatients(db, limit, offset, therapistID, keyword, groupByDate)
+	patients, totalPatient, err := fetchPatients(db, limit, offset, therapistID, keyword, groupByDate, sortBy, sortDir)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",

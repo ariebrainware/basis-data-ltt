@@ -158,7 +158,7 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /treatment [get]
 func ListTreatments(c *gin.Context) {
-	limit, offset, therapistID, keyword, groupByDate := parseQueryParams(c)
+	limit, offset, therapistID, keyword, groupByDate, _, _ := parseQueryParams(c)
 	filterByTherapist := c.Query("filter_by_therapist") == "true"
 
 	db := middleware.GetDB(c)
