@@ -1,11 +1,9 @@
 package endpoint
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
