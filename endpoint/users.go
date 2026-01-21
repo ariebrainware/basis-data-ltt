@@ -114,23 +114,45 @@ func UpdateUser(c *gin.Context) {
 
 // ListUsers godoc
 // @Summary      List all users (admin only)
-// @Description  Get a paginated list of users. Admin-only access.
+// @Description  Get a paginated list of users using cursor-based pagination. Admin-only access.
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
 // @Security     SessionToken
-// @Param        limit query int false "Limit number of results"
-// @Param        offset query int false "Offset for pagination"
+// @Param        limit query int false "Limit number of results (default 10, max 100)"
+// @Param        cursor query int false "Cursor for pagination (User ID)"
 // @Param        keyword query string false "Search keyword for name or email"
-// @Success      200 {object} util.APIResponse{data=object} "Users retrieved"
+// @Success      200 {object} util.APIResponse{data=object} "Users retrieved with cursor pagination"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /user [get]
 func ListUsers(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
-	offset, _ := strconv.Atoi(c.Query("offset"))
+	cursorStr := c.Query("cursor")
 	keyword := c.Query("keyword")
+
+	// Set default and max limits
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	// Parse and validate cursor
+	var cursor uint
+	if cursorStr != "" {
+		cursorVal, err := strconv.ParseUint(cursorStr, 10, 64)
+		if err != nil || cursorVal > uint64(^uint(0)) {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Invalid cursor parameter",
+				Err: fmt.Errorf("cursor must be a valid positive integer"),
+			})
+			return
+		}
+		cursor = uint(cursorVal)
+	}
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -145,32 +167,45 @@ func ListUsers(c *gin.Context) {
 	// GORM automatically excludes soft-deleted records (where deleted_at IS NOT NULL)
 	// when querying models with gorm.Model. No explicit filter is needed here.
 	query := db.Model(&model.User{})
+	
+	// Apply keyword filter if provided
 	if keyword != "" {
 		kw := "%" + keyword + "%"
 		query = query.Where("name LIKE ? OR email LIKE ?", kw, kw)
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to count users", Err: err})
-		return
+	// Apply cursor-based pagination
+	if cursor > 0 {
+		query = query.Where("id > ?", cursor)
 	}
 
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-	if offset > 0 {
-		query = query.Offset(offset)
-	}
-
-	if err := query.Order("created_at DESC").Find(&users).Error; err != nil {
+	// Fetch one extra record to determine if there are more pages
+	if err := query.Order("id ASC").Limit(limit + 1).Find(&users).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve users", Err: err})
 		return
 	}
 
+	// Determine if there are more pages
+	hasMore := len(users) > limit
+	if hasMore {
+		users = users[:limit]
+	}
+
+	// Get the next cursor (only if there are more pages)
+	var nextCursor *uint
+	if hasMore {
+		lastID := users[len(users)-1].ID
+		nextCursor = &lastID
+	}
+
 	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Users retrieved",
-		Data: map[string]interface{}{"total": total, "total_fetched": len(users), "users": users},
+		Msg: "Users retrieved",
+		Data: map[string]interface{}{
+			"users":       users,
+			"total_fetched": len(users),
+			"has_more":    hasMore,
+			"next_cursor": nextCursor,
+		},
 	})
 }
 
