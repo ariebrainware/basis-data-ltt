@@ -11,6 +11,38 @@ import (
 	"gorm.io/gorm"
 )
 
+// setupTestDB is a helper function that sets up the test environment, database connection,
+// migration, and table cleanup. It returns a *gorm.DB instance for use in tests.
+func setupTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	
+	t.Setenv("APPENV", "test")
+	t.Setenv("JWTSECRET", "test-secret")
+
+	// preserve and restore global JWT secret used by util
+	prevSecret := os.Getenv("JWTSECRET")
+	util.SetJWTSecret("test-secret")
+	t.Cleanup(func() {
+		util.SetJWTSecret(prevSecret)
+	})
+
+	// connect to in-memory DB
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		t.Fatalf("connect test db: %v", err)
+	}
+
+	// migrate patient table
+	if err := db.AutoMigrate(&model.Patient{}); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	// clean table
+	db.Where("1 = 1").Delete(&model.Patient{})
+
+	return db
+}
+
 func TestGetInitials(t *testing.T) {
 	if got := getInitials("John Doe"); got != "J" {
 		t.Fatalf("getInitials() = %s; want J", got)
@@ -68,29 +100,7 @@ func TestFetchPatientsDateFilter(t *testing.T) {
 }
 
 func TestFetchPatientsSortByFullName(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-
-	// preserve and restore global JWT secret used by util
-	prevSecret := os.Getenv("JWTSECRET")
-	util.SetJWTSecret("test-secret")
-	t.Cleanup(func() {
-		util.SetJWTSecret(prevSecret)
-	})
-
-	// connect to in-memory DB
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-
-	// migrate patient table
-	if err := db.AutoMigrate(&model.Patient{}); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-
-	// clean table
-	db.Where("1 = 1").Delete(&model.Patient{})
+	db := setupTestDB(t)
 
 	// Create patients in non-alphabetical order to verify sorting works correctly regardless of insertion order
 	alice := model.Patient{FullName: "Alice Smith", PatientCode: "A001", PhoneNumber: "111"}
@@ -145,29 +155,7 @@ func TestFetchPatientsSortByFullName(t *testing.T) {
 }
 
 func TestFetchPatientsSortByPatientCode(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-
-	// preserve and restore global JWT secret used by util
-	prevSecret := os.Getenv("JWTSECRET")
-	util.SetJWTSecret("test-secret")
-	t.Cleanup(func() {
-		util.SetJWTSecret(prevSecret)
-	})
-
-	// connect to in-memory DB
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-
-	// migrate patient table
-	if err := db.AutoMigrate(&model.Patient{}); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-
-	// clean table
-	db.Where("1 = 1").Delete(&model.Patient{})
+	db := setupTestDB(t)
 
 	// create patients with different patient codes
 	patient1 := model.Patient{FullName: "Patient One", PatientCode: "P003", PhoneNumber: "111"}
@@ -222,29 +210,7 @@ func TestFetchPatientsSortByPatientCode(t *testing.T) {
 }
 
 func TestFetchPatientsDefaultSort(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-
-	// preserve and restore global JWT secret used by util
-	prevSecret := os.Getenv("JWTSECRET")
-	util.SetJWTSecret("test-secret")
-	t.Cleanup(func() {
-		util.SetJWTSecret(prevSecret)
-	})
-
-	// connect to in-memory DB
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-
-	// migrate patient table
-	if err := db.AutoMigrate(&model.Patient{}); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-
-	// clean table
-	db.Where("1 = 1").Delete(&model.Patient{})
+	db := setupTestDB(t)
 
 	// create patients with explicit creation times
 	now := time.Now()
