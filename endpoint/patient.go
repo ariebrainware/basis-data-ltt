@@ -61,7 +61,7 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 	case "patient_code":
 		query = query.Order(fmt.Sprintf("patients.patient_code %s", orderDir))
 	default:
-		query = query.Order("created_at DESC")
+		query = query.Order("patients.created_at DESC")
 	}
 
 	if limit > 0 {
