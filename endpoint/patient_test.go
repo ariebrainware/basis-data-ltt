@@ -92,7 +92,7 @@ func TestFetchPatientsSortByFullName(t *testing.T) {
 	// clean table
 	db.Where("1 = 1").Delete(&model.Patient{})
 
-	// create patients with different names
+	// Create patients in non-alphabetical order to verify sorting works correctly regardless of insertion order
 	alice := model.Patient{FullName: "Alice Smith", PatientCode: "A001", PhoneNumber: "111"}
 	charlie := model.Patient{FullName: "Charlie Brown", PatientCode: "C001", PhoneNumber: "333"}
 	bob := model.Patient{FullName: "Bob Johnson", PatientCode: "B001", PhoneNumber: "222"}
