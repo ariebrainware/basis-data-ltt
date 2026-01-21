@@ -35,18 +35,19 @@ func RemoveSessionTokenFromUserSet(userID uint, token string) error {
 	}
 	ctx := context.Background()
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-	if err := rdb.SRem(ctx, userSetKey, token).Err(); err != nil {
-		return err
-	}
-	// Check if the set is empty and delete it if so
-	count, err := rdb.SCard(ctx, userSetKey).Result()
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return rdb.Del(ctx, userSetKey).Err()
-	}
-	return nil
+	
+	// Use a Lua script to atomically remove the token and delete the set if empty
+	script := `
+		local removed = redis.call('SREM', KEYS[1], ARGV[1])
+		if removed > 0 then
+			local count = redis.call('SCARD', KEYS[1])
+			if count == 0 then
+				redis.call('DEL', KEYS[1])
+			end
+		end
+		return removed
+	`
+	return rdb.Eval(ctx, script, []string{userSetKey}, token).Err()
 }
 
 // InvalidateUserSessions deletes all session:<token> keys for the given user and
