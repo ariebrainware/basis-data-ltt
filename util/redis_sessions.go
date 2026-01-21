@@ -34,7 +34,6 @@ func RemoveSessionTokenFromUserSet(userID uint, token string) error {
 	}
 	ctx := context.Background()
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-	
 	// Use a Lua script to atomically remove the token and delete the set if empty
 	script := `
 		local removed = redis.call('SREM', KEYS[1], ARGV[1])
