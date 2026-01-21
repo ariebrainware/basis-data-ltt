@@ -130,6 +130,7 @@ func UpdateUser(c *gin.Context) {
 func ListUsers(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	cursorStr := c.Query("cursor")
+	offsetStr := c.Query("offset")
 	keyword := c.Query("keyword")
 
 	// Set default and max limits
@@ -154,6 +155,15 @@ func ListUsers(c *gin.Context) {
 		cursor = uint(cursorVal)
 	}
 
+	// Parse offset (optional). Negative offsets are ignored.
+	var offset int
+	if offsetStr != "" {
+		offVal, err := strconv.Atoi(offsetStr)
+		if err == nil && offVal > 0 {
+			offset = offVal
+		}
+	}
+
 	db := middleware.GetDB(c)
 	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -174,9 +184,23 @@ func ListUsers(c *gin.Context) {
 		query = query.Where("name LIKE ? OR email LIKE ?", kw, kw)
 	}
 
-	// Apply cursor-based pagination
+	// Compute total number of matching users (without pagination)
+	var total int64
+	countQuery := db.Model(&model.User{})
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		countQuery = countQuery.Where("name LIKE ? OR email LIKE ?", kw, kw)
+	}
+	if err := countQuery.Count(&total).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to count users", Err: err})
+		return
+	}
+
+	// Apply cursor-based pagination if provided, otherwise apply offset if provided
 	if cursor > 0 {
 		query = query.Where("id > ?", cursor)
+	} else if offset > 0 {
+		query = query.Offset(offset)
 	}
 
 	// Fetch one extra record to determine if there are more pages
@@ -202,6 +226,7 @@ func ListUsers(c *gin.Context) {
 		Msg: "Users retrieved",
 		Data: map[string]interface{}{
 			"users":         users,
+			"total":         total,
 			"total_fetched": len(users),
 			"has_more":      hasMore,
 			"next_cursor":   nextCursor,
