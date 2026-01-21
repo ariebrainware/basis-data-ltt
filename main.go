@@ -140,6 +140,19 @@ func main() {
 		// Logout is available to all authenticated users
 		auth.DELETE("/logout", endpoint.Logout)
 
+		// Current user profile update
+		auth.PATCH("/user", endpoint.UpdateUser)
+
+		// Admin-only user management
+		userAdmin := auth.Group("/user")
+		userAdmin.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			userAdmin.GET("", endpoint.ListUsers)
+			userAdmin.GET("/:id", endpoint.GetUserInfo)
+			userAdmin.PATCH("/:id", endpoint.UpdateUserByID)
+			userAdmin.DELETE("/:id", endpoint.DeleteUser)
+		}
+
 		// Patient routes - accessible by Admin only
 		patient := auth.Group("/patient")
 		patient.Use(middleware.RequireRole(model.RoleAdmin))
