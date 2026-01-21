@@ -167,7 +167,7 @@ func ListUsers(c *gin.Context) {
 	// GORM automatically excludes soft-deleted records (where deleted_at IS NOT NULL)
 	// when querying models with gorm.Model. No explicit filter is needed here.
 	query := db.Model(&model.User{})
-	
+
 	// Apply keyword filter if provided
 	if keyword != "" {
 		kw := "%" + keyword + "%"
@@ -201,10 +201,10 @@ func ListUsers(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg: "Users retrieved",
 		Data: map[string]interface{}{
-			"users":       users,
+			"users":         users,
 			"total_fetched": len(users),
-			"has_more":    hasMore,
-			"next_cursor": nextCursor,
+			"has_more":      hasMore,
+			"next_cursor":   nextCursor,
 		},
 	})
 }

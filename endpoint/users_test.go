@@ -454,7 +454,7 @@ func TestListUsersPaginationAndSearch(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("login admin non-200: %d %s", rr.Code, rr.Body.String())
 	}
-	
+
 	var resp apiResp
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode login resp failed: %v", err)
