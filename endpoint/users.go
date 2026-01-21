@@ -143,8 +143,8 @@ func ListUsers(c *gin.Context) {
 	// Parse and validate cursor
 	var cursor uint
 	if cursorStr != "" {
-		cursorVal, err := strconv.ParseUint(cursorStr, 10, 64)
-		if err != nil || cursorVal > uint64(^uint(0)) {
+		cursorVal, err := strconv.ParseUint(cursorStr, 10, strconv.IntSize)
+		if err != nil {
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Invalid cursor parameter",
 				Err: fmt.Errorf("cursor must be a valid positive integer"),
