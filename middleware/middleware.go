@@ -203,10 +203,11 @@ func ValidateLoginToken() gin.HandlerFunc {
 			if err == nil {
 				parts := strings.Split(val, ":")
 				if len(parts) == 2 {
-					// Parse user ID and role ID from Redis value. Parse to uint64
-					// and perform explicit bounds checks before converting to
-					// narrower types to avoid integer overflow vulnerabilities.
-					uid64, errUID := strconv.ParseUint(parts[0], 10, 64)
+					// Parse user ID and role ID from Redis value. Parse user ID
+					// using the platform's native int size and perform explicit
+					// bounds checks before converting to narrower types to
+					// avoid integer overflow vulnerabilities.
+					uid64, errUID := strconv.ParseUint(parts[0], 10, strconv.IntSize)
 					rid64, errRID := strconv.ParseUint(parts[1], 10, 32)
 
 					// Fail fast on parse errors.
