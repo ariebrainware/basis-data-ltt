@@ -53,29 +53,7 @@ func TestGetInitials(t *testing.T) {
 }
 
 func TestFetchPatientsDateFilter(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-
-	// preserve and restore global JWT secret used by util
-	prevSecret := os.Getenv("JWTSECRET")
-	util.SetJWTSecret("test-secret")
-	t.Cleanup(func() {
-		util.SetJWTSecret(prevSecret)
-	})
-
-	// connect to in-memory DB
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-
-	// migrate patient table
-	if err := db.AutoMigrate(&model.Patient{}); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-
-	// clean table
-	db.Where("1 = 1").Delete(&model.Patient{})
+	db := setupTestDB(t)
 
 	old := model.Patient{Model: gorm.Model{CreatedAt: time.Now().AddDate(0, -4, 0)}, FullName: "Old Patient", PhoneNumber: "111"}
 	recent := model.Patient{Model: gorm.Model{CreatedAt: time.Now()}, FullName: "Recent Patient", PhoneNumber: "222"}
