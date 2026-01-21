@@ -120,7 +120,7 @@ func UpdateUser(c *gin.Context) {
 // @Router       /user [get]
 func ListUsers(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
-	cursor, _ := strconv.ParseUint(c.Query("cursor"), 10, 32)
+	cursorStr := c.Query("cursor")
 	keyword := c.Query("keyword")
 
 	// Set default and max limits
@@ -129,6 +129,20 @@ func ListUsers(c *gin.Context) {
 	}
 	if limit > 100 {
 		limit = 100
+	}
+
+	// Parse and validate cursor
+	var cursor uint
+	if cursorStr != "" {
+		cursorVal, err := strconv.ParseUint(cursorStr, 10, 64)
+		if err != nil || cursorVal > uint64(^uint(0)) {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Invalid cursor parameter",
+				Err: fmt.Errorf("cursor must be a valid positive integer"),
+			})
+			return
+		}
+		cursor = uint(cursorVal)
 	}
 
 	db := middleware.GetDB(c)
@@ -151,7 +165,7 @@ func ListUsers(c *gin.Context) {
 
 	// Apply cursor-based pagination
 	if cursor > 0 {
-		query = query.Where("id > ?", uint(cursor))
+		query = query.Where("id > ?", cursor)
 	}
 
 	// Fetch one extra record to determine if there are more pages
@@ -166,9 +180,9 @@ func ListUsers(c *gin.Context) {
 		users = users[:limit]
 	}
 
-	// Get the next cursor
+	// Get the next cursor (only if there are more pages)
 	var nextCursor *uint
-	if hasMore && len(users) > 0 {
+	if hasMore {
 		lastID := users[len(users)-1].ID
 		nextCursor = &lastID
 	}
