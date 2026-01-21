@@ -81,12 +81,12 @@ func UpdateUser(c *gin.Context) {
 
 	// If email provided and different, ensure uniqueness
 	if req.Email != "" && req.Email != user.Email {
-		var count int64
-		if err := db.Model(&model.User{}).Where("email = ? AND id != ?", req.Email, user.ID).Count(&count).Error; err != nil {
+		exists, err := emailExists(db, req.Email, user.ID)
+		if err != nil {
 			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
 			return
 		}
-		if count > 0 {
+		if exists {
 			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
 			return
 		}
