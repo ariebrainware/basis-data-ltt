@@ -133,6 +133,8 @@ func ListUsers(c *gin.Context) {
 	}
 
 	var users []model.User
+	// GORM automatically excludes soft-deleted records (where deleted_at IS NOT NULL)
+	// when querying models with gorm.Model. No explicit filter is needed here.
 	query := db.Model(&model.User{})
 	if keyword != "" {
 		kw := "%" + keyword + "%"
