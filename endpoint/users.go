@@ -106,6 +106,14 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// If password changed, invalidate all sessions for this user (DB + Redis)
+	if req.Password != "" {
+		// delete sessions in DB
+		_ = db.Where("user_id = ?", user.ID).Delete(&model.Session{}).Error
+		// delete sessions in Redis (best-effort)
+		_ = util.InvalidateUserSessions(user.ID)
+	}
+
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "User updated successfully",
 		Data: user,
@@ -439,6 +447,9 @@ func DeleteUser(c *gin.Context) {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to delete user", Err: err})
 		return
 	}
+
+	// Also remove any Redis session keys for this user (best-effort)
+	_ = util.InvalidateUserSessions(uid)
 
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User deleted"})
 }

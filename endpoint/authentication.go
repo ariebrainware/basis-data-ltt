@@ -128,6 +128,8 @@ func Login(c *gin.Context) {
 		exp := time.Until(session.ExpiresAt)
 		val := fmt.Sprintf("%d:%d", session.UserID, role.ID)
 		_ = rdb.Set(context.Background(), fmt.Sprintf("session:%s", tokenString), val, exp).Err()
+		// Also update per-user set via util helper
+		_ = util.AddSessionToUserSet(session.UserID, tokenString, exp)
 	}
 
 	// Return the token in a JSON response
@@ -193,6 +195,8 @@ func Logout(c *gin.Context) {
 	// Also delete session from Redis if available
 	if rdb := config.GetRedisClient(); rdb != nil {
 		_ = rdb.Del(context.Background(), fmt.Sprintf("session:%s", sessionToken)).Err()
+		// Also remove token from the per-user set via util helper
+		_ = util.RemoveSessionTokenFromUserSet(session.UserID, sessionToken)
 	}
 
 	// Respond with a success message
