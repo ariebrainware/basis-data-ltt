@@ -46,8 +46,14 @@ func InvalidateUserSessions(userID uint) error {
 	ctx := context.Background()
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 	members, err := rdb.SMembers(ctx, userSetKey).Result()
-	if err != nil && err != redis.Nil {
-		return err
+	// redis.Nil indicates the key doesn't exist (no active sessions), which is a valid scenario
+	if err != nil {
+		if err == redis.Nil {
+			// No sessions exist for this user - continue to clean up the user set key
+			members = []string{}
+		} else {
+			return err
+		}
 	}
 	for _, tok := range members {
 		_ = rdb.Del(ctx, fmt.Sprintf("session:%s", tok)).Err()
