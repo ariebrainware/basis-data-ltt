@@ -142,6 +142,8 @@ func ListUsers(c *gin.Context) {
 	}
 
 	var users []model.User
+	// GORM automatically excludes soft-deleted records (where deleted_at IS NOT NULL)
+	// when querying models with gorm.Model. No explicit filter is needed here.
 	query := db.Model(&model.User{})
 	if keyword != "" {
 		kw := "%" + keyword + "%"
@@ -348,17 +350,29 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := db.First(&user, uid).Error; err != nil {
+	// Use a transaction to ensure user deletion and session invalidation are atomic.
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var user model.User
+		if err := tx.First(&user, uid).Error; err != nil {
+			return err
+		}
+
+		// Explicitly delete all sessions associated with this user so that any
+		// active tokens/sessions are invalidated immediately.
+		if err := tx.Where("user_id = ?", uid).Delete(&model.Session{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Delete(&user).Error; err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
 			return
 		}
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
-		return
-	}
-
-	if err := db.Delete(&user).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to delete user", Err: err})
 		return
 	}
