@@ -24,8 +24,8 @@ func resetMockRedisClient() {
 	mockRedisClient = nil
 }
 
-// We need to modify the functions to use the mock client in tests
-// For now, we'll test the behavior by checking the actual implementation
+// NOTE: These tests verify Redis operations in isolation using a mock Redis client.
+// They exercise the expected Redis commands directly and do not call the production helper functions.
 
 func TestAddSessionToUserSet_Success(t *testing.T) {
 	// Create a mock Redis client
