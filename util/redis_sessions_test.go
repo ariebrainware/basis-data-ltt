@@ -27,10 +27,9 @@ func TestAddSessionToUserSet(t *testing.T) {
 	rdb, mock := redismock.NewClientMock()
 	defer config.ResetRedisClientForTest()
 	config.SetRedisClientForTest(rdb)
-
-	userID := uint(123)
 	token := "test-token-123"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+	exp := 24 * time.Hour
+	userSetKey := "user_sessions:123"
 
 	// Expect SAdd and Persist commands
 	mock.ExpectSAdd(userSetKey, token).SetVal(1)
