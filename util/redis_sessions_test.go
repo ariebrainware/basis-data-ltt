@@ -1,319 +1,307 @@
 package util
 
 import (
-	"context"
-	"fmt"
-	"sync"
-	"testing"
+"errors"
+"fmt"
+"testing"
+"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
-	"github.com/go-redis/redismock/v9"
+"github.com/go-redis/redismock/v9"
 )
 
-// removeSessionLuaScript is the Lua script used in RemoveSessionTokenFromUserSet
-// to atomically remove a token and delete the set if empty.
-const removeSessionLuaScript = `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
+func TestAddSessionToUserSet_Success(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
 
-func TestAddSessionToUserSet(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+userID := uint(123)
+token := "test-token-123"
+exp := 24 * time.Hour
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	userID := uint(123)
-	token := "test-token-123"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+// Set expectations
+mock.ExpectSAdd(userSetKey, token).SetVal(1)
+mock.ExpectExpire(userSetKey, exp).SetVal(true)
 
-	// Expect SAdd and Persist commands
-	mock.ExpectSAdd(userSetKey, token).SetVal(1)
-	mock.ExpectPersist(userSetKey).SetVal(true)
-
-	err := AddSessionToUserSet(userID, token)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the actual function with mock client
+err := addSessionToUserSetWithClient(db, userID, token, exp)
+if err != nil {
+t.Fatalf("addSessionToUserSetWithClient failed: %v", err)
 }
 
-func TestAddSessionToUserSet_RedisNotAvailable(t *testing.T) {
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(nil)
-
-	err := AddSessionToUserSet(123, "token")
-	if err != nil {
-		t.Fatalf("expected no error when Redis is not available, got %v", err)
-	}
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
 }
 
-func TestRemoveSessionTokenFromUserSet_TokenRemovedCorrectly(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestAddSessionToUserSet_NilClient(t *testing.T) {
+userID := uint(123)
+token := "test-token-123"
+exp := 24 * time.Hour
 
-	userID := uint(123)
-	token := "test-token-123"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-
-	// Expect Eval to be called with the script, and return 1 (token removed)
-	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(1))
-
-	err := RemoveSessionTokenFromUserSet(userID, token)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the function with nil client
+err := addSessionToUserSetWithClient(nil, userID, token, exp)
+if err != nil {
+t.Fatalf("expected nil error for nil client, got %v", err)
+}
 }
 
-func TestRemoveSessionTokenFromUserSet_EmptySetDeleted(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestAddSessionToUserSet_SAddError(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
 
-	userID := uint(123)
-	token := "last-token"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+userID := uint(123)
+token := "test-token-123"
+exp := 24 * time.Hour
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	// The Lua script will remove the token and delete the set
-	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(1))
+// Set expectation for SAdd to fail
+expectedErr := errors.New("redis connection error")
+mock.ExpectSAdd(userSetKey, token).SetErr(expectedErr)
 
-	err := RemoveSessionTokenFromUserSet(userID, token)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the actual function
+err := addSessionToUserSetWithClient(db, userID, token, exp)
+if err == nil {
+t.Fatal("expected error from addSessionToUserSetWithClient, got nil")
+}
+if err.Error() != expectedErr.Error() {
+t.Fatalf("expected error %v, got %v", expectedErr, err)
 }
 
-func TestRemoveSessionTokenFromUserSet_NonEmptySetPersists(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
-
-	userID := uint(123)
-	token := "token-to-remove"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-
-	// The Lua script will remove the token but NOT delete the set (count > 0)
-	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(1))
-
-	err := RemoveSessionTokenFromUserSet(userID, token)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
 }
 
-func TestRemoveSessionTokenFromUserSet_TokenNotFound(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestAddSessionToUserSet_ExpireError(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
 
-	userID := uint(123)
-	token := "nonexistent-token"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+userID := uint(123)
+token := "test-token-123"
+exp := 24 * time.Hour
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	// Lua script returns 0 (token not found)
-	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token).SetVal(int64(0))
+// Set expectations: SAdd succeeds but Expire fails
+mock.ExpectSAdd(userSetKey, token).SetVal(1)
+expectedErr := errors.New("expire failed")
+mock.ExpectExpire(userSetKey, exp).SetErr(expectedErr)
 
-	err := RemoveSessionTokenFromUserSet(userID, token)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the actual function
+err := addSessionToUserSetWithClient(db, userID, token, exp)
+if err == nil {
+t.Fatal("expected error from addSessionToUserSetWithClient, got nil")
+}
+if err.Error() != expectedErr.Error() {
+t.Fatalf("expected error %v, got %v", expectedErr, err)
 }
 
-func TestRemoveSessionTokenFromUserSet_RedisNotAvailable(t *testing.T) {
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(nil)
-
-	err := RemoveSessionTokenFromUserSet(123, "token")
-	if err != nil {
-		t.Fatalf("expected no error when Redis is not available, got %v", err)
-	}
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
 }
 
-func TestRemoveSessionTokenFromUserSet_ConcurrentRemoval(t *testing.T) {
-	// This test verifies that concurrent removal operations are handled correctly
-	// by using the atomic Lua script
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestRemoveSessionTokenFromUserSet_Success(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
 
-	// Allow expectations to be matched out of order for concurrent operations
-	mock.MatchExpectationsInOrder(false)
+userID := uint(123)
+token := "test-token-123"
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	userID := uint(123)
-	token1 := "token-1"
-	token2 := "token-2"
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+// Set expectation
+mock.ExpectSRem(userSetKey, token).SetVal(1)
 
-	// Expect two concurrent Eval calls (order may vary due to concurrency)
-	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token1).SetVal(int64(1))
-	mock.ExpectEval(removeSessionLuaScript, []string{userSetKey}, token2).SetVal(int64(1))
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	errCh := make(chan error, 2)
-
-	// Remove token1 concurrently
-	go func() {
-		defer wg.Done()
-		if err := RemoveSessionTokenFromUserSet(userID, token1); err != nil {
-			errCh <- err
-		}
-	}()
-
-	// Remove token2 concurrently
-	go func() {
-		defer wg.Done()
-		if err := RemoveSessionTokenFromUserSet(userID, token2); err != nil {
-			errCh <- err
-		}
-	}()
-
-	wg.Wait()
-	close(errCh)
-
-	for err := range errCh {
-		t.Fatalf("expected no error during concurrent removal, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the actual function
+err := removeSessionTokenFromUserSetWithClient(db, userID, token)
+if err != nil {
+t.Fatalf("removeSessionTokenFromUserSetWithClient failed: %v", err)
 }
 
-func TestInvalidateUserSessions(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
-
-	userID := uint(123)
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-	tokens := []string{"token1", "token2", "token3"}
-
-	// Expect SMembers to return the list of tokens
-	mock.ExpectSMembers(userSetKey).SetVal(tokens)
-
-	// Expect Del for each session token
-	for _, token := range tokens {
-		mock.ExpectDel(fmt.Sprintf("session:%s", token)).SetVal(1)
-	}
-
-	// Expect Del for the user set
-	mock.ExpectDel(userSetKey).SetVal(1)
-
-	err := InvalidateUserSessions(userID)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
 }
 
-func TestInvalidateUserSessions_NoTokens(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestRemoveSessionTokenFromUserSet_NilClient(t *testing.T) {
+userID := uint(123)
+token := "test-token-123"
 
-	userID := uint(123)
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-
-	// Expect SMembers to return an empty list
-	mock.ExpectSMembers(userSetKey).SetVal([]string{})
-
-	// Expect Del for the user set
-	mock.ExpectDel(userSetKey).SetVal(0)
-
-	err := InvalidateUserSessions(userID)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the function with nil client
+err := removeSessionTokenFromUserSetWithClient(nil, userID, token)
+if err != nil {
+t.Fatalf("expected nil error for nil client, got %v", err)
+}
 }
 
-func TestInvalidateUserSessions_KeyNotFound(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestRemoveSessionTokenFromUserSet_Error(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
 
-	userID := uint(123)
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+userID := uint(123)
+token := "test-token-123"
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
 
-	// Expect SMembers to return redis.Nil (key not found)
-	mock.ExpectSMembers(userSetKey).RedisNil()
+// Set expectation for SRem to fail
+expectedErr := errors.New("redis connection error")
+mock.ExpectSRem(userSetKey, token).SetErr(expectedErr)
 
-	// Expect Del for the user set (even though it doesn't exist)
-	mock.ExpectDel(userSetKey).SetVal(0)
-
-	err := InvalidateUserSessions(userID)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Call the actual function
+err := removeSessionTokenFromUserSetWithClient(db, userID, token)
+if err == nil {
+t.Fatal("expected error from removeSessionTokenFromUserSetWithClient, got nil")
+}
+if err.Error() != expectedErr.Error() {
+t.Fatalf("expected error %v, got %v", expectedErr, err)
 }
 
-func TestInvalidateUserSessions_RedisNotAvailable(t *testing.T) {
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(nil)
-
-	err := InvalidateUserSessions(123)
-	if err != nil {
-		t.Fatalf("expected no error when Redis is not available, got %v", err)
-	}
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
 }
 
-func TestInvalidateUserSessions_RedisError(t *testing.T) {
-	rdb, mock := redismock.NewClientMock()
-	defer config.ResetRedisClientForTest()
-	config.SetRedisClientForTest(rdb)
+func TestInvalidateUserSessions_Success(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
 
-	userID := uint(123)
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+userID := uint(123)
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+tokens := []string{"token1", "token2", "token3"}
 
-	// Expect SMembers to return an error (not redis.Nil)
-	mock.ExpectSMembers(userSetKey).SetErr(context.DeadlineExceeded)
+// Set expectations
+mock.ExpectSMembers(userSetKey).SetVal(tokens)
+for _, tok := range tokens {
+sessionKey := fmt.Sprintf("session:%s", tok)
+mock.ExpectDel(sessionKey).SetVal(1)
+}
+mock.ExpectDel(userSetKey).SetVal(1)
 
-	err := InvalidateUserSessions(userID)
-	if err == nil {
-		t.Fatalf("expected error when Redis fails, got nil")
-	}
-	if err != context.DeadlineExceeded {
-		t.Errorf("expected context.DeadlineExceeded, got %v", err)
-	}
+// Call the actual function
+err := invalidateUserSessionsWithClient(db, userID)
+if err != nil {
+t.Fatalf("invalidateUserSessionsWithClient failed: %v", err)
+}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("unmet expectations: %v", err)
-	}
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
+}
+
+func TestInvalidateUserSessions_NilClient(t *testing.T) {
+userID := uint(123)
+
+// Call the function with nil client
+err := invalidateUserSessionsWithClient(nil, userID)
+if err != nil {
+t.Fatalf("expected nil error for nil client, got %v", err)
+}
+}
+
+func TestInvalidateUserSessions_EmptySet(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
+
+userID := uint(123)
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+
+// Set expectations for empty set
+mock.ExpectSMembers(userSetKey).SetVal([]string{})
+mock.ExpectDel(userSetKey).SetVal(1)
+
+// Call the actual function
+err := invalidateUserSessionsWithClient(db, userID)
+if err != nil {
+t.Fatalf("invalidateUserSessionsWithClient failed: %v", err)
+}
+
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
+}
+
+func TestInvalidateUserSessions_SMembersError(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
+
+userID := uint(123)
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+
+// Set expectation for SMembers to fail with a non-Nil error
+expectedErr := errors.New("redis connection error")
+mock.ExpectSMembers(userSetKey).SetErr(expectedErr)
+
+// Call the actual function
+err := invalidateUserSessionsWithClient(db, userID)
+if err == nil {
+t.Fatal("expected error from invalidateUserSessionsWithClient, got nil")
+}
+if err.Error() != expectedErr.Error() {
+t.Fatalf("expected error %v, got %v", expectedErr, err)
+}
+
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
+}
+
+func TestInvalidateUserSessions_SMembersNil(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
+
+userID := uint(123)
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+
+// Set expectation for SMembers to return redis.Nil (key doesn't exist)
+mock.ExpectSMembers(userSetKey).RedisNil()
+// Even with redis.Nil, we should still try to delete the key
+mock.ExpectDel(userSetKey).SetVal(0)
+
+// Call the actual function - redis.Nil should be handled gracefully
+err := invalidateUserSessionsWithClient(db, userID)
+if err != nil {
+t.Fatalf("expected no error when SMembers returns redis.Nil, got %v", err)
+}
+
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
+}
+
+func TestInvalidateUserSessions_DelError(t *testing.T) {
+db, mock := redismock.NewClientMock()
+defer db.Close()
+
+userID := uint(123)
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+tokens := []string{"token1"}
+
+// Set expectations: SMembers succeeds, Del fails
+mock.ExpectSMembers(userSetKey).SetVal(tokens)
+sessionKey := fmt.Sprintf("session:%s", tokens[0])
+mock.ExpectDel(sessionKey).SetVal(1)
+
+expectedErr := errors.New("del failed")
+mock.ExpectDel(userSetKey).SetErr(expectedErr)
+
+// Call the actual function
+err := invalidateUserSessionsWithClient(db, userID)
+if err == nil {
+t.Fatal("expected error from invalidateUserSessionsWithClient, got nil")
+}
+if err.Error() != expectedErr.Error() {
+t.Fatalf("expected error %v, got %v", expectedErr, err)
+}
+
+// Verify all expectations were met
+if err := mock.ExpectationsWereMet(); err != nil {
+t.Errorf("there were unfulfilled expectations: %s", err)
+}
 }

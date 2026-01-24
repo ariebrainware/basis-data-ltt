@@ -129,7 +129,7 @@ func Login(c *gin.Context) {
 		val := fmt.Sprintf("%d:%d", session.UserID, role.ID)
 		_ = rdb.Set(context.Background(), fmt.Sprintf("session:%s", tokenString), val, exp).Err()
 		// Also update per-user set via util helper
-		_ = util.AddSessionToUserSet(session.UserID, tokenString)
+		_ = util.AddSessionToUserSet(session.UserID, tokenString, exp)
 	}
 
 	// Return the token in a JSON response

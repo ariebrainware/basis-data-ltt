@@ -1,70 +1,71 @@
 package util
 
 import (
-	"context"
-	"fmt"
+"context"
+"fmt"
+"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
-	"github.com/redis/go-redis/v9"
+"github.com/ariebrainware/basis-data-ltt/config"
+"github.com/redis/go-redis/v9"
 )
 
-// AddSessionToUserSet adds the session token to the per-user Redis set.
-// The set has no TTL and persists until explicitly cleaned up via
-// RemoveSessionTokenFromUserSet or InvalidateUserSessions.
-func AddSessionToUserSet(userID uint, token string) error {
-	rdb := config.GetRedisClient()
-	if rdb == nil {
-		return nil
-	}
-	ctx := context.Background()
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-	if err := rdb.SAdd(ctx, userSetKey, token).Err(); err != nil {
-		return err
-	}
-	// Use PERSIST to ensure the set has no TTL and relies on explicit cleanup
-	return rdb.Persist(ctx, userSetKey).Err()
+// addSessionToUserSetWithClient is the internal implementation that accepts a Redis client.
+// This allows for dependency injection in tests.
+func addSessionToUserSetWithClient(rdb *redis.Client, userID uint, token string, exp time.Duration) error {
+if rdb == nil {
+return nil
+}
+ctx := context.Background()
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+if err := rdb.SAdd(ctx, userSetKey, token).Err(); err != nil {
+return err
+}
+return rdb.Expire(ctx, userSetKey, exp).Err()
+}
+
+// AddSessionToUserSet adds the session token to the per-user Redis set and
+// sets the TTL to `exp` so the set expires when the last session expires.
+func AddSessionToUserSet(userID uint, token string, exp time.Duration) error {
+return addSessionToUserSetWithClient(config.GetRedisClient(), userID, token, exp)
+}
+
+// removeSessionTokenFromUserSetWithClient is the internal implementation that accepts a Redis client.
+// This allows for dependency injection in tests.
+func removeSessionTokenFromUserSetWithClient(rdb *redis.Client, userID uint, token string) error {
+if rdb == nil {
+return nil
+}
+ctx := context.Background()
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+return rdb.SRem(ctx, userSetKey, token).Err()
 }
 
 // RemoveSessionTokenFromUserSet removes a single session token from the per-user set.
-// If the set becomes empty after removal, it is deleted.
 func RemoveSessionTokenFromUserSet(userID uint, token string) error {
-	rdb := config.GetRedisClient()
-	if rdb == nil {
-		return nil
-	}
-	ctx := context.Background()
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-	// Use a Lua script to atomically remove the token and delete the set if empty
-	script := `
-		local removed = redis.call('SREM', KEYS[1], ARGV[1])
-		if removed > 0 then
-			local count = redis.call('SCARD', KEYS[1])
-			if count == 0 then
-				redis.call('DEL', KEYS[1])
-			end
-		end
-		return removed
-	`
-	return rdb.Eval(ctx, script, []string{userSetKey}, token).Err()
+return removeSessionTokenFromUserSetWithClient(config.GetRedisClient(), userID, token)
+}
+
+// invalidateUserSessionsWithClient is the internal implementation that accepts a Redis client.
+// This allows for dependency injection in tests.
+func invalidateUserSessionsWithClient(rdb *redis.Client, userID uint) error {
+if rdb == nil {
+return nil
+}
+ctx := context.Background()
+userSetKey := fmt.Sprintf("user_sessions:%d", userID)
+members, err := rdb.SMembers(ctx, userSetKey).Result()
+if err != nil && err != redis.Nil {
+return err
+}
+for _, tok := range members {
+_ = rdb.Del(ctx, fmt.Sprintf("session:%s", tok)).Err()
+}
+return rdb.Del(ctx, userSetKey).Err()
 }
 
 // InvalidateUserSessions deletes all session:<token> keys for the given user and
 // removes the per-user set. Best-effort: it will return an error if Redis calls
 // fail, but callers may choose to ignore it.
 func InvalidateUserSessions(userID uint) error {
-	rdb := config.GetRedisClient()
-	if rdb == nil {
-		return nil
-	}
-	ctx := context.Background()
-	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
-	members, err := rdb.SMembers(ctx, userSetKey).Result()
-	// redis.Nil indicates the key doesn't exist (no active sessions), which is a valid scenario
-	if err != nil && err != redis.Nil {
-		return err
-	}
-	for _, tok := range members {
-		_ = rdb.Del(ctx, fmt.Sprintf("session:%s", tok)).Err()
-	}
-	return rdb.Del(ctx, userSetKey).Err()
+return invalidateUserSessionsWithClient(config.GetRedisClient(), userID)
 }
