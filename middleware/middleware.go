@@ -176,6 +176,67 @@ func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 	}
 }
 
+// RequireRoleOrOwner allows access when the user's role is one of the
+// allowedRoles OR when the authenticated user is the owner of the
+// resource identified by the URL parameter `id`.
+func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// First allow if the user's role is one of the allowed roles
+		if roleID, exists := GetRoleID(c); exists {
+			for _, allowed := range allowedRoles {
+				if roleID == allowed {
+					c.Next()
+					return
+				}
+			}
+		}
+
+		// Otherwise check ownership: compare context user id with URL param `id`
+		userID, ok := GetUserID(c)
+		if !ok {
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "User not authenticated",
+				Err: fmt.Errorf("user id not found in context"),
+			})
+			c.Abort()
+			return
+		}
+
+		idParam := c.Param("id")
+		if idParam == "" {
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Resource id required",
+				Err: fmt.Errorf("resource id parameter missing"),
+			})
+			c.Abort()
+			return
+		}
+
+		// Parse id param to unsigned integer
+		uid64, err := strconv.ParseUint(idParam, 10, 64)
+		if err != nil {
+			util.CallUserNotAuthorized(c, util.APIErrorParams{
+				Msg: "Invalid resource id",
+				Err: err,
+			})
+			c.Abort()
+			return
+		}
+
+		if uint(uid64) == userID {
+			c.Next()
+			return
+		}
+
+		util.CallUserNotAuthorized(c, util.APIErrorParams{
+			Msg: "Insufficient permissions to access this resource",
+			Err: fmt.Errorf("user %d not owner nor allowed role", userID),
+		})
+		c.Abort()
+		return
+	}
+}
+
 func ValidateLoginToken() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		db := GetDB(c)
