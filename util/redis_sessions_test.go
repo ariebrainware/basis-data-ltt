@@ -337,19 +337,3 @@ func TestInvalidateUserSessions_DelError(t *testing.T) {
 		t.Errorf("there were unfulfilled expectations: %s", err)
 	}
 }
-
-// Test that functions handle nil Redis client gracefully
-func TestNilRedisClient_Behavior(t *testing.T) {
-	// These tests verify that the actual functions return nil when Redis client is nil
-	// The actual functions check: if rdb == nil { return nil }
-	
-	// We can't directly test the actual functions without modifying them to accept
-	// a client parameter, but we can document the expected behavior:
-	// - AddSessionToUserSet returns nil when config.GetRedisClient() is nil
-	// - RemoveSessionTokenFromUserSet returns nil when config.GetRedisClient() is nil
-	// - InvalidateUserSessions returns nil when config.GetRedisClient() is nil
-	
-	// This is the current implementation behavior and is tested implicitly
-	// in integration tests when Redis is not available.
-	t.Log("Nil Redis client should be handled gracefully by returning nil error")
-}
