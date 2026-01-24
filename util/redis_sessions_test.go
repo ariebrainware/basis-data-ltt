@@ -11,22 +11,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// mockRedisClient temporarily replaces the global Redis client for testing
-var mockRedisClient *redis.Client
-
-// setMockRedisClient is a test helper to inject a mock Redis client
-func setMockRedisClient(client *redis.Client) {
-	mockRedisClient = client
-}
-
-// resetMockRedisClient clears the mock client
-func resetMockRedisClient() {
-	mockRedisClient = nil
-}
-
-// NOTE: These tests verify Redis operations in isolation using a mock Redis client.
-// They exercise the expected Redis commands directly and do not call the production helper functions.
-
 func TestAddSessionToUserSet_Success(t *testing.T) {
 	// Create a mock Redis client
 	db, mock := redismock.NewClientMock()
