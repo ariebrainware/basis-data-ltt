@@ -143,6 +143,9 @@ func main() {
 		// Current user profile update
 		auth.PATCH("/user", endpoint.UpdateUser)
 
+		// Verify current password before allowing password change in frontend
+		auth.GET("/verify-password", endpoint.VerifyPassword)
+
 		// Admin-only user management
 		userAdmin := auth.Group("/user")
 		userAdmin.Use(middleware.RequireRole(model.RoleAdmin))

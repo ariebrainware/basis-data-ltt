@@ -300,3 +300,69 @@ func Signup(c *gin.Context) {
 		Data: tokenString,
 	})
 }
+
+// VerifyPassword godoc
+// @Summary      Verify current user's password
+// @Description  Validate the provided current password for the authenticated user
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        password query string true "Current password"
+// @Success      200 {object} util.APIResponse "Password verified"
+// @Failure      400 {object} util.APIResponse "Invalid request payload"
+// @Failure      401 {object} util.APIResponse "Invalid password or unauthorized"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /verify-password [get]
+func VerifyPassword(c *gin.Context) {
+	// Read password from query parameter
+	password := c.Query("password")
+	if password == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Password is required",
+			Err: fmt.Errorf("password query parameter is required"),
+		})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return
+	}
+
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		util.CallUserNotAuthorized(c, util.APIErrorParams{
+			Msg: "User not authenticated",
+			Err: fmt.Errorf("user id not found in context"),
+		})
+		return
+	}
+
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "User not found",
+			Err: err,
+		})
+		return
+	}
+
+	if user.Password == util.HashPassword(password) {
+		util.CallSuccessOK(c, util.APISuccessParams{
+			Msg:  "Password verified",
+			Data: map[string]bool{"verified": true},
+		})
+		return
+	}
+
+	util.CallUserNotAuthorized(c, util.APIErrorParams{
+		Msg: "Invalid password",
+		Err: fmt.Errorf("provided password does not match"),
+	})
+}
