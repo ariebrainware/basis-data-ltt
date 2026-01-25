@@ -35,7 +35,7 @@ func TestVerifyPasswordUnauthorized(t *testing.T) {
 	})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	
+
 	reqBody := map[string]string{"password": "whatever"}
 	b, _ := json.Marshal(reqBody)
 	req, _ := http.NewRequest("POST", "/verify-password", bytes.NewBuffer(b))
@@ -144,7 +144,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("verify-password (correct) failed: %d body=%s", rr.Code, rr.Body.String())
 	}
-	
+
 	// Verify the response structure
 	var verifyResp apiResp
 	if err := json.Unmarshal(rr.Body.Bytes(), &verifyResp); err != nil {
