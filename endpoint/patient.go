@@ -182,9 +182,10 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// Prevent duplicate registration: check by full_name + any phone_number
-	// Normalize phone numbers and check using FIND_IN_SET on the stored
-	// comma-separated phone_number column (after removing spaces).
+	// Prevent duplicate registration: check by full_name + any phone_number.
+	// Normalize phone numbers (trim spaces, drop empties), fetch patients with the same
+	// full_name, then split the stored comma-separated phone_number column and compare
+	// in Go using string operations.
 	normalizedPhones := []string{}
 	for _, p := range patientRequest.PhoneNumber {
 		ph := strings.TrimSpace(p)
@@ -223,6 +224,24 @@ func CreatePatient(c *gin.Context) {
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 
+		// Re-check for duplicate patient inside the transaction to avoid race conditions.
+		if len(normalizedPhones) > 0 {
+			var matchesTx []model.Patient
+			if err := tx.Where("full_name = ?", patientRequest.FullName).Find(&matchesTx).Error; err != nil {
+				return err
+			}
+			for _, ph := range normalizedPhones {
+				for _, m := range matchesTx {
+					stored := strings.Split(m.PhoneNumber, ",")
+					for _, sp := range stored {
+						if strings.TrimSpace(sp) == ph {
+							// Abort the transaction if a duplicate is detected.
+							return fmt.Errorf("patient already exists with same name and phone number")
+						}
+					}
+				}
+			}
+		}
 		// determine the patient code by fullname initials + incremented number
 		initials := getInitials(patientRequest.FullName)
 

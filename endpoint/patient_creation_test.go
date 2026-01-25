@@ -101,7 +101,6 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 	t.Setenv("APITOKEN", "test-api-token")
 	util.SetJWTSecret("test-secret")
 
-	cfg := config.LoadConfig()
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("connect test db: %v", err)
@@ -114,9 +113,15 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 	}
 
 	// Clean tables to ensure deterministic test
-	db.Where("1 = 1").Delete(&model.Patient{})
-	db.Where("1 = 1").Delete(&model.User{})
-	db.Where("1 = 1").Delete(&model.PatientCode{})
+	if err := db.Unscoped().Where("1 = 1").Delete(&model.Patient{}).Error; err != nil {
+		t.Fatalf("cleanup patients: %v", err)
+	}
+	if err := db.Unscoped().Where("1 = 1").Delete(&model.User{}).Error; err != nil {
+		t.Fatalf("cleanup users: %v", err)
+	}
+	if err := db.Unscoped().Where("1 = 1").Delete(&model.PatientCode{}).Error; err != nil {
+		t.Fatalf("cleanup patient codes: %v", err)
+	}
 
 	// Seed roles and a patient code for initial letter 'J' (for "John Doe")
 	if err := model.SeedRoles(db); err != nil {
