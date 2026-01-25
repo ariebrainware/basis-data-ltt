@@ -212,8 +212,8 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 			return
 		}
 
-		// Parse id param to unsigned integer
-		uid64, err := strconv.ParseUint(idParam, 10, 64)
+		// Parse id param to unsigned integer, constrained to platform uint size
+		uid, err := strconv.ParseUint(idParam, 10, 0)
 		if err != nil {
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Invalid resource id",
@@ -223,7 +223,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 			return
 		}
 
-		if uint(uid64) == userID {
+		if uint(uid) == userID {
 			c.Next()
 			return
 		}
