@@ -153,8 +153,8 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer test-api-token")
 	req.Header.Set("session-token", loginData.Token)
 	r.ServeHTTP(rr, req)
-	if rr.Code == http.StatusOK {
-		t.Fatalf("verify-password unexpectedly succeeded with wrong password: body=%s", rr.Body.String())
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when verifying wrong password, got %d body=%s", rr.Code, rr.Body.String())
 	}
 }
 
