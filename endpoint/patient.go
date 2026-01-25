@@ -173,10 +173,8 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// Normalize full_name: trim leading/trailing whitespace and collapse internal whitespace
-	patientRequest.FullName = strings.TrimSpace(patientRequest.FullName)
-	// Collapse multiple internal spaces into a single space
-	patientRequest.FullName = strings.Join(strings.Fields(patientRequest.FullName), " ")
+	// Normalize full_name to prevent duplicate detection bypass via whitespace variations
+	patientRequest.FullName = util.NormalizeName(patientRequest.FullName)
 
 	db := middleware.GetDB(c)
 	if db == nil {
