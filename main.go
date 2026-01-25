@@ -144,7 +144,7 @@ func main() {
 		auth.PATCH("/user", endpoint.UpdateUser)
 
 		// Verify current password before allowing password change in frontend
-		auth.GET("/verify-password", endpoint.VerifyPassword)
+		auth.POST("/verify-password", endpoint.VerifyPassword)
 
 		// Admin-only user management
 		userAdmin := auth.Group("/user")
