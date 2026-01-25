@@ -319,6 +319,7 @@ type VerifyPasswordRequest struct {
 // @Success      200 {object} util.APIResponse "Password verified"
 // @Failure      400 {object} util.APIResponse "Invalid request payload"
 // @Failure      401 {object} util.APIResponse "Invalid password or unauthorized"
+// @Failure      404 {object} util.APIResponse "User not found"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /verify-password [post]
 func VerifyPassword(c *gin.Context) {
