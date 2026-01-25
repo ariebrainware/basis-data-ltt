@@ -189,16 +189,16 @@ func main() {
 			disease.DELETE("/:id", endpoint.DeleteDisease)
 		}
 
-		// Therapist routes - accessible by Admin only
+		// Therapist routes - allow Admin and Therapist to GET; Admin-only for mutations
 		therapist := auth.Group("/therapist")
-		therapist.Use(middleware.RequireRole(model.RoleAdmin))
 		{
-			therapist.GET("", endpoint.ListTherapist)
-			therapist.GET("/:id", endpoint.GetTherapistInfo)
-			therapist.POST("", endpoint.CreateTherapist)
-			therapist.PATCH("/:id", endpoint.UpdateTherapist)
-			therapist.DELETE("/:id", endpoint.DeleteTherapist)
-			therapist.PUT("/:id", endpoint.TherapistApproval)
+			therapist.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.ListTherapist)
+			therapist.GET("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.GetTherapistInfo)
+
+			therapist.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateTherapist)
+			therapist.PATCH("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateTherapist)
+			therapist.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTherapist)
+			therapist.PUT("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.TherapistApproval)
 		}
 	}
 
