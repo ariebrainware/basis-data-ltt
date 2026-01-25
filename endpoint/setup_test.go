@@ -9,17 +9,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const testJWTSecret = "test-secret-123"
+
 // TestMain sets up consistent test configuration for all tests in the endpoint_test package.
 // This prevents test order dependency issues caused by the singleton config pattern.
 func TestMain(m *testing.M) {
 	// Set consistent environment variables for all tests
 	os.Setenv("APPENV", "test")
-	os.Setenv("JWTSECRET", "test-secret-123")
+	os.Setenv("JWTSECRET", testJWTSecret)
 	os.Setenv("APITOKEN", "test-api-token")
 	os.Setenv("GINMODE", "release")
 
 	// Initialize util's JWT secret
-	util.SetJWTSecret("test-secret-123")
+	util.SetJWTSecret(testJWTSecret)
 
 	// Initialize the singleton config once before any tests run
 	cfg := config.LoadConfig()
@@ -27,9 +29,6 @@ func TestMain(m *testing.M) {
 	// Set Gin mode from initialized config
 	gin.SetMode(cfg.GinMode)
 
-	// Run all tests
-	exitCode := m.Run()
-
-	// Exit with the test result code
-	os.Exit(exitCode)
+	// Run all tests and exit with the result code
+	os.Exit(m.Run())
 }
