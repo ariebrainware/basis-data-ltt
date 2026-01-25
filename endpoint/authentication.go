@@ -353,8 +353,15 @@ func VerifyPassword(c *gin.Context) {
 
 	var user model.User
 	if err := db.First(&user, userID).Error; err != nil {
-		util.CallErrorNotFound(c, util.APIErrorParams{
-			Msg: "User not found",
+		if err == gorm.ErrRecordNotFound {
+			util.CallErrorNotFound(c, util.APIErrorParams{
+				Msg: "User not found",
+				Err: err,
+			})
+			return
+		}
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to retrieve user",
 			Err: err,
 		})
 		return
