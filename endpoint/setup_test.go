@@ -21,10 +21,18 @@ const testJWTSecret = "test-secret-123"
 // (via cache=shared DSN) - failing to clean up tables can cause test contamination.
 func TestMain(m *testing.M) {
 	// Set consistent environment variables for all tests
-	os.Setenv("APPENV", "test")
-	os.Setenv("JWTSECRET", testJWTSecret)
-	os.Setenv("APITOKEN", "test-api-token")
-	os.Setenv("GINMODE", "release")
+	if err := os.Setenv("APPENV", "test"); err != nil {
+		panic("failed to set APPENV: " + err.Error())
+	}
+	if err := os.Setenv("JWTSECRET", testJWTSecret); err != nil {
+		panic("failed to set JWTSECRET: " + err.Error())
+	}
+	if err := os.Setenv("APITOKEN", "test-api-token"); err != nil {
+		panic("failed to set APITOKEN: " + err.Error())
+	}
+	if err := os.Setenv("GINMODE", "release"); err != nil {
+		panic("failed to set GINMODE: " + err.Error())
+	}
 
 	// Initialize util's JWT secret
 	util.SetJWTSecret(testJWTSecret)
@@ -36,7 +44,5 @@ func TestMain(m *testing.M) {
 	// Set Gin mode to match the environment variable
 	gin.SetMode("release")
 
-	// Run all tests and exit with the result code
-	// Note: os.Exit bypasses deferred functions - tests must use t.Cleanup()
 	os.Exit(m.Run())
 }
