@@ -154,9 +154,9 @@ func main() {
 			userAdmin.DELETE("/:id", endpoint.DeleteUser)
 		}
 
-		// Allow Admins or the resource owner to GET/PATCH a user by id
+		// Allow Admins or the resource owner to GET a user by id; only Admins may PATCH by id
 		auth.GET("/user/:id", middleware.RequireRoleOrOwner(model.RoleAdmin), endpoint.GetUserInfo)
-		auth.PATCH("/user/:id", middleware.RequireRoleOrOwner(model.RoleAdmin), endpoint.UpdateUserByID)
+		auth.PATCH("/user/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateUserByID)
 
 		// Patient routes - accessible by Admin only
 		patient := auth.Group("/patient")
