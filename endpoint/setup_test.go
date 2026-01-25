@@ -13,6 +13,12 @@ const testJWTSecret = "test-secret-123"
 
 // TestMain sets up consistent test configuration for all tests in the endpoint_test package.
 // This prevents test order dependency issues caused by the singleton config pattern.
+//
+// IMPORTANT: This function calls os.Exit(), which bypasses deferred cleanup functions and
+// prevents test coverage reports from being written. This is standard Go testing practice.
+// Individual tests MUST handle their own cleanup using t.Cleanup() to ensure proper resource
+// management. This is especially critical since tests share an in-memory SQLite database
+// (via cache=shared DSN) - failing to clean up tables can cause test contamination.
 func TestMain(m *testing.M) {
 	// Set consistent environment variables for all tests
 	os.Setenv("APPENV", "test")
@@ -31,5 +37,6 @@ func TestMain(m *testing.M) {
 	gin.SetMode("release")
 
 	// Run all tests and exit with the result code
+	// Note: os.Exit bypasses deferred functions - tests must use t.Cleanup()
 	os.Exit(m.Run())
 }
