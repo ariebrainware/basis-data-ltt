@@ -5,14 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
-	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,13 +18,7 @@ import (
 
 // Unit test: calling VerifyPassword without an authenticated user should return 401
 func TestVerifyPasswordUnauthorized(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "unit-secret")
-	t.Setenv("APITOKEN", "test-api-token")
-	t.Setenv("GINMODE", "test")
-
-	util.SetJWTSecret("unit-secret")
-
+	// Config is initialized in TestMain (setup_test.go)
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
@@ -60,13 +52,7 @@ func TestVerifyPasswordUnauthorized(t *testing.T) {
 
 // Integration test: signup/login then verify password (correct and incorrect)
 func TestVerifyPasswordIntegration(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "integ-secret-123")
-	t.Setenv("APITOKEN", "test-api-token")
-	t.Setenv("GINMODE", "release")
-
-	util.SetJWTSecret("integ-secret-123")
-
+	// Config is initialized in TestMain (setup_test.go)
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
@@ -88,12 +74,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 		t.Fatalf("failed to seed patient code: %v", err)
 	}
 
-	// Set gin mode directly from environment to avoid relying on singleton config
-	ginMode := os.Getenv("GINMODE")
-	if ginMode == "" {
-		ginMode = "release"
-	}
-	gin.SetMode(ginMode)
+	// Gin mode is set in TestMain (setup_test.go)
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.DatabaseMiddleware(db))

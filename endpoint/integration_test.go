@@ -11,7 +11,6 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/endpoint"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
-	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,16 +36,7 @@ func doRequest(r http.Handler, method, path string, body []byte, headers map[str
 }
 
 func TestIntegrationFlow(t *testing.T) {
-	// Set environment for test run using t.Setenv for test isolation
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret-123")
-	t.Setenv("APITOKEN", "test-api-token")
-	t.Setenv("GINMODE", "release")
-
-	// Ensure util uses the test secret
-	util.SetJWTSecret("test-secret-123")
-
-	cfg := config.LoadConfig()
+	// Config is initialized in TestMain (setup_test.go)
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
@@ -86,7 +76,7 @@ func TestIntegrationFlow(t *testing.T) {
 		t.Fatalf("failed to seed patient code: %v", err)
 	}
 
-	gin.SetMode(cfg.GinMode)
+	// Gin mode is set in TestMain (setup_test.go)
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.DatabaseMiddleware(db))
