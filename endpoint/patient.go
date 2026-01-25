@@ -182,18 +182,46 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
+	// Prevent duplicate registration: check by full_name + any phone_number
+	// Normalize phone numbers and check using FIND_IN_SET on the stored
+	// comma-separated phone_number column (after removing spaces).
+	normalizedPhones := []string{}
+	for _, p := range patientRequest.PhoneNumber {
+		ph := strings.TrimSpace(p)
+		if ph != "" {
+			normalizedPhones = append(normalizedPhones, ph)
+		}
+	}
+	if len(normalizedPhones) > 0 {
+		// Fetch any patients with the same full_name and perform phone matching in Go
+		var matches []model.Patient
+		if err := db.Where("full_name = ?", patientRequest.FullName).Find(&matches).Error; err != nil {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to check existing patient",
+				Err: err,
+			})
+			return
+		}
+		for _, ph := range normalizedPhones {
+			for _, m := range matches {
+				stored := strings.Split(m.PhoneNumber, ",")
+				for _, sp := range stored {
+					if strings.TrimSpace(sp) == ph {
+						util.CallUserError(c, util.APIErrorParams{
+							Msg: "Patient already exists with same name and phone number",
+							Err: fmt.Errorf("patient duplicate detected"),
+						})
+						return
+					}
+				}
+			}
+		}
+	}
+
 	var existingPatient model.Patient
 	var existingUser model.User
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		// Check if username and phone already registered
-		// Use parameterized IN query with the slice directly to avoid
-		// concatenating values into SQL and to let GORM bind parameters safely.
-		if err := tx.Where("full_name = ? AND phone_number IN ?", patientRequest.FullName, patientRequest.PhoneNumber).First(&existingPatient).Error; err != nil {
-			if err != gorm.ErrRecordNotFound {
-				return fmt.Errorf("database error: %v", err)
-			} // else continue to create new patient
-		}
 
 		// determine the patient code by fullname initials + incremented number
 		initials := getInitials(patientRequest.FullName)
