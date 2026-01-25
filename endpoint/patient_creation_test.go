@@ -101,7 +101,6 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 	t.Setenv("APITOKEN", "test-api-token")
 	util.SetJWTSecret("test-secret")
 
-	cfg := config.LoadConfig()
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("connect test db: %v", err)
