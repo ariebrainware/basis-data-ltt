@@ -2,6 +2,7 @@ package util
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -96,4 +97,14 @@ func CallUserNotAuthorized(c *gin.Context, params APIErrorParams) {
 		Msg:     params.Msg,
 	}
 	c.JSON(http.StatusUnauthorized, response)
+}
+
+// NormalizeName normalizes a name by trimming leading/trailing whitespace
+// and collapsing multiple internal spaces into single spaces.
+// This ensures consistent name formatting and helps prevent duplicate detection bypass.
+func NormalizeName(name string) string {
+	// Trim leading and trailing whitespace
+	name = strings.TrimSpace(name)
+	// Collapse multiple internal spaces into single space
+	return strings.Join(strings.Fields(name), " ")
 }

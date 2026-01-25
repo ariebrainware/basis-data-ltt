@@ -173,6 +173,9 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
+	// Normalize full_name to prevent duplicate detection bypass via whitespace variations
+	patientRequest.FullName = util.NormalizeName(patientRequest.FullName)
+
 	db := middleware.GetDB(c)
 	if db == nil {
 		util.CallServerError(c, util.APIErrorParams{
