@@ -41,7 +41,11 @@ func TestVerifyPasswordUnauthorized(t *testing.T) {
 	})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	req, _ := http.NewRequest("GET", "/verify-password?password=whatever", nil)
+	
+	reqBody := map[string]string{"password": "whatever"}
+	b, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "/verify-password", bytes.NewBuffer(b))
+	req.Header.Set("Content-Type", "application/json")
 	c.Request = req
 	c.Set(middleware.DBKey, db)
 
@@ -96,7 +100,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	auth := r.Group("/")
 	auth.Use(middleware.ValidateLoginToken())
 	{
-		auth.GET("/verify-password", endpoint.VerifyPassword)
+		auth.POST("/verify-password", endpoint.VerifyPassword)
 	}
 
 	// Signup
@@ -142,19 +146,38 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	}
 
 	// Correct password should verify
+	vpBody := map[string]string{"password": "pass123"}
+	b, _ = json.Marshal(vpBody)
 	rr = httptest.NewRecorder()
-	req, _ = http.NewRequest("GET", "/verify-password?password=pass123", nil)
+	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))
 	req.Header.Set("Authorization", "Bearer test-api-token")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("session-token", loginData.Token)
 	r.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("verify-password (correct) failed: %d body=%s", rr.Code, rr.Body.String())
 	}
+	
+	// Verify the response structure
+	var verifyResp apiResp
+	if err := json.Unmarshal(rr.Body.Bytes(), &verifyResp); err != nil {
+		t.Fatalf("failed to decode verify response: %v", err)
+	}
+	var verifyData map[string]bool
+	if err := json.Unmarshal(verifyResp.Data, &verifyData); err != nil {
+		t.Fatalf("failed to parse verify data: %v", err)
+	}
+	if !verifyData["verified"] {
+		t.Fatalf("expected verified=true, got %v", verifyData)
+	}
 
 	// Incorrect password should be unauthorized
+	vpBody = map[string]string{"password": "wrongpass"}
+	b, _ = json.Marshal(vpBody)
 	rr = httptest.NewRecorder()
-	req, _ = http.NewRequest("GET", "/verify-password?password=wrongpass", nil)
+	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))
 	req.Header.Set("Authorization", "Bearer test-api-token")
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("session-token", loginData.Token)
 	r.ServeHTTP(rr, req)
 	if rr.Code != http.StatusUnauthorized {
