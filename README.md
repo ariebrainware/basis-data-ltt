@@ -148,7 +148,7 @@ Authentication:
 - `POST /login` - obtain session token
 - `DELETE /logout` - invalidate session (requires `session-token` header)
 - `GET /token/validate` - validate session token
-- `GET /verify-password` - (protected) verify current user's password before allowing password change
+- `POST /verify-password` - (protected) verify current user's password before allowing password change
 
 Patient (admin):
 - `POST /patient` - create patient (public)
