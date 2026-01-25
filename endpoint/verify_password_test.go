@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
@@ -66,7 +67,6 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 
 	util.SetJWTSecret("integ-secret-123")
 
-	cfg := config.LoadConfig()
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
@@ -88,7 +88,12 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 		t.Fatalf("failed to seed patient code: %v", err)
 	}
 
-	gin.SetMode(cfg.GinMode)
+	// Set gin mode directly from environment to avoid relying on singleton config
+	ginMode := os.Getenv("GINMODE")
+	if ginMode == "" {
+		ginMode = "release"
+	}
+	gin.SetMode(ginMode)
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.DatabaseMiddleware(db))
