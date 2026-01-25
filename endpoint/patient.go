@@ -182,9 +182,10 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// Prevent duplicate registration: check by full_name + any phone_number
-	// Normalize phone numbers and check using FIND_IN_SET on the stored
-	// comma-separated phone_number column (after removing spaces).
+	// Prevent duplicate registration: check by full_name + any phone_number.
+	// Normalize phone numbers (trim spaces, drop empties), fetch patients with the same
+	// full_name, then split the stored comma-separated phone_number column and compare
+	// in Go using string operations.
 	normalizedPhones := []string{}
 	for _, p := range patientRequest.PhoneNumber {
 		ph := strings.TrimSpace(p)
