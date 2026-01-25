@@ -22,6 +22,7 @@ func TestVerifyPasswordUnauthorized(t *testing.T) {
 	t.Setenv("APPENV", "test")
 	t.Setenv("JWTSECRET", "unit-secret")
 	t.Setenv("APITOKEN", "test-api-token")
+	t.Setenv("GINMODE", "test")
 
 	util.SetJWTSecret("unit-secret")
 
