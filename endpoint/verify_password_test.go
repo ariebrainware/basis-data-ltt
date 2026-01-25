@@ -35,6 +35,10 @@ func TestVerifyPasswordUnauthorized(t *testing.T) {
 		t.Fatalf("auto migrate failed: %v", err)
 	}
 
+	// Clean up migrated tables to avoid leaking state into other tests
+	t.Cleanup(func() {
+		_ = db.Migrator().DropTable(&model.User{}, &model.Session{})
+	})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	req, _ := http.NewRequest("GET", "/verify-password?password=whatever", nil)
