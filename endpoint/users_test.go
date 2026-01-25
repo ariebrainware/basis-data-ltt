@@ -16,14 +16,7 @@ import (
 
 // This test covers admin user management and self-profile update flows.
 func TestUserEndpoints(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret-123")
-	t.Setenv("APITOKEN", "test-api-token")
-	t.Setenv("GINMODE", "release")
-
-	util.SetJWTSecret("test-secret-123")
-
-	cfg := config.LoadConfig()
+	// Config is initialized in TestMain (setup_test.go)
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
@@ -47,7 +40,7 @@ func TestUserEndpoints(t *testing.T) {
 		t.Fatalf("seeding roles failed: %v", err)
 	}
 
-	gin.SetMode(cfg.GinMode)
+	// Gin mode is set in TestMain (setup_test.go)
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.DatabaseMiddleware(db))
@@ -382,14 +375,7 @@ func TestUserEndpoints(t *testing.T) {
 
 // TestListUsersPaginationAndSearch tests ListUsers pagination and search functionality
 func TestListUsersPaginationAndSearch(t *testing.T) {
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret-123")
-	t.Setenv("APITOKEN", "test-api-token")
-	t.Setenv("GINMODE", "release")
-
-	util.SetJWTSecret("test-secret-123")
-
-	cfg := config.LoadConfig()
+	// Config is initialized in TestMain (setup_test.go)
 	db, err := config.ConnectMySQL()
 	if err != nil {
 		t.Fatalf("failed to connect test DB: %v", err)
@@ -413,7 +399,7 @@ func TestListUsersPaginationAndSearch(t *testing.T) {
 		t.Fatalf("seeding roles failed: %v", err)
 	}
 
-	gin.SetMode(cfg.GinMode)
+	// Gin mode is set in TestMain (setup_test.go)
 	r := gin.Default()
 	r.Use(middleware.CORSMiddleware())
 	r.Use(middleware.DatabaseMiddleware(db))
