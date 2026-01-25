@@ -183,7 +183,7 @@ If a test needs to run against MySQL, set environment variables accordingly. Mos
 
 - The config loader is a singleton: see [config/config.go](config/config.go).
 - Database connection is injected into Gin context via `middleware.DatabaseMiddleware` ([middleware/middleware.go](middleware/middleware.go)).
-- Passwords are HMAC-SHA256 using the `JWTSECRET` as key (see [util/password.go](util/password.go)).
+- Passwords should be hashed using a dedicated slow password hashing function (for example, bcrypt or Argon2 with per-user salts). Do not reuse `JWTSECRET` (or any JWT signing key) for password hashing; see [util/password.go](util/password.go) and update it if needed to follow this guidance.
 - Session tokens are stored in the `sessions` table and cached in Redis when available (see [endpoint/authentication.go](endpoint/authentication.go)).
 
 If you'd like, I can also add a quick `make` target or Docker instructions to simplify local setup.
