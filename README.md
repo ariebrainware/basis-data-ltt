@@ -1,59 +1,19 @@
-# Project Documentation
-
-This document summarize the setup, available routes, and core functionalities provided by the project.
-
-## Table of Contents
-- [Overview](#overview)
-- [Setup](#setup)
-- [API Documentation](#api-documentation)
-- [Routes](#routes)
-- [Functionality](#functionality)
-
-## Overview
-
-This project is a backend service written in Go. It is designed to manage basis data and provide a RESTful API interface. The documentation covers installation, configuration, and route details.
-
-## Setup
-
-### Prerequisites
-- Go (version 1.15+ recommended)
-- Git
-
-### Installation
-
-1. Clone the repository:
-    ```
-    git clone https://github.com/ariebrainware/basis-data-ltt.git
-    ```
-2. Navigate to the project directory:
-    ```
-    cd /Users/ariebrainware/go/src/github.com/ariebrainware/basis-data-ltt
-    ```
-3. Install dependencies:
-    ```
-    go mod download
-    ```
-
-### Configuration
-- Create and configure any necessary environment variables. For example, a `.env` file can be used to set database connections and server ports.
-- Sample environment variables:
-  ```
-    APPNAME=basis-data-ltt
-    APITOKEN=ed25519key
-    APPENV=local
-    APPPORT=19091
-    GINMODE=debug
-    DBHOST=localhost
-    DBPORT=3306
-    DBNAME=databasename
-    DBUSER=databaseuser
-    DBPASS=databasepassword
-  ```
-
-### Build and Run
- # basis-data-ltt
+# basis-data-ltt
 
 Lightweight Go REST API for managing patients, diseases, treatments, therapists and sessions.
+
+---
+
+## Table of Contents
+
+- [Quick links](#quick-links)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Build & Run](#build--run)
+- [API Documentation](#api-documentation)
+- [Important Routes](#important-routes)
+- [Testing](#testing)
+- [Notes for Contributors](#notes-for-contributors)
 
 ---
 
@@ -71,7 +31,7 @@ Lightweight Go REST API for managing patients, diseases, treatments, therapists 
 
 ## Prerequisites
 
-- Go 1.18+
+- Go 1.24.0+
 - (Optional) MySQL for local development; tests use an in-memory SQLite when `APPENV=test`.
 
 ## Setup
@@ -124,7 +84,7 @@ Server defaults to `:APPPORT` (19091). The app sets timezone to `Asia/Jakarta` o
 
 ---
 
-## API documentation (Swagger)
+## API Documentation
 
 Run the server and open:
 
@@ -141,7 +101,7 @@ swag init --parseDependency --parseInternal
 
 ---
 
-## Important routes
+## Important Routes
 
 Authentication:
 - `POST /signup` - register
@@ -179,7 +139,7 @@ If a test needs to run against MySQL, set environment variables accordingly. Mos
 
 ---
 
-## Notes for contributors
+## Notes for Contributors
 
 - The config loader is a singleton: see [config/config.go](config/config.go).
 - Database connection is injected into Gin context via `middleware.DatabaseMiddleware` ([middleware/middleware.go](middleware/middleware.go)).
@@ -187,3 +147,4 @@ If a test needs to run against MySQL, set environment variables accordingly. Mos
 - Session tokens are stored in the `sessions` table and cached in Redis when available (see [endpoint/authentication.go](endpoint/authentication.go)).
 
 If you'd like, I can also add a quick `make` target or Docker instructions to simplify local setup.
+

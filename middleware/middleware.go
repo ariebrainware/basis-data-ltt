@@ -225,7 +225,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 
 		// Ensure the parsed id fits into the platform-dependent uint type to avoid overflow
 		maxUint := ^uint(0)
-		if uid64 > uint64(maxUint) {
+		if uid > uint64(maxUint) {
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Invalid resource id",
 				Err: fmt.Errorf("resource id out of range"),
