@@ -1,203 +1,150 @@
-# Project Documentation
+# basis-data-ltt
 
-This document summarize the setup, available routes, and core functionalities provided by the project.
+Lightweight Go REST API for managing patients, diseases, treatments, therapists and sessions.
+
+---
 
 ## Table of Contents
-- [Overview](#overview)
+
+- [Quick links](#quick-links)
+- [Prerequisites](#prerequisites)
 - [Setup](#setup)
+- [Build & Run](#build--run)
 - [API Documentation](#api-documentation)
-- [Routes](#routes)
-- [Functionality](#functionality)
+- [Important Routes](#important-routes)
+- [Testing](#testing)
+- [Notes for Contributors](#notes-for-contributors)
 
-## Overview
+---
 
-This project is a backend service written in Go. It is designed to manage basis data and provide a RESTful API interface. The documentation covers installation, configuration, and route details.
+## Quick links
+
+- Code: [main.go](main.go)
+- Configuration: [config/config.go](config/config.go)
+- Middleware: [middleware/middleware.go](middleware/middleware.go)
+- Authentication & endpoints: [endpoint/authentication.go](endpoint/authentication.go)
+- Models: [model](model)
+- Utility helpers: [util/helperfunc.go](util/helperfunc.go) and [util/password.go](util/password.go)
+- Swagger docs entrypoint: [docs/swagger.yaml](docs/swagger.yaml)
+
+---
+
+## Prerequisites
+
+- Go 1.24.0+
+- (Optional) MySQL for local development; tests use an in-memory SQLite when `APPENV=test`.
 
 ## Setup
 
-### Prerequisites
-- Go (version 1.15+ recommended)
-- Git
+1. Clone and enter the repo:
 
-### Installation
+```bash
+git clone https://github.com/ariebrainware/basis-data-ltt.git
+cd basis-data-ltt
+```
 
-1. Clone the repository:
-    ```
-    git clone https://github.com/ariebrainware/basis-data-ltt.git
-    ```
-2. Navigate to the project directory:
-    ```
-    cd /Users/ariebrainware/go/src/github.com/ariebrainware/basis-data-ltt
-    ```
-3. Install dependencies:
-    ```
-    go mod download
-    ```
+2. Download dependencies:
 
-### Configuration
-- Create and configure any necessary environment variables. For example, a `.env` file can be used to set database connections and server ports.
-- Sample environment variables:
-  ```
-    APPNAME=basis-data-ltt
-    APITOKEN=ed25519key
-    APPENV=local
-    APPPORT=19091
-    GINMODE=debug
-    DBHOST=localhost
-    DBPORT=3306
-    DBNAME=databasename
-    DBUSER=databaseuser
-    DBPASS=databasepassword
-  ```
+```bash
+go mod download
+```
 
-### Build and Run
-- To build the project, use:
-  ```
-  go build -o basisdata
-  ```
-- To run the service, use:
-  ```
-  ./basisdata
-  ```
-- During development, you can simply run:
-  ```
-  go run main.go
-  ```
+3. Copy or create a `.env` file for local development. Important environment variables:
+
+```
+APPENV=local        # local|development|production|test
+APPPORT=19091
+APITOKEN=<api-token-for-cors-middleware>
+JWTSECRET=<jwt-secret-used-for-signing-and-password-hmac>
+DBHOST=127.0.0.1
+DBPORT=3306
+DBNAME=basis_data_ltt
+DBUSER=root
+DBPASS=password
+GINMODE=debug
+```
+
+Note: The application stores the JWT secret in memory via `util.SetJWTSecret()` on startup. Tests set `APPENV=test` and use an in-memory SQLite DB.
+
+## Build & Run
+
+Build:
+
+```bash
+go build -o basis-data-ltt
+```
+
+Run (development):
+
+```bash
+go run main.go
+```
+
+Server defaults to `:APPPORT` (19091). The app sets timezone to `Asia/Jakarta` on startup.
+
+---
 
 ## API Documentation
 
-This project uses Swagger/OpenAPI for API documentation. Once the server is running, you can access the interactive API documentation at:
+Run the server and open:
 
 ```
 http://localhost:19091/swagger/index.html
 ```
 
-**Note:** The Swagger UI is publicly accessible and does not require authentication to view the documentation. However, to test the API endpoints directly from Swagger UI, you will need to authenticate by clicking the "Authorize" button and providing the required tokens.
-
-### Swagger UI Features
-
-The Swagger UI provides:
-- **Interactive API Testing**: Try out API endpoints directly from the browser
-- **Complete Endpoint Documentation**: All endpoints with request/response schemas
-- **Authentication Support**: Built-in support for Bearer token and session token authentication
-- **Request/Response Examples**: Sample payloads for all endpoints
-
-### Updating API Documentation
-
-When you make changes to the API endpoints, regenerate the Swagger documentation using:
+API docs are generated with `swag` from code annotations. To regenerate docs locally:
 
 ```bash
-# Install swag CLI (one-time setup)
 go install github.com/swaggo/swag/cmd/swag@latest
-
-# Generate/update documentation
 swag init --parseDependency --parseInternal
 ```
 
-The documentation is generated from Go annotations in the code. After updating, the changes will be reflected in the Swagger UI.
+---
 
-## Routes
+## Important Routes
 
-Below is an outline of the REST API endpoints provided:
+Authentication:
+- `POST /signup` - register
+- `POST /login` - obtain session token
+- `DELETE /logout` - invalidate session (requires `session-token` header)
+- `GET /token/validate` - validate session token
+- `POST /verify-password` - (protected) verify current user's password before allowing password change
 
-**Note:** For complete and interactive API documentation, please visit the [Swagger UI](http://localhost:19091/swagger/index.html) when the server is running.
+Patient (admin):
+- `POST /patient` - create patient (public)
+- `GET|PATCH|DELETE /patient/:id` - manage patients (admin)
 
-### Authentication Endpoints
+Disease (admin):
+- `GET|POST|PATCH|DELETE /disease`
 
-- **POST /login** - User login with email and password
-- **POST /signup** - Register a new user account
-- **DELETE /logout** - Invalidate user session (requires authentication)
-- **GET /token/validate** - Validate session token
+Treatment (admin, therapist):
+- `GET|POST|PATCH|DELETE /treatment`
 
-### Patient Endpoints (Admin only, except POST /patient)
+Therapist (admin):
+- `GET|POST|PATCH|PUT|DELETE /therapist`
 
-- **GET /patient** - List all patients with pagination and filtering
-- **POST /patient** - Create a new patient (public endpoint)
-- **GET /patient/{id}** - Get patient details by ID
-- **PATCH /patient/{id}** - Update patient information
-- **DELETE /patient/{id}** - Delete a patient
-
-### Disease Endpoints (Admin only)
-
-- **GET /disease** - List all diseases with pagination
-- **POST /disease** - Create a new disease
-- **GET /disease/{id}** - Get disease details by ID
-- **PATCH /disease/{id}** - Update disease information
-- **DELETE /disease/{id}** - Delete a disease
-
-### Treatment Endpoints (Admin and Therapist)
-
-- **GET /treatment** - List all treatments with filtering options
-- **POST /treatment** - Create a new treatment record
-- **PATCH /treatment/{id}** - Update treatment information
-- **DELETE /treatment/{id}** - Delete a treatment record
-
-### Therapist Endpoints (Admin only)
-
-- **GET /therapist** - List all therapists with pagination and filtering
-- **POST /therapist** - Register a new therapist
-- **GET /therapist/{id}** - Get therapist details by ID
-- **PATCH /therapist/{id}** - Update therapist information
-- **PUT /therapist/{id}** - Approve a therapist account
-- **DELETE /therapist/{id}** - Delete a therapist
-
-### Legacy Route Documentation
-
-### GET /
-- **Description:** Health check or landing route.
-- **Response:** Simple status message confirming the service is operational.
-
-### GET /swagger/*
-- **Description:** Swagger API documentation UI
-- **Response:** Interactive API documentation interface
+See the Swagger UI for full request/response schemas.
 
 ---
 
-**Note:** The legacy routes below are deprecated. Please refer to the Swagger documentation for the current API structure.
+## Testing
 
-### GET /api/resource
-- **Description:** Retrieve a list of resources.
-- **Response:** JSON array of resources.
+Unit and integration tests are included. Tests set `APPENV=test` and use an in-memory SQLite DB. Run:
 
-### POST /api/resource
-- **Description:** Create a new resource.
-- **Request Body:** JSON payload with resource details.
-- **Response:** JSON object of the newly created resource.
+```bash
+go test ./...
+```
 
-### PUT /api/resource/{id}
-- **Description:** Update an existing resource.
-- **Path Parameter:** `id` of the resource to update.
-- **Request Body:** JSON payload with updated resource details.
-- **Response:** JSON object of the updated resource.
+If a test needs to run against MySQL, set environment variables accordingly. Most CI/test code in this repo uses the in-memory DB when `APPENV=test`.
 
-### DELETE /api/resource/{id}
-- **Description:** Delete a specific resource.
-- **Path Parameter:** `id` of the resource to delete.
-- **Response:** JSON message confirming deletion.
+---
 
-## Functionality
+## Notes for Contributors
 
-### Data Management
-The primary functionality revolves around creating, reading, updating, and deleting (CRUD) resources in the database. This includes:
-- Validating input data.
-- Managing database transactions.
-- Returning appropriate HTTP status codes and error messages.
+- The config loader is a singleton: see [config/config.go](config/config.go).
+- Database connection is injected into Gin context via `middleware.DatabaseMiddleware` ([middleware/middleware.go](middleware/middleware.go)).
+- Passwords should be hashed using a dedicated slow password hashing function (for example, bcrypt or Argon2 with per-user salts). Do not reuse `JWTSECRET` (or any JWT signing key) for password hashing; see [util/password.go](util/password.go) and update it if needed to follow this guidance.
+- Session tokens are stored in the `sessions` table and cached in Redis when available (see [endpoint/authentication.go](endpoint/authentication.go)).
 
-### Error Handling
-- The project uses proper error handling middleware to capture and log errors.
-- Returns structured JSON error responses with helpful error messages.
+If you'd like, I can also add a quick `make` target or Docker instructions to simplify local setup.
 
-### Middleware
-- Logging: Request and response logging.
-- Authentication & Authorization: Secure certain routes based on user roles (if applicable).
-
-### Testing
-- Include unit and integration tests to cover API endpoint behaviors.
-- Use Go's built-in testing framework:
-  ```
-  go test ./...
-  ```
-
-## Conclusion
-
-This document provides a high-level overview of the necessary steps for setting up, running, and understanding the API and its routes. For more details, please refer to inline code comments and further documentation within the codebase.

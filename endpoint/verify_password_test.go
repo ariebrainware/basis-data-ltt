@@ -1,0 +1,178 @@
+package endpoint_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/endpoint"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
+	"github.com/ariebrainware/basis-data-ltt/model"
+	"github.com/gin-gonic/gin"
+)
+
+// reuse apiResp defined in integration_test.go
+
+// Unit test: calling VerifyPassword without an authenticated user should return 401
+func TestVerifyPasswordUnauthorized(t *testing.T) {
+	// Config is initialized in TestMain (setup_test.go)
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		t.Fatalf("failed to connect test DB: %v", err)
+	}
+
+	// Ensure minimal migration
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("auto migrate failed: %v", err)
+	}
+
+	// Clean up migrated tables to avoid leaking state into other tests
+	t.Cleanup(func() {
+		_ = db.Migrator().DropTable(&model.User{}, &model.Session{})
+	})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	reqBody := map[string]string{"password": "whatever"}
+	b, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "/verify-password", bytes.NewBuffer(b))
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+	c.Set(middleware.DBKey, db)
+
+	endpoint.VerifyPassword(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when user not authenticated, got %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+// Integration test: signup/login then verify password (correct and incorrect)
+func TestVerifyPasswordIntegration(t *testing.T) {
+	// Config is initialized in TestMain (setup_test.go)
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		t.Fatalf("failed to connect test DB: %v", err)
+	}
+
+	testModels := []interface{}{&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}}
+	t.Cleanup(func() {
+		_ = db.Migrator().DropTable(testModels...)
+	})
+
+	if err := db.AutoMigrate(testModels...); err != nil {
+		t.Fatalf("auto migrate failed: %v", err)
+	}
+
+	if err := model.SeedRoles(db); err != nil {
+		t.Fatalf("seeding roles failed: %v", err)
+	}
+	if err := db.Create(&model.PatientCode{Alphabet: "P", Number: 1, Code: "P1"}).Error; err != nil {
+		t.Fatalf("failed to seed patient code: %v", err)
+	}
+
+	// Gin mode is set in TestMain (setup_test.go)
+	r := gin.Default()
+	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.DatabaseMiddleware(db))
+
+	// Public endpoints
+	r.POST("/signup", endpoint.Signup)
+	r.POST("/login", endpoint.Login)
+
+	// Protected verify-password endpoint
+	auth := r.Group("/")
+	auth.Use(middleware.ValidateLoginToken())
+	{
+		auth.POST("/verify-password", endpoint.VerifyPassword)
+	}
+
+	// Signup
+	signupBody := map[string]string{"name": "Test User", "email": "vp@example.com", "password": "pass123"}
+	b, _ := json.Marshal(signupBody)
+	rr := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/signup", bytesNewBuffer(b))
+	req.Header.Set("Authorization", "Bearer test-api-token")
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("signup failed: %d body=%s", rr.Code, rr.Body.String())
+	}
+	var resp apiResp
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode signup response: %v", err)
+	}
+
+	// Login
+	loginBody := map[string]string{"email": "vp@example.com", "password": "pass123"}
+	b, _ = json.Marshal(loginBody)
+	rr = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/login", bytesNewBuffer(b))
+	req.Header.Set("Authorization", "Bearer test-api-token")
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("login failed: %d body=%s", rr.Code, rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode login response: %v", err)
+	}
+	var loginData struct {
+		Token  string `json:"token"`
+		Role   string `json:"role"`
+		UserID uint   `json:"user_id"`
+	}
+	if err := json.Unmarshal(resp.Data, &loginData); err != nil {
+		t.Fatalf("failed to parse login data: %v", err)
+	}
+	if loginData.Token == "" {
+		t.Fatalf("login returned empty token")
+	}
+
+	// Correct password should verify
+	vpBody := map[string]string{"password": "pass123"}
+	b, _ = json.Marshal(vpBody)
+	rr = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))
+	req.Header.Set("Authorization", "Bearer test-api-token")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("session-token", loginData.Token)
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("verify-password (correct) failed: %d body=%s", rr.Code, rr.Body.String())
+	}
+
+	// Verify the response structure
+	var verifyResp apiResp
+	if err := json.Unmarshal(rr.Body.Bytes(), &verifyResp); err != nil {
+		t.Fatalf("failed to decode verify response: %v", err)
+	}
+	var verifyData map[string]bool
+	if err := json.Unmarshal(verifyResp.Data, &verifyData); err != nil {
+		t.Fatalf("failed to parse verify data: %v", err)
+	}
+	if !verifyData["verified"] {
+		t.Fatalf("expected verified=true, got %v", verifyData)
+	}
+
+	// Incorrect password should be unauthorized
+	vpBody = map[string]string{"password": "wrongpass"}
+	b, _ = json.Marshal(vpBody)
+	rr = httptest.NewRecorder()
+	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))
+	req.Header.Set("Authorization", "Bearer test-api-token")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("session-token", loginData.Token)
+	r.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when verifying wrong password, got %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+// tiny helper to avoid importing bytes repeatedly
+func bytesNewBuffer(b []byte) *bytes.Buffer {
+	return bytes.NewBuffer(b)
+}

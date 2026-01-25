@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"time"
 
@@ -298,5 +299,86 @@ func Signup(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Signup successful",
 		Data: tokenString,
+	})
+}
+
+// VerifyPasswordRequest represents the request body for password verification
+type VerifyPasswordRequest struct {
+	Password string `json:"password" binding:"required"`
+}
+
+// VerifyPassword godoc
+// @Summary      Verify current user's password
+// @Description  Validate the provided current password for the authenticated user
+// @Tags         Authentication
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        request body VerifyPasswordRequest true "Password to verify"
+// @Success      200 {object} util.APIResponse "Password verified"
+// @Failure      400 {object} util.APIResponse "Invalid request payload"
+// @Failure      401 {object} util.APIResponse "Invalid password or unauthorized"
+// @Failure      404 {object} util.APIResponse "User not found"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /verify-password [post]
+func VerifyPassword(c *gin.Context) {
+	// Read password from JSON body
+	var req VerifyPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request payload",
+			Err: err,
+		})
+		return
+	}
+
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return
+	}
+
+	userID, ok := middleware.GetUserID(c)
+	if !ok {
+		util.CallUserNotAuthorized(c, util.APIErrorParams{
+			Msg: "User not authenticated",
+			Err: fmt.Errorf("user id not found in context"),
+		})
+		return
+	}
+
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallErrorNotFound(c, util.APIErrorParams{
+				Msg: "User not found",
+				Err: err,
+			})
+			return
+		}
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to retrieve user",
+			Err: err,
+		})
+		return
+	}
+
+	// Use constant-time comparison to prevent timing attacks
+	hashedProvided := util.HashPassword(req.Password)
+	if subtle.ConstantTimeCompare([]byte(user.Password), []byte(hashedProvided)) == 1 {
+		util.CallSuccessOK(c, util.APISuccessParams{
+			Msg:  "Password verified",
+			Data: map[string]bool{"verified": true},
+		})
+		return
+	}
+
+	util.CallUserNotAuthorized(c, util.APIErrorParams{
+		Msg: "Invalid password",
+		Err: fmt.Errorf("provided password does not match"),
 	})
 }
