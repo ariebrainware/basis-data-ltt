@@ -224,6 +224,24 @@ func CreatePatient(c *gin.Context) {
 
 	err = db.Transaction(func(tx *gorm.DB) error {
 
+		// Re-check for duplicate patient inside the transaction to avoid race conditions.
+		if len(normalizedPhones) > 0 {
+			var matchesTx []model.Patient
+			if err := tx.Where("full_name = ?", patientRequest.FullName).Find(&matchesTx).Error; err != nil {
+				return err
+			}
+			for _, ph := range normalizedPhones {
+				for _, m := range matchesTx {
+					stored := strings.Split(m.PhoneNumber, ",")
+					for _, sp := range stored {
+						if strings.TrimSpace(sp) == ph {
+							// Abort the transaction if a duplicate is detected.
+							return fmt.Errorf("patient already exists with same name and phone number")
+						}
+					}
+				}
+			}
+		}
 		// determine the patient code by fullname initials + incremented number
 		initials := getInitials(patientRequest.FullName)
 
