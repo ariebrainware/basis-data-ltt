@@ -24,10 +24,11 @@ func TestMain(m *testing.M) {
 	util.SetJWTSecret(testJWTSecret)
 
 	// Initialize the singleton config once before any tests run
-	cfg := config.LoadConfig()
+	// This ensures ConnectMySQL() uses consistent config values
+	config.LoadConfig()
 
-	// Set Gin mode from initialized config
-	gin.SetMode(cfg.GinMode)
+	// Set Gin mode to match the environment variable
+	gin.SetMode("release")
 
 	// Run all tests and exit with the result code
 	os.Exit(m.Run())
