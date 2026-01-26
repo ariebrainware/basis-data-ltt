@@ -210,7 +210,7 @@ func main() {
 		Limit:  5,
 		Window: 15 * time.Minute,
 	})
-	
+
 	r.POST("/login", authRateLimit, endpoint.Login)
 	r.POST("/signup", authRateLimit, endpoint.Signup)
 	r.GET("/token/validate", endpoint.ValidateToken)

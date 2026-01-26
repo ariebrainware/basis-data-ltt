@@ -64,13 +64,13 @@ func LogSecurityEvent(event SecurityEvent) {
 		sanitizeLogValue(event.UserAgent),
 		sanitizeLogValue(event.Message),
 	)
-	
+
 	if len(event.Details) > 0 {
 		// Don't log Details map directly to avoid injection
 		// Instead, log the count of details
 		msg = fmt.Sprintf("%s DetailsCount=%d", msg, len(event.Details))
 	}
-	
+
 	securityLogger.Println(msg)
 }
 

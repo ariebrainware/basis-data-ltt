@@ -12,8 +12,8 @@ import (
 
 const (
 	// Rate limiting defaults
-	defaultRateLimit   = 5             // 5 attempts
-	defaultRateWindow  = 15 * time.Minute // per 15 minutes
+	defaultRateLimit  = 5                // 5 attempts
+	defaultRateWindow = 15 * time.Minute // per 15 minutes
 )
 
 // RateLimitConfig holds configuration for rate limiting
@@ -35,10 +35,10 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 		// Get client identifier (IP address)
 		clientIP := c.ClientIP()
 		endpoint := c.Request.URL.Path
-		
+
 		// Create rate limit key
 		key := fmt.Sprintf("ratelimit:%s:%s", endpoint, clientIP)
-		
+
 		// Check rate limit
 		allowed, err := checkRateLimit(key, config.Limit, config.Window)
 		if err != nil {
@@ -56,7 +56,7 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 		if !allowed {
 			// Log rate limit exceeded
 			util.LogRateLimitExceeded("", clientIP, endpoint)
-			
+
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Too many requests. Please try again later.",
 				Err: fmt.Errorf("rate limit exceeded"),
@@ -80,7 +80,7 @@ func checkRateLimit(key string, limit int, window time.Duration) (bool, error) {
 	}
 
 	ctx := context.Background()
-	
+
 	// Use Lua script for atomic rate limit check and increment
 	// This prevents race conditions between multiple concurrent requests
 	luaScript := `
@@ -102,12 +102,12 @@ func checkRateLimit(key string, limit int, window time.Duration) (bool, error) {
 		redis.call('INCR', key)
 		return 1
 	`
-	
+
 	result, err := rdb.Eval(ctx, luaScript, []string{key}, limit, int(window.Seconds())).Int()
 	if err != nil {
 		return false, fmt.Errorf("failed to check rate limit: %w", err)
 	}
-	
+
 	return result == 1, nil
 }
 
@@ -120,6 +120,6 @@ func ResetRateLimit(clientIP, endpoint string) error {
 
 	key := fmt.Sprintf("ratelimit:%s:%s", endpoint, clientIP)
 	ctx := context.Background()
-	
+
 	return rdb.Del(ctx, key).Err()
 }

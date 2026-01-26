@@ -69,7 +69,7 @@ func setCorsHeaders(c *gin.Context) {
 		contentType = "application/json"
 	}
 	c.Writer.Header().Set("Content-Type", contentType)
-	
+
 	// Add HSTS header for HTTPS security
 	// Only add HSTS header when HTTPS is enabled
 	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {

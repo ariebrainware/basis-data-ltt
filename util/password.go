@@ -22,11 +22,11 @@ var (
 
 const (
 	// Argon2id parameters (exceeds minimum cost of 12)
-	argon2Time    = 3     // Number of iterations
+	argon2Time    = 3         // Number of iterations
 	argon2Memory  = 64 * 1024 // 64 MB
-	argon2Threads = 4     // Number of threads
-	argon2KeyLen  = 32    // Length of the derived key
-	saltLength    = 16    // Length of the salt in bytes
+	argon2Threads = 4         // Number of threads
+	argon2KeyLen  = 32        // Length of the derived key
+	saltLength    = 16        // Length of the salt in bytes
 )
 
 func getEnv(key, fallback string) string {
@@ -72,7 +72,7 @@ func HashPasswordArgon2(password, salt string) (string, error) {
 
 	hash := argon2.IDKey([]byte(password), saltBytes, argon2Time, argon2Memory, argon2Threads, argon2KeyLen)
 	encodedHash := base64.RawStdEncoding.EncodeToString(hash)
-	
+
 	// Format: argon2id$salt$hash
 	return fmt.Sprintf("argon2id$%s$%s", salt, encodedHash), nil
 }
@@ -98,11 +98,11 @@ func VerifyPasswordArgon2(password, encodedHash string) (bool, error) {
 	// Use constant-time comparison to prevent timing attacks
 	expectedHashBytes := []byte(expectedHash)
 	actualHashBytes := []byte(actualHash)
-	
+
 	if len(expectedHashBytes) != len(actualHashBytes) {
 		return false, nil
 	}
-	
+
 	return subtle.ConstantTimeCompare(expectedHashBytes, actualHashBytes) == 1, nil
 }
 
@@ -125,16 +125,16 @@ func VerifyPassword(password, hash, salt string) (bool, error) {
 	if strings.HasPrefix(hash, "argon2id$") {
 		return VerifyPasswordArgon2(password, hash)
 	}
-	
+
 	// Legacy HMAC verification with constant-time comparison (no separate salt)
 	expectedHash := HashPassword(password)
 	expectedBytes := []byte(expectedHash)
 	actualBytes := []byte(hash)
-	
+
 	if len(expectedBytes) != len(actualBytes) {
 		return false, nil
 	}
-	
+
 	return subtle.ConstantTimeCompare(expectedBytes, actualBytes) == 1, nil
 }
 
