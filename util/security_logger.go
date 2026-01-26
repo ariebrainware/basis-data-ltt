@@ -192,3 +192,13 @@ func LogRateLimitExceeded(email, ip, endpoint string) {
 		Message:   fmt.Sprintf("Rate limit exceeded for endpoint: %s", endpoint),
 	})
 }
+
+// GetSecurityLoggerForTest returns the current security logger for testing purposes
+func GetSecurityLoggerForTest() *log.Logger {
+	return securityLogger
+}
+
+// SetSecurityLoggerForTest sets a custom logger for testing purposes
+func SetSecurityLoggerForTest(logger *log.Logger) {
+	securityLogger = logger
+}
