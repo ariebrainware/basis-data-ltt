@@ -253,8 +253,15 @@ All endpoints validate input using Gin's binding and validation:
 ```go
 type LoginRequest struct {
     Email    string `json:"email" binding:"required,email"`
+    Password string `json:"password" binding:"required"`
+}
+
+type SignupRequest struct {
+    Name     string `json:"name" binding:"required"`
+    Email    string `json:"email" binding:"required,email"`
     Password string `json:"password" binding:"required,min=8"`
 }
+```
 ```
 
 ### Validation Rules

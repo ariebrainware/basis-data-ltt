@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"strings"
-	"time"
 )
 
 // SecurityEventType represents different types of security events
@@ -25,7 +24,6 @@ const (
 
 // SecurityEvent represents a security event to be logged
 type SecurityEvent struct {
-	Timestamp time.Time
 	EventType SecurityEventType
 	UserID    string
 	Email     string
@@ -57,8 +55,6 @@ func sanitizeLogValue(value string) string {
 
 // LogSecurityEvent logs a security event
 func LogSecurityEvent(event SecurityEvent) {
-	event.Timestamp = time.Now()
-	
 	// Sanitize all string fields to prevent log injection
 	msg := fmt.Sprintf("Event=%s UserID=%s Email=%s IP=%s UserAgent=%s Message=%s",
 		sanitizeLogValue(string(event.EventType)),
