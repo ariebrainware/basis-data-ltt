@@ -64,3 +64,9 @@ func ConnectRedis() (*redis.Client, error) {
 func GetRedisClient() *redis.Client {
 	return redisClient
 }
+
+// SetRedisClientForTesting allows tests to inject a mock Redis client.
+// This should only be used in tests.
+func SetRedisClientForTesting(client *redis.Client) {
+	redisClient = client
+}

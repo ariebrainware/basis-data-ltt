@@ -15,8 +15,8 @@ import (
 )
 
 type LoginRequest struct {
-	Email    string `json:"email" example:"user@example.com"`
-	Password string `json:"password" example:"password123"`
+	Email    string `json:"email" binding:"required,email" example:"user@example.com"`
+	Password string `json:"password" binding:"required" example:"password123"`
 }
 
 type LoginResponse struct {
@@ -289,9 +289,9 @@ func Logout(c *gin.Context) {
 }
 
 type SignupRequest struct {
-	Name     string `json:"name" example:"John Doe"`
-	Email    string `json:"email" example:"john@example.com"`
-	Password string `json:"password" example:"password123"`
+	Name     string `json:"name" binding:"required" example:"John Doe"`
+	Email    string `json:"email" binding:"required,email" example:"john@example.com"`
+	Password string `json:"password" binding:"required,min=8" example:"password123"`
 }
 
 // Signup godoc
@@ -322,15 +322,6 @@ func Signup(c *gin.Context) {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Database connection not available",
 			Err: fmt.Errorf("db is nil"),
-		})
-		return
-	}
-
-	// Validate password strength
-	if len(req.Password) < 8 {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Password must be at least 8 characters long",
-			Err: fmt.Errorf("password too short"),
 		})
 		return
 	}
