@@ -1,12 +1,13 @@
 # basis-data-ltt
 
-Lightweight Go REST API for managing patients, diseases, treatments, therapists and sessions.
+Lightweight Go REST API for managing patients, diseases, treatments, therapists and sessions with comprehensive security features.
 
 ---
 
 ## Table of Contents
 
 - [Quick links](#quick-links)
+- [Security](#security)
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
 - [Build & Run](#build--run)
@@ -26,6 +27,25 @@ Lightweight Go REST API for managing patients, diseases, treatments, therapists 
 - Models: [model](model)
 - Utility helpers: [util/helperfunc.go](util/helperfunc.go) and [util/password.go](util/password.go)
 - Swagger docs entrypoint: [docs/swagger.yaml](docs/swagger.yaml)
+- **Security Guide**: [SECURITY.md](SECURITY.md)
+
+---
+
+## Security
+
+This application implements comprehensive security features:
+
+- **Argon2id Password Hashing** - Industry-standard password hashing with unique salts
+- **Rate Limiting** - Protection against brute force attacks (5 attempts per 15 minutes)
+- **Account Lockout** - Automatic lockout after 5 failed login attempts
+- **Security Logging** - Comprehensive audit trail of security events
+- **HTTPS/TLS Support** - Encrypted communication support
+- **HSTS Headers** - HTTP Strict Transport Security
+- **SQL Injection Prevention** - Parameterized queries via GORM
+- **Input Validation** - Request validation on all endpoints
+- **Session Management** - Secure token-based authentication with 1-hour expiration
+
+For detailed security information, configuration, and best practices, see [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -51,20 +71,44 @@ go mod download
 
 3. Copy or create a `.env` file for local development. Important environment variables:
 
-```
+```bash
+# Application Configuration
 APPENV=local        # local|development|production|test
 APPPORT=19091
 APITOKEN=<api-token-for-cors-middleware>
-JWTSECRET=<jwt-secret-used-for-signing-and-password-hmac>
+JWTSECRET=<jwt-secret-used-for-signing> # Use a strong secret (min 32 chars)
+GINMODE=debug
+
+# Database Configuration
 DBHOST=127.0.0.1
 DBPORT=3306
 DBNAME=basis_data_ltt
 DBUSER=root
 DBPASS=password
-GINMODE=debug
+
+# Redis Configuration (optional, for rate limiting and caching)
+REDIS_ADDR=localhost:6379
+REDIS_PASS=
+REDIS_DB=0
+
+# TLS/HTTPS Configuration (optional, for production)
+ENABLE_TLS=false
+TLS_CERT_FILE=/path/to/cert.pem
+TLS_KEY_FILE=/path/to/key.pem
+
+# HSTS Configuration (optional, recommended for production with TLS)
+ENABLE_HSTS=false
+HSTS_MAX_AGE=31536000
+HSTS_INCLUDE_SUBDOMAINS=true
 ```
 
-Note: The application stores the JWT secret in memory via `util.SetJWTSecret()` on startup. Tests set `APPENV=test` and use an in-memory SQLite DB.
+See [.env.sample](.env.sample) for all available configuration options.
+
+**Security Notes:**
+- Use a strong `JWTSECRET` (minimum 32 random characters)
+- Never commit `.env` files to version control
+- In production, use environment variables instead of `.env` files
+- See [SECURITY.md](SECURITY.md) for security best practices
 
 ## Build & Run
 
@@ -143,8 +187,12 @@ If a test needs to run against MySQL, set environment variables accordingly. Mos
 
 - The config loader is a singleton: see [config/config.go](config/config.go).
 - Database connection is injected into Gin context via `middleware.DatabaseMiddleware` ([middleware/middleware.go](middleware/middleware.go)).
-- Passwords should be hashed using a dedicated slow password hashing function (for example, bcrypt or Argon2 with per-user salts). Do not reuse `JWTSECRET` (or any JWT signing key) for password hashing; see [util/password.go](util/password.go) and update it if needed to follow this guidance.
+- **Passwords are hashed using Argon2id** with unique per-user salts. The implementation is in [util/password.go](util/password.go). Never use the JWT secret for password hashing.
 - Session tokens are stored in the `sessions` table and cached in Redis when available (see [endpoint/authentication.go](endpoint/authentication.go)).
+- Rate limiting is implemented using Redis when available; see [middleware/ratelimit.go](middleware/ratelimit.go).
+- **Security logging** is enabled for all authentication and authorization events; see [util/security_logger.go](util/security_logger.go).
+- Review [SECURITY.md](SECURITY.md) before making changes to authentication, authorization, or password handling code.
 
 If you'd like, I can also add a quick `make` target or Docker instructions to simplify local setup.
+
 
