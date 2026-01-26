@@ -456,11 +456,11 @@ func TestListUsersPaginationAndSearch(t *testing.T) {
 
 	// Create additional test users
 	testUsers := []map[string]string{
-		{"name": "Alice Johnson", "email": "alice@example.com", "password": "pass123"},
-		{"name": "Bob Smith", "email": "bob@example.com", "password": "pass123"},
-		{"name": "Charlie Brown", "email": "charlie@example.com", "password": "pass123"},
-		{"name": "David Wilson", "email": "david@example.com", "password": "pass123"},
-		{"name": "Eve Davis", "email": "eve@example.com", "password": "pass123"},
+		{"name": "Alice Johnson", "email": "alice@example.com", "password": "pass1234"},
+		{"name": "Bob Smith", "email": "bob@example.com", "password": "pass1234"},
+		{"name": "Charlie Brown", "email": "charlie@example.com", "password": "pass1234"},
+		{"name": "David Wilson", "email": "david@example.com", "password": "pass1234"},
+		{"name": "Eve Davis", "email": "eve@example.com", "password": "pass1234"},
 	}
 
 	for _, user := range testUsers {

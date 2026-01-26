@@ -205,8 +205,14 @@ func main() {
 	// the exception for create patient so it can be accessed without login
 	r.POST("/patient", endpoint.CreatePatient)
 
-	r.POST("/login", endpoint.Login)
-	r.POST("/signup", endpoint.Signup)
+	// Apply rate limiting to authentication endpoints (5 attempts per 15 minutes)
+	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{
+		Limit:  5,
+		Window: 15 * time.Minute,
+	})
+	
+	r.POST("/login", authRateLimit, endpoint.Login)
+	r.POST("/signup", authRateLimit, endpoint.Signup)
 	r.GET("/token/validate", endpoint.ValidateToken)
 
 	// Start server on specified port with graceful shutdown
@@ -220,9 +226,22 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// Check if TLS is enabled
+	tlsCertFile := os.Getenv("TLS_CERT_FILE")
+	tlsKeyFile := os.Getenv("TLS_KEY_FILE")
+	enableTLS := os.Getenv("ENABLE_TLS")
+
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("error starting server: %v", err)
+		if enableTLS == "true" && tlsCertFile != "" && tlsKeyFile != "" {
+			log.Printf("Starting HTTPS server on %s", address)
+			if err := srv.ListenAndServeTLS(tlsCertFile, tlsKeyFile); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("error starting HTTPS server: %v", err)
+			}
+		} else {
+			log.Printf("Starting HTTP server on %s", address)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("error starting HTTP server: %v", err)
+			}
 		}
 	}()
 

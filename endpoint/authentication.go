@@ -2,7 +2,6 @@ package endpoint
 
 import (
 	"context"
-	"crypto/subtle"
 	"fmt"
 	"time"
 
@@ -58,10 +57,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	var hashedPassword string
-	if req.Password != "" {
-		hashedPassword = util.HashPassword(req.Password)
-	} else {
+	if req.Password == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request payload",
 			Err: fmt.Errorf("password cannot be empty"),
@@ -69,21 +65,96 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// Get client info for logging
+	clientIP := c.ClientIP()
+	userAgent := c.Request.UserAgent()
+
 	// Check if user exists
-	var User model.User
-	err := db.Model(&User).Where("email = ? AND password = ?", req.Email, hashedPassword).First(&User).Error
+	var user model.User
+	err := db.Model(&user).Where("email = ?", req.Email).First(&user).Error
 	if err == gorm.ErrRecordNotFound {
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "user not found")
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "User not found, please sign up first",
+			Msg: "Invalid email or password",
 			Err: fmt.Errorf("user not found"),
 		})
 		return
 	}
+	if err != nil {
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "database error")
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database error",
+			Err: err,
+		})
+		return
+	}
+
+	// Check if account is locked
+	if user.LockedUntil != nil && *user.LockedUntil > time.Now().Unix() {
+		lockExpiry := time.Unix(*user.LockedUntil, 0)
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "account locked")
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: fmt.Sprintf("Account is locked until %s due to multiple failed login attempts", lockExpiry.Format(time.RFC3339)),
+			Err: fmt.Errorf("account locked"),
+		})
+		return
+	}
+
+	// Verify password (supports both Argon2id and legacy HMAC)
+	passwordMatch, err := util.VerifyPassword(req.Password, user.Password, user.PasswordSalt)
+	if err != nil {
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "password verification error")
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Password verification failed",
+			Err: err,
+		})
+		return
+	}
+
+	if !passwordMatch {
+		// Increment failed attempts
+		user.FailedAttempts++
+		
+		// Lock account after 5 failed attempts
+		if user.FailedAttempts >= 5 {
+			lockUntil := time.Now().Add(15 * time.Minute).Unix()
+			user.LockedUntil = &lockUntil
+			util.LogAccountLocked(user.ID, user.Email, clientIP, "too many failed login attempts")
+		}
+		
+		if err := db.Save(&user).Error; err != nil {
+			util.LogLoginFailure(req.Email, clientIP, userAgent, "failed to update failed attempts")
+		}
+		
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "invalid password")
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid email or password",
+			Err: fmt.Errorf("invalid password"),
+		})
+		return
+	}
+
+	// Reset failed attempts on successful login
+	if user.FailedAttempts > 0 || user.LockedUntil != nil {
+		user.FailedAttempts = 0
+		user.LockedUntil = nil
+		if err := db.Save(&user).Error; err != nil {
+			// Log but don't fail the login
+			util.LogSecurityEvent(util.SecurityEvent{
+				EventType: util.EventSuspiciousActivity,
+				UserID:    fmt.Sprintf("%d", user.ID),
+				Email:     user.Email,
+				IP:        clientIP,
+				Message:   fmt.Sprintf("Failed to reset failed attempts: %v", err),
+			})
+		}
+	}
 
 	// Check role
 	var role model.Role
-	err = db.Model(&role).Where("id = ?", User.RoleID).First(&role).Error
+	err = db.Model(&role).Where("id = ?", user.RoleID).First(&role).Error
 	if err == gorm.ErrRecordNotFound {
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "role not found")
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Role not found",
 			Err: fmt.Errorf("role not found"),
@@ -93,13 +164,14 @@ func Login(c *gin.Context) {
 
 	// Create JWT token with claims
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email": User.Email,
+		"email": user.Email,
 		"exp":   time.Now().Add(time.Hour * 1).Unix(),
-		"role":  User.RoleID,
+		"role":  user.RoleID,
 	})
 
 	tokenString, err := token.SignedString(util.GetJWTSecretByte())
 	if err != nil {
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "token generation failed")
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Could not generate token",
 			Err: err,
@@ -109,14 +181,15 @@ func Login(c *gin.Context) {
 
 	// Record Session
 	session := model.Session{
-		UserID:       User.ID,
+		UserID:       user.ID,
 		SessionToken: tokenString,
 		ExpiresAt:    time.Now().Add(time.Hour * 1),
-		ClientIP:     c.ClientIP(),
-		Browser:      c.Request.UserAgent(),
+		ClientIP:     clientIP,
+		Browser:      userAgent,
 	}
 
 	if err := db.Create(&session).Error; err != nil {
+		util.LogLoginFailure(req.Email, clientIP, userAgent, "session creation failed")
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to record session",
 			Err: err,
@@ -133,10 +206,13 @@ func Login(c *gin.Context) {
 		_ = util.AddSessionToUserSet(session.UserID, tokenString, exp)
 	}
 
+	// Log successful login
+	util.LogLoginSuccess(user.ID, user.Email, clientIP, userAgent)
+
 	// Return the token in a JSON response
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Login successful",
-		Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: User.ID},
+		Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: user.ID},
 	})
 }
 
@@ -182,6 +258,12 @@ func Logout(c *gin.Context) {
 			Err: err,
 		})
 		return
+	}
+
+	// Get user info for logging
+	var user model.User
+	if err := db.First(&user, session.UserID).Error; err == nil {
+		util.LogLogout(user.ID, user.Email, c.ClientIP(), c.Request.UserAgent())
 	}
 
 	// Delete the session record from the database
@@ -244,31 +326,59 @@ func Signup(c *gin.Context) {
 		return
 	}
 
-	var existingUser *model.User
-	err := db.First(&existingUser, "email = ?", req.Email).Error
-	if err == gorm.ErrRecordNotFound {
-		fmt.Println(err)
-	}
-
-	if existingUser.Email == req.Email {
+	// Validate password strength
+	if len(req.Password) < 8 {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Email already exists",
-			Err: fmt.Errorf("email already exists"),
+			Msg: "Password must be at least 8 characters long",
+			Err: fmt.Errorf("password too short"),
 		})
 		return
 	}
 
-	// Hash the password using HMAC-SHA256 with jwtSecret as key.
-	var hashedPassword string
-	if req.Password != "" {
-		hashedPassword = util.HashPassword(req.Password)
+	var existingUser model.User
+	err := db.First(&existingUser, "email = ?", req.Email).Error
+	if err != gorm.ErrRecordNotFound {
+		if err == nil {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Email already exists",
+				Err: fmt.Errorf("email already exists"),
+			})
+			return
+		}
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database error",
+			Err: err,
+		})
+		return
+	}
+
+	// Generate salt and hash password using Argon2id
+	salt, err := util.GenerateSalt()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to generate password salt",
+			Err: err,
+		})
+		return
+	}
+
+	hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to hash password",
+			Err: err,
+		})
+		return
 	}
 
 	newUser := model.User{
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: hashedPassword,
-		RoleID:   1,
+		Name:         req.Name,
+		Email:        req.Email,
+		Password:     hashedPassword,
+		PasswordSalt: salt,
+		RoleID:       1,
+		FailedAttempts: 0,
+		LockedUntil:  nil,
 	}
 
 	// Insert the new user into the database.
@@ -279,6 +389,16 @@ func Signup(c *gin.Context) {
 		})
 		return
 	}
+
+	// Log successful signup
+	util.LogSecurityEvent(util.SecurityEvent{
+		EventType: util.EventLoginSuccess,
+		UserID:    fmt.Sprintf("%d", newUser.ID),
+		Email:     newUser.Email,
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Message:   "User signed up successfully",
+	})
 
 	// Generate a JWT token upon successful signup.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -368,8 +488,16 @@ func VerifyPassword(c *gin.Context) {
 	}
 
 	// Use constant-time comparison to prevent timing attacks
-	hashedProvided := util.HashPassword(req.Password)
-	if subtle.ConstantTimeCompare([]byte(user.Password), []byte(hashedProvided)) == 1 {
+	passwordMatch, err := util.VerifyPassword(req.Password, user.Password, user.PasswordSalt)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Password verification failed",
+			Err: err,
+		})
+		return
+	}
+	
+	if passwordMatch {
 		util.CallSuccessOK(c, util.APISuccessParams{
 			Msg:  "Password verified",
 			Data: map[string]bool{"verified": true},
