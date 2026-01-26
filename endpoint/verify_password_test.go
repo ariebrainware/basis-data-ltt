@@ -91,7 +91,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	}
 
 	// Signup
-	signupBody := map[string]string{"name": "Test User", "email": "vp@example.com", "password": "pass123"}
+	signupBody := map[string]string{"name": "Test User", "email": "vp@example.com", "password": "pass1234"}
 	b, _ := json.Marshal(signupBody)
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/signup", bytesNewBuffer(b))
@@ -107,7 +107,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	}
 
 	// Login
-	loginBody := map[string]string{"email": "vp@example.com", "password": "pass123"}
+	loginBody := map[string]string{"email": "vp@example.com", "password": "pass1234"}
 	b, _ = json.Marshal(loginBody)
 	rr = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/login", bytesNewBuffer(b))
@@ -133,7 +133,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	}
 
 	// Correct password should verify
-	vpBody := map[string]string{"password": "pass123"}
+	vpBody := map[string]string{"password": "pass1234"}
 	b, _ = json.Marshal(vpBody)
 	rr = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))

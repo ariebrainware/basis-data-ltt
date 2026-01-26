@@ -189,9 +189,13 @@ func TestUserEndpoints(t *testing.T) {
 	if err := db.First(&targetUser, targetData.UserID).Error; err != nil {
 		t.Fatalf("failed to query target user from DB: %v", err)
 	}
-	expectedHash := util.HashPassword("newtargetpass")
-	if targetUser.Password != expectedHash {
-		t.Fatalf("expected target password hash to be updated; got %s, want %s", targetUser.Password, expectedHash)
+	// Verify password using util.VerifyPassword which supports Argon2 and legacy HMAC
+	ok, err := util.VerifyPassword("newtargetpass", targetUser.Password, targetUser.PasswordSalt)
+	if err != nil {
+		t.Fatalf("error verifying updated password: %v", err)
+	}
+	if !ok {
+		t.Fatalf("updated password did not verify for target user")
 	}
 
 	// 9) Target (self) updates own profile using their existing session token
@@ -208,9 +212,12 @@ func TestUserEndpoints(t *testing.T) {
 	if err := db.First(&targetUser, targetData.UserID).Error; err != nil {
 		t.Fatalf("failed to query target user after self-update: %v", err)
 	}
-	expectedFinalHash := util.HashPassword("finalpass")
-	if targetUser.Password != expectedFinalHash {
-		t.Fatalf("expected target password hash to be finalpass; got %s, want %s", targetUser.Password, expectedFinalHash)
+	ok, err = util.VerifyPassword("finalpass", targetUser.Password, targetUser.PasswordSalt)
+	if err != nil {
+		t.Fatalf("error verifying final password: %v", err)
+	}
+	if !ok {
+		t.Fatalf("final password did not verify for target user")
 	}
 
 	// 11) Admin: DeleteUser target
@@ -456,11 +463,11 @@ func TestListUsersPaginationAndSearch(t *testing.T) {
 
 	// Create additional test users
 	testUsers := []map[string]string{
-		{"name": "Alice Johnson", "email": "alice@example.com", "password": "pass123"},
-		{"name": "Bob Smith", "email": "bob@example.com", "password": "pass123"},
-		{"name": "Charlie Brown", "email": "charlie@example.com", "password": "pass123"},
-		{"name": "David Wilson", "email": "david@example.com", "password": "pass123"},
-		{"name": "Eve Davis", "email": "eve@example.com", "password": "pass123"},
+		{"name": "Alice Johnson", "email": "alice@example.com", "password": "pass1234"},
+		{"name": "Bob Smith", "email": "bob@example.com", "password": "pass1234"},
+		{"name": "Charlie Brown", "email": "charlie@example.com", "password": "pass1234"},
+		{"name": "David Wilson", "email": "david@example.com", "password": "pass1234"},
+		{"name": "Eve Davis", "email": "eve@example.com", "password": "pass1234"},
 	}
 
 	for _, user := range testUsers {

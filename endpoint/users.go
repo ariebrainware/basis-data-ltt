@@ -98,7 +98,20 @@ func UpdateUser(c *gin.Context) {
 	}
 
 	if req.Password != "" {
-		user.Password = util.HashPassword(req.Password)
+		salt, err := util.GenerateSalt()
+		if err != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
+			return
+		}
+
+		hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
+		if err != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
+			return
+		}
+
+		user.Password = hashedPassword
+		user.PasswordSalt = salt
 	}
 
 	if err := db.Save(&user).Error; err != nil {
@@ -314,7 +327,20 @@ func AdminUpdateUser(c *gin.Context) {
 	}
 
 	if req.Password != "" {
-		user.Password = util.HashPassword(req.Password)
+		salt, err := util.GenerateSalt()
+		if err != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
+			return
+		}
+
+		hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
+		if err != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
+			return
+		}
+
+		user.Password = hashedPassword
+		user.PasswordSalt = salt
 	}
 
 	if err := db.Save(&user).Error; err != nil {

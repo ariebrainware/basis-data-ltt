@@ -69,6 +69,21 @@ func setCorsHeaders(c *gin.Context) {
 		contentType = "application/json"
 	}
 	c.Writer.Header().Set("Content-Type", contentType)
+
+	// Add HSTS header for HTTPS security
+	// Only add HSTS header when HTTPS is enabled
+	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {
+		hstsMaxAge := os.Getenv("HSTS_MAX_AGE")
+		if hstsMaxAge == "" {
+			hstsMaxAge = "31536000" // 1 year default
+		}
+		includeSubDomains := os.Getenv("HSTS_INCLUDE_SUBDOMAINS")
+		hstsValue := fmt.Sprintf("max-age=%s", hstsMaxAge)
+		if includeSubDomains == "true" {
+			hstsValue += "; includeSubDomains"
+		}
+		c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
+	}
 }
 
 // CORSMiddleware configures CORS headers for incoming requests.
@@ -146,6 +161,8 @@ func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		roleID, exists := GetRoleID(c)
 		if !exists {
+			userID, _ := GetUserID(c)
+			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, "Role information not available")
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Role information not available",
 				Err: fmt.Errorf("role information not available in context"),
@@ -164,6 +181,8 @@ func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 		}
 
 		if !roleAllowed {
+			userID, _ := GetUserID(c)
+			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, fmt.Sprintf("Insufficient permissions (role %d)", roleID))
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Insufficient permissions to access this resource",
 				Err: fmt.Errorf("user role %d not authorized", roleID),
@@ -260,6 +279,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 		}
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
+			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Session token not provided")
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Session token not provided",
 				Err: fmt.Errorf("session token not provided"),
@@ -316,6 +336,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.deleted_at IS NULL", sessionToken, time.Now()).
 			Take(&result).Error
 		if err != nil {
+			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Invalid or expired session token")
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Invalid or expired session token",
 				Err: fmt.Errorf("failed to validate session: %w", err),
@@ -325,6 +346,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 		}
 
 		if result.UserID == 0 {
+			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "No active session found")
 			util.CallUserNotAuthorized(c, util.APIErrorParams{
 				Msg: "Invalid or expired session token",
 				Err: fmt.Errorf("no active session found for provided token"),

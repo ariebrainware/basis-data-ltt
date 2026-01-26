@@ -73,6 +73,20 @@ func main() {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
 
+	// Provide DB to security logger for persistence of security events
+	util.SetSecurityLoggerDB(db)
+
+	// Initialize local GeoIP database if provided (GEOIP_DB_PATH)
+	if err := util.InitGeoIP(os.Getenv("GEOIP_DB_PATH")); err != nil {
+		log.Printf("Warning: could not initialize GeoIP DB: %v", err)
+	} else {
+		// Ensure we close the reader on shutdown
+		defer util.CloseGeoIP()
+	}
+
+	// Initialize in-memory user email cache (LRU) from env
+	util.InitUserEmailCacheFromEnv()
+
 	// Initialize Redis (optional, warn on failure)
 	if _, err := config.ConnectRedis(); err != nil {
 		log.Printf("Warning: could not connect to Redis: %v", err)
@@ -103,7 +117,7 @@ func main() {
 	}
 
 	// Proceed with auto-migration for all models
-	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{})
+	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}, &model.SecurityLog{})
 	if err != nil {
 		log.Fatalf("Error migrating database: %v", err)
 	}
@@ -123,6 +137,8 @@ func main() {
 	r.Use(middleware.CORSMiddleware())
 	// Pass db to all handlers via context middleware
 	r.Use(middleware.DatabaseMiddleware(db))
+	// Log endpoint calls (persisted to SecurityLog when DB available)
+	r.Use(middleware.EndpointCallLogger())
 
 	// Basic HTTP handler for root path
 	r.GET("/", func(c *gin.Context) {
@@ -205,8 +221,14 @@ func main() {
 	// the exception for create patient so it can be accessed without login
 	r.POST("/patient", endpoint.CreatePatient)
 
-	r.POST("/login", endpoint.Login)
-	r.POST("/signup", endpoint.Signup)
+	// Apply rate limiting to authentication endpoints (5 attempts per 15 minutes)
+	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{
+		Limit:  5,
+		Window: 15 * time.Minute,
+	})
+
+	r.POST("/login", authRateLimit, endpoint.Login)
+	r.POST("/signup", authRateLimit, endpoint.Signup)
 	r.GET("/token/validate", endpoint.ValidateToken)
 
 	// Start server on specified port with graceful shutdown
@@ -220,9 +242,22 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// Check if TLS is enabled
+	tlsCertFile := os.Getenv("TLS_CERT_FILE")
+	tlsKeyFile := os.Getenv("TLS_KEY_FILE")
+	enableTLS := os.Getenv("ENABLE_TLS")
+
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("error starting server: %v", err)
+		if enableTLS == "true" && tlsCertFile != "" && tlsKeyFile != "" {
+			log.Printf("Starting HTTPS server on %s", address)
+			if err := srv.ListenAndServeTLS(tlsCertFile, tlsKeyFile); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("error starting HTTPS server: %v", err)
+			}
+		} else {
+			log.Printf("Starting HTTP server on %s", address)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("error starting HTTP server: %v", err)
+			}
 		}
 	}()
 

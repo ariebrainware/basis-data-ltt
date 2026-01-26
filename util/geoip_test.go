@@ -1,0 +1,187 @@
+package util
+
+import (
+	"context"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestInitGeoIP_EmptyPath(t *testing.T) {
+	// Should not error with empty path
+	err := InitGeoIP("")
+	if err != nil {
+		t.Errorf("Expected no error with empty path, got %v", err)
+	}
+}
+
+func TestInitGeoIP_NonExistentFile(t *testing.T) {
+	err := InitGeoIP("/nonexistent/path/to/geoip.mmdb")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+}
+
+func TestValidateGeoIP_NonExistentFile(t *testing.T) {
+	err := ValidateGeoIP("/nonexistent/path/to/geoip.mmdb")
+	if err == nil {
+		t.Error("Expected error for non-existent file")
+	}
+}
+
+func TestGetIPLocation_EmptyIP(t *testing.T) {
+	city, country := GetIPLocation("")
+	if city != "" || country != "" {
+		t.Errorf("Expected empty strings for empty IP, got city=%q, country=%q", city, country)
+	}
+}
+
+func TestGetIPLocation_PrivateIPs(t *testing.T) {
+	testCases := []string{
+		"127.0.0.1",
+		"::1",
+		"10.0.0.1",
+		"10.255.255.255",
+		"192.168.1.1",
+		"192.168.0.0",
+		"::",
+		"::ffff",
+	}
+
+	for _, ip := range testCases {
+		city, country := GetIPLocation(ip)
+		if city != "" || country != "" {
+			t.Errorf("Expected empty strings for private IP %s, got city=%q, country=%q", ip, city, country)
+		}
+	}
+}
+
+func TestGetIPLocation_NoDB(t *testing.T) {
+	// Ensure DB is nil
+	geoipDB = nil
+	geoipCache = nil
+
+	city, country := GetIPLocation("8.8.8.8")
+	if city != "" || country != "" {
+		t.Errorf("Expected empty strings when DB is nil, got city=%q, country=%q", city, country)
+	}
+}
+
+func TestGetGeoIPCacheMetrics_NoCache(t *testing.T) {
+	geoipCache = nil
+	hits, misses, size := GetGeoIPCacheMetrics()
+
+	// Metrics should still be accessible even without cache
+	_ = hits
+	_ = misses
+	if size != 0 {
+		t.Errorf("Expected size 0 when cache is nil, got %d", size)
+	}
+}
+
+func TestDownloadGeoIP_InvalidURL(t *testing.T) {
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "geoip.mmdb")
+
+	_, err := DownloadGeoIP(ctx, "http://invalid-url-that-does-not-exist-12345.com/file.mmdb", destPath)
+	if err == nil {
+		t.Error("Expected error for invalid URL")
+	}
+}
+
+func TestDownloadGeoIP_HTTPError(t *testing.T) {
+	// Create a test server that returns 404
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "geoip.mmdb")
+
+	_, err := DownloadGeoIP(ctx, server.URL, destPath)
+	if err == nil {
+		t.Error("Expected error for HTTP 404")
+	}
+}
+
+func TestDownloadGeoIP_Success(t *testing.T) {
+	// Create a test server that returns mock data
+	mockData := []byte("mock geoip database content")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write(mockData)
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "geoip.mmdb")
+
+	resultPath, err := DownloadGeoIP(ctx, server.URL, destPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if resultPath != destPath {
+		t.Errorf("Expected result path %s, got %s", destPath, resultPath)
+	}
+
+	// Verify file was written
+	data, err := os.ReadFile(destPath)
+	if err != nil {
+		t.Fatalf("Failed to read downloaded file: %v", err)
+	}
+
+	if string(data) != string(mockData) {
+		t.Errorf("Expected file content %q, got %q", mockData, data)
+	}
+}
+
+func TestDownloadGeoIP_ContextCancellation(t *testing.T) {
+	// Create a test server that delays response
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Create context that will be cancelled quickly
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "geoip.mmdb")
+
+	_, err := DownloadGeoIP(ctx, server.URL, destPath)
+	if err == nil {
+		t.Error("Expected error due to context cancellation")
+	}
+}
+
+func TestCloseGeoIP(t *testing.T) {
+	// Should not panic when DB is nil
+	geoipDB = nil
+	CloseGeoIP()
+
+	// Verify it's still nil
+	if geoipDB != nil {
+		t.Error("Expected geoipDB to remain nil after CloseGeoIP")
+	}
+}
+
+func TestGetIPLocation_InvalidIP(t *testing.T) {
+	geoipDB = nil
+	geoipCache = nil
+
+	// Test with invalid IP format
+	city, country := GetIPLocation("not-an-ip")
+	if city != "" || country != "" {
+		t.Errorf("Expected empty strings for invalid IP, got city=%q, country=%q", city, country)
+	}
+}

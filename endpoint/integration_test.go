@@ -95,7 +95,7 @@ func TestIntegrationFlow(t *testing.T) {
 	}
 
 	// 1) Signup
-	signupBody := map[string]string{"name": "Test User", "email": "test@example.com", "password": "pass123"}
+	signupBody := map[string]string{"name": "Test User", "email": "test@example.com", "password": "pass1234"}
 	b, _ := json.Marshal(signupBody)
 	rr, err := doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
 	if err != nil {
@@ -118,7 +118,7 @@ func TestIntegrationFlow(t *testing.T) {
 	}
 
 	// 2) Login
-	loginBody := map[string]string{"email": "test@example.com", "password": "pass123"}
+	loginBody := map[string]string{"email": "test@example.com", "password": "pass1234"}
 	b, _ = json.Marshal(loginBody)
 	rr, err = doRequest(r, "POST", "/login", b, map[string]string{"Authorization": "Bearer test-api-token"})
 	if err != nil {
