@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
@@ -114,18 +115,18 @@ func Login(c *gin.Context) {
 	if !passwordMatch {
 		// Increment failed attempts
 		user.FailedAttempts++
-		
+
 		// Lock account after 5 failed attempts
 		if user.FailedAttempts >= 5 {
 			lockUntil := time.Now().Add(15 * time.Minute).Unix()
 			user.LockedUntil = &lockUntil
 			util.LogAccountLocked(user.ID, user.Email, clientIP, "too many failed login attempts")
 		}
-		
+
 		if err := db.Save(&user).Error; err != nil {
 			util.LogLoginFailure(req.Email, clientIP, userAgent, "failed to update failed attempts")
 		}
-		
+
 		util.LogLoginFailure(req.Email, clientIP, userAgent, "invalid password")
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid email or password",
@@ -147,6 +148,36 @@ func Login(c *gin.Context) {
 				IP:        clientIP,
 				Message:   fmt.Sprintf("Failed to reset failed attempts: %v", err),
 			})
+		}
+	}
+
+	// If the stored password is a legacy HMAC (non-Argon2), upgrade it
+	// to Argon2id using the plaintext password the user just provided.
+	if !strings.HasPrefix(user.Password, "argon2id$") {
+		salt, err := util.GenerateSalt()
+		if err == nil {
+			hashed, herr := util.HashPasswordArgon2(req.Password, salt)
+			if herr == nil {
+				user.Password = hashed
+				user.PasswordSalt = salt
+				if err := db.Save(&user).Error; err != nil {
+					util.LogSecurityEvent(util.SecurityEvent{
+						EventType: util.EventSuspiciousActivity,
+						UserID:    fmt.Sprintf("%d", user.ID),
+						Email:     user.Email,
+						IP:        clientIP,
+						Message:   fmt.Sprintf("Failed to upgrade password hash: %v", err),
+					})
+				} else {
+					util.LogSecurityEvent(util.SecurityEvent{
+						EventType: util.EventPasswordChanged,
+						UserID:    fmt.Sprintf("%d", user.ID),
+						Email:     user.Email,
+						IP:        clientIP,
+						Message:   "Upgraded password hash to Argon2",
+					})
+				}
+			}
 		}
 	}
 
@@ -372,13 +403,13 @@ func Signup(c *gin.Context) {
 	}
 
 	newUser := model.User{
-		Name:         req.Name,
-		Email:        req.Email,
-		Password:     hashedPassword,
-		PasswordSalt: salt,
-		RoleID:       1,
+		Name:           req.Name,
+		Email:          req.Email,
+		Password:       hashedPassword,
+		PasswordSalt:   salt,
+		RoleID:         1,
 		FailedAttempts: 0,
-		LockedUntil:  nil,
+		LockedUntil:    nil,
 	}
 
 	// Insert the new user into the database.
@@ -496,7 +527,7 @@ func VerifyPassword(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	if passwordMatch {
 		util.CallSuccessOK(c, util.APISuccessParams{
 			Msg:  "Password verified",
