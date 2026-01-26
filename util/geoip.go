@@ -133,7 +133,7 @@ func GetIPLocation(ip string) (string, string) {
 	if ip == "127.0.0.1" || ip == "::1" ||
 		(len(ip) >= 4 && ip[:4] == "10.") ||
 		(len(ip) >= 8 && ip[:8] == "192.168") ||
-		(len(ip) >= 3 && ip[:3] == "::") {
+		(len(ip) >= 2 && ip[:2] == "::") {
 		return "", ""
 	}
 
