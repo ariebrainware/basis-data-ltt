@@ -232,8 +232,9 @@ db.Where("email = ? AND password = ?", email, hash).First(&user)
 
 **What to Avoid:**
 ```go
-// NEVER use string concatenation for queries
-db.Raw("SELECT * FROM users WHERE email = '" + email + "'")
+// NEVER use string concatenation for queries.
+// Avoid building SQL by embedding user input directly. Instead use
+// parameterized queries as shown in the "Safe Examples" section above.
 ```
 
 ### Code Review Checklist
