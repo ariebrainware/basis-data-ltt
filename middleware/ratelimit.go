@@ -8,7 +8,6 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -82,32 +81,34 @@ func checkRateLimit(key string, limit int, window time.Duration) (bool, error) {
 
 	ctx := context.Background()
 	
-	// Get current count
-	count, err := rdb.Get(ctx, key).Int64()
-	if err == redis.Nil {
-		// Key doesn't exist, this is the first request
-		// Use SET with EX for atomic set-with-expiry
-		err = rdb.Set(ctx, key, 1, window).Err()
-		if err != nil {
-			return false, fmt.Errorf("failed to set rate limit: %w", err)
-		}
-		return true, nil
-	} else if err != nil {
-		return false, fmt.Errorf("failed to get rate limit: %w", err)
-	}
+	// Use Lua script for atomic rate limit check and increment
+	// This prevents race conditions between multiple concurrent requests
+	luaScript := `
+		local key = KEYS[1]
+		local limit = tonumber(ARGV[1])
+		local window = tonumber(ARGV[2])
+		
+		local current = redis.call('GET', key)
+		if current == false then
+			redis.call('SET', key, 1, 'EX', window)
+			return 1
+		end
+		
+		current = tonumber(current)
+		if current >= limit then
+			return 0
+		end
+		
+		redis.call('INCR', key)
+		return 1
+	`
 	
-	// Check if limit exceeded
-	if count >= int64(limit) {
-		return false, nil
-	}
-	
-	// Increment counter
-	newCount, err := rdb.Incr(ctx, key).Result()
+	result, err := rdb.Eval(ctx, luaScript, []string{key}, limit, int(window.Seconds())).Int()
 	if err != nil {
-		return false, fmt.Errorf("failed to increment rate limit: %w", err)
+		return false, fmt.Errorf("failed to check rate limit: %w", err)
 	}
 	
-	return newCount <= int64(limit), nil
+	return result == 1, nil
 }
 
 // ResetRateLimit resets the rate limit for a given key (useful for testing or admin operations)

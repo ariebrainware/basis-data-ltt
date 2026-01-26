@@ -117,13 +117,16 @@ func HashPassword(password string) (hashedPassword string) {
 }
 
 // VerifyPassword verifies a password against either Argon2id or legacy HMAC hash
+// The salt parameter is only used for future extensibility and is currently unused
+// because Argon2id embeds the salt in the hash string. For legacy HMAC hashes,
+// no separate salt was used.
 func VerifyPassword(password, hash, salt string) (bool, error) {
-	// Check if it's an Argon2id hash
+	// Check if it's an Argon2id hash (salt is embedded in the hash)
 	if strings.HasPrefix(hash, "argon2id$") {
 		return VerifyPasswordArgon2(password, hash)
 	}
 	
-	// Legacy HMAC verification with constant-time comparison
+	// Legacy HMAC verification with constant-time comparison (no separate salt)
 	expectedHash := HashPassword(password)
 	expectedBytes := []byte(expectedHash)
 	actualBytes := []byte(hash)
