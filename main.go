@@ -84,6 +84,9 @@ func main() {
 		defer util.CloseGeoIP()
 	}
 
+	// Initialize in-memory user email cache (LRU) from env
+	util.InitUserEmailCacheFromEnv()
+
 	// Initialize Redis (optional, warn on failure)
 	if _, err := config.ConnectRedis(); err != nil {
 		log.Printf("Warning: could not connect to Redis: %v", err)

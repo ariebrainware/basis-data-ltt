@@ -37,10 +37,18 @@ func EndpointCallLogger() gin.HandlerFunc {
 			details["role_id"] = roleID
 		}
 
+		// Attempt to fetch the user's email when userID is present. Use in-memory cache.
+		email := ""
+		if userID != 0 {
+			if db := GetDB(c); db != nil {
+				email = util.GetUserEmail(db, userID)
+			}
+		}
+
 		util.LogSecurityEvent(util.SecurityEvent{
 			EventType: util.EventEndpointCall,
 			UserID:    fmt.Sprintf("%d", userID),
-			Email:     "",
+			Email:     email,
 			IP:        c.ClientIP(),
 			UserAgent: c.Request.UserAgent(),
 			Message:   fmt.Sprintf("%s %s -> %d", c.Request.Method, c.Request.URL.Path, status),
