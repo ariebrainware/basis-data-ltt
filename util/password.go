@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -94,7 +95,15 @@ func VerifyPasswordArgon2(password, encodedHash string) (bool, error) {
 	hash := argon2.IDKey([]byte(password), saltBytes, argon2Time, argon2Memory, argon2Threads, argon2KeyLen)
 	actualHash := base64.RawStdEncoding.EncodeToString(hash)
 
-	return actualHash == expectedHash, nil
+	// Use constant-time comparison to prevent timing attacks
+	expectedHashBytes := []byte(expectedHash)
+	actualHashBytes := []byte(actualHash)
+	
+	if len(expectedHashBytes) != len(actualHashBytes) {
+		return false, nil
+	}
+	
+	return subtle.ConstantTimeCompare(expectedHashBytes, actualHashBytes) == 1, nil
 }
 
 // HashPassword is deprecated - use HashPasswordArgon2 for new passwords
@@ -114,9 +123,16 @@ func VerifyPassword(password, hash, salt string) (bool, error) {
 		return VerifyPasswordArgon2(password, hash)
 	}
 	
-	// Legacy HMAC verification
+	// Legacy HMAC verification with constant-time comparison
 	expectedHash := HashPassword(password)
-	return expectedHash == hash, nil
+	expectedBytes := []byte(expectedHash)
+	actualBytes := []byte(hash)
+	
+	if len(expectedBytes) != len(actualBytes) {
+		return false, nil
+	}
+	
+	return subtle.ConstantTimeCompare(expectedBytes, actualBytes) == 1, nil
 }
 
 // SetJWTSecret allows tests or runtime code to update the JWT secret used

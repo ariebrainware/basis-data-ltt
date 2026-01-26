@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type SecurityEventType string
 const (
 	EventLoginSuccess       SecurityEventType = "LOGIN_SUCCESS"
 	EventLoginFailure       SecurityEventType = "LOGIN_FAILURE"
+	EventSignupSuccess      SecurityEventType = "SIGNUP_SUCCESS"
 	EventLogout             SecurityEventType = "LOGOUT"
 	EventAccountLocked      SecurityEventType = "ACCOUNT_LOCKED"
 	EventPasswordChanged    SecurityEventType = "PASSWORD_CHANGED"
@@ -40,21 +42,37 @@ func init() {
 	securityLogger = log.New(os.Stdout, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 }
 
+// sanitizeLogValue removes newlines and other characters that could break log parsing
+func sanitizeLogValue(value string) string {
+	// Replace newlines, carriage returns, and tabs with spaces
+	value = strings.ReplaceAll(value, "\n", " ")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\t", " ")
+	// Truncate very long values to prevent log flooding
+	if len(value) > 200 {
+		value = value[:200] + "..."
+	}
+	return value
+}
+
 // LogSecurityEvent logs a security event
 func LogSecurityEvent(event SecurityEvent) {
 	event.Timestamp = time.Now()
 	
+	// Sanitize all string fields to prevent log injection
 	msg := fmt.Sprintf("Event=%s UserID=%s Email=%s IP=%s UserAgent=%s Message=%s",
-		event.EventType,
-		event.UserID,
-		event.Email,
-		event.IP,
-		event.UserAgent,
-		event.Message,
+		sanitizeLogValue(string(event.EventType)),
+		sanitizeLogValue(event.UserID),
+		sanitizeLogValue(event.Email),
+		sanitizeLogValue(event.IP),
+		sanitizeLogValue(event.UserAgent),
+		sanitizeLogValue(event.Message),
 	)
 	
 	if len(event.Details) > 0 {
-		msg = fmt.Sprintf("%s Details=%v", msg, event.Details)
+		// Don't log Details map directly to avoid injection
+		// Instead, log the count of details
+		msg = fmt.Sprintf("%s DetailsCount=%d", msg, len(event.Details))
 	}
 	
 	securityLogger.Println(msg)

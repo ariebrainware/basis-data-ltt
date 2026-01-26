@@ -82,25 +82,32 @@ func checkRateLimit(key string, limit int, window time.Duration) (bool, error) {
 
 	ctx := context.Background()
 	
-	// Use Redis pipeline for atomic operations
-	pipe := rdb.Pipeline()
+	// Get current count
+	count, err := rdb.Get(ctx, key).Int64()
+	if err == redis.Nil {
+		// Key doesn't exist, this is the first request
+		// Use SET with EX for atomic set-with-expiry
+		err = rdb.Set(ctx, key, 1, window).Err()
+		if err != nil {
+			return false, fmt.Errorf("failed to set rate limit: %w", err)
+		}
+		return true, nil
+	} else if err != nil {
+		return false, fmt.Errorf("failed to get rate limit: %w", err)
+	}
+	
+	// Check if limit exceeded
+	if count >= int64(limit) {
+		return false, nil
+	}
 	
 	// Increment counter
-	incrCmd := pipe.Incr(ctx, key)
-	
-	// Set expiration on first request
-	pipe.Expire(ctx, key, window)
-	
-	// Execute pipeline
-	_, err := pipe.Exec(ctx)
-	if err != nil && err != redis.Nil {
-		return false, fmt.Errorf("failed to check rate limit: %w", err)
+	newCount, err := rdb.Incr(ctx, key).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to increment rate limit: %w", err)
 	}
-
-	// Get the counter value
-	count := incrCmd.Val()
 	
-	return count <= int64(limit), nil
+	return newCount <= int64(limit), nil
 }
 
 // ResetRateLimit resets the rate limit for a given key (useful for testing or admin operations)

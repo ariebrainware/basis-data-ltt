@@ -392,7 +392,7 @@ func Signup(c *gin.Context) {
 
 	// Log successful signup
 	util.LogSecurityEvent(util.SecurityEvent{
-		EventType: util.EventLoginSuccess,
+		EventType: util.EventSignupSuccess,
 		UserID:    fmt.Sprintf("%d", newUser.ID),
 		Email:     newUser.Email,
 		IP:        c.ClientIP(),
