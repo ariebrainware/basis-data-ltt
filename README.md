@@ -195,4 +195,22 @@ If a test needs to run against MySQL, set environment variables accordingly. Mos
 
 If you'd like, I can also add a quick `make` target or Docker instructions to simplify local setup.
 
+## GeoIP Local Database (optional)
+
+This project can use a local MaxMind GeoIP2/GeoLite2 `.mmdb` file to resolve IPs to a city and country for `SecurityLog` entries.
+
+- Place your `.mmdb` file somewhere accessible and set the environment variable `GEOIP_DB_PATH` to its path.
+- The application will initialize the GeoIP reader on startup when `GEOIP_DB_PATH` is set. You can also call `util.DownloadGeoIP()` programmatically to download a file and `util.ValidateGeoIP()` to validate it.
+- The code includes an in-memory cache with 24h TTL to avoid repeated lookups. Metrics are available via `util.GetGeoIPCacheMetrics()` (cache hits, misses, size).
+
+Example usage (manual):
+
+```bash
+# export GEOIP_DB_PATH=/opt/geoip/GeoLite2-City.mmdb
+export GEOIP_DB_PATH=/path/to/GeoLite2-City.mmdb
+go run main.go
+```
+
+If you need help automating downloading the GeoIP DB (MaxMind requires agreeing to their license), I can add a small script that downloads and validates the DB given a signed URL or local mirror.
+
 

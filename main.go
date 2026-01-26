@@ -73,6 +73,17 @@ func main() {
 		log.Fatalf("Error connecting to MySQL: %v", err)
 	}
 
+	// Provide DB to security logger for persistence of security events
+	util.SetSecurityLoggerDB(db)
+
+	// Initialize local GeoIP database if provided (GEOIP_DB_PATH)
+	if err := util.InitGeoIP(os.Getenv("GEOIP_DB_PATH")); err != nil {
+		log.Printf("Warning: could not initialize GeoIP DB: %v", err)
+	} else {
+		// Ensure we close the reader on shutdown
+		defer util.CloseGeoIP()
+	}
+
 	// Initialize Redis (optional, warn on failure)
 	if _, err := config.ConnectRedis(); err != nil {
 		log.Printf("Warning: could not connect to Redis: %v", err)
@@ -103,7 +114,7 @@ func main() {
 	}
 
 	// Proceed with auto-migration for all models
-	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{})
+	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}, &model.SecurityLog{})
 	if err != nil {
 		log.Fatalf("Error migrating database: %v", err)
 	}
@@ -123,6 +134,8 @@ func main() {
 	r.Use(middleware.CORSMiddleware())
 	// Pass db to all handlers via context middleware
 	r.Use(middleware.DatabaseMiddleware(db))
+	// Log endpoint calls (persisted to SecurityLog when DB available)
+	r.Use(middleware.EndpointCallLogger())
 
 	// Basic HTTP handler for root path
 	r.GET("/", func(c *gin.Context) {

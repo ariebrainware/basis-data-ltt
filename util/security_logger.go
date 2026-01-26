@@ -1,10 +1,15 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/ariebrainware/basis-data-ltt/model"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 // SecurityEventType represents different types of security events
@@ -20,6 +25,7 @@ const (
 	EventUnauthorizedAccess SecurityEventType = "UNAUTHORIZED_ACCESS"
 	EventRateLimitExceeded  SecurityEventType = "RATE_LIMIT_EXCEEDED"
 	EventSuspiciousActivity SecurityEventType = "SUSPICIOUS_ACTIVITY"
+	EventEndpointCall       SecurityEventType = "ENDPOINT_CALL"
 )
 
 // SecurityEvent represents a security event to be logged
@@ -34,6 +40,13 @@ type SecurityEvent struct {
 }
 
 var securityLogger *log.Logger
+var securityDB *gorm.DB
+
+// SetSecurityLoggerDB sets a gorm DB instance used by the security logger.
+// Call this during application startup (e.g. in main) after DB initialization.
+func SetSecurityLoggerDB(db *gorm.DB) {
+	securityDB = db
+}
 
 func init() {
 	// Initialize security logger - in production, this could write to a separate file
@@ -72,7 +85,46 @@ func LogSecurityEvent(event SecurityEvent) {
 	}
 
 	securityLogger.Println(msg)
+
+	// Persist to DB if available (best-effort, do not fail operation)
+	if securityDB != nil {
+		var details datatypes.JSON
+		if event.Details != nil {
+			if b, err := json.Marshal(event.Details); err == nil {
+				details = datatypes.JSON(b)
+			}
+		}
+
+		// Attempt to resolve city/country for the IP (best-effort, local DB then cache)
+		city, country := GetIPLocation(event.IP)
+		var location string
+		if city != "" && country != "" {
+			location = fmt.Sprintf("%s/%s", city, country)
+		} else if country != "" {
+			location = country
+		} else if city != "" {
+			location = city
+		}
+
+		entry := model.SecurityLog{
+			EventType: string(event.EventType),
+			UserID:    event.UserID,
+			Email:     sanitizeLogValue(event.Email),
+			IP:        sanitizeLogValue(event.IP),
+			Location:  sanitizeLogValue(location),
+			UserAgent: sanitizeLogValue(event.UserAgent),
+			Message:   sanitizeLogValue(event.Message),
+			Details:   details,
+		}
+
+		// best-effort write; ignore errors but log them to stderr
+		if err := securityDB.Create(&entry).Error; err != nil {
+			securityLogger.Printf("Failed to persist security event: %v", err)
+		}
+	}
 }
+
+// (IP lookup implemented in util/geoip.go)
 
 // LogLoginSuccess logs a successful login event
 func LogLoginSuccess(userID uint, email, ip, userAgent string) {
