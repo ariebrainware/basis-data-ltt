@@ -47,7 +47,7 @@ argon2id$base64(salt)$base64(hash)
 
 ### Backward Compatibility
 
-The system maintains backward compatibility with legacy HMAC-SHA256 passwords during migration. When a user with a legacy password logs in successfully, their password will be re-hashed using Argon2id on next password change.
+The system maintains backward compatibility with legacy HMAC-SHA256 passwords during migration. When a user with a legacy password logs in successfully, their password will be re-hashed using Argon2id immediately after that successful login.
 
 ## Rate Limiting
 
