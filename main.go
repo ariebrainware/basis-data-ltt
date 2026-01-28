@@ -246,10 +246,18 @@ func startServer(srv *http.Server) {
 func isTLSEnabled() (bool, string, string) {
 	cert := os.Getenv("TLS_CERT_FILE")
 	key := os.Getenv("TLS_KEY_FILE")
-	if os.Getenv("ENABLE_TLS") == "true" && cert != "" && key != "" {
-		return true, cert, key
+
+	enabledEnv := os.Getenv("ENABLE_TLS") == "true"
+	if !enabledEnv {
+		return false, "", ""
 	}
-	return false, "", ""
+
+	// Ensure both certificate and key are provided
+	if cert == "" || key == "" {
+		return false, "", ""
+	}
+
+	return true, cert, key
 }
 
 // initServices initializes optional runtime services like GeoIP, user cache, and Redis.
