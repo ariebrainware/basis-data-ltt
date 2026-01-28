@@ -21,6 +21,32 @@ const (
 	RoleIDKey = "role_id"
 )
 
+// getenvOrDefault returns the environment value for key or the provided default.
+func getenvOrDefault(key, def string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+// setHSTSHeader sets the Strict-Transport-Security header when appropriate.
+func setHSTSHeader(c *gin.Context) {
+	hstsMaxAge := getenvOrDefault("HSTS_MAX_AGE", "31536000")
+	includeSubDomains := os.Getenv("HSTS_INCLUDE_SUBDOMAINS")
+	hstsValue := fmt.Sprintf("max-age=%s", hstsMaxAge)
+	if includeSubDomains == "true" {
+		hstsValue += "; includeSubDomains"
+	}
+	c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
+}
+
+// unauthorizedSession logs and returns a standardized unauthorized session response.
+func unauthorizedSession(c *gin.Context, msg, logMsg string, err error) {
+	util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, logMsg)
+	unauthorizedAbort(c, msg, err)
+}
+
 // unauthorizedAbort calls the standardized unauthorized response and aborts the context.
 func unauthorizedAbort(c *gin.Context, msg string, err error) {
 	util.CallUserNotAuthorized(c, util.APIErrorParams{Msg: msg, Err: err})
@@ -77,55 +103,16 @@ func tokenValidator(c *gin.Context, expectedToken string) bool {
 }
 
 func setCorsHeaders(c *gin.Context) {
-	origin := os.Getenv("CORSALLOWORIGIN")
-	if origin == "" {
-		origin = "http://localhost:3000"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+	c.Writer.Header().Set("Access-Control-Allow-Origin", getenvOrDefault("CORSALLOWORIGIN", "http://localhost:3000"))
+	c.Writer.Header().Set("Access-Control-Allow-Methods", getenvOrDefault("CORSALLOWMETHODS", "POST, PUT, GET, OPTIONS, DELETE, PATCH"))
+	c.Writer.Header().Set("Access-Control-Allow-Headers", getenvOrDefault("CORSALLOWHEADERS", "X-Requested-With, Content-Type, Authorization, session-token"))
+	c.Writer.Header().Set("Access-Control-Max-Age", getenvOrDefault("CORSMAXAGE", "86400"))
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", getenvOrDefault("CORSALLOWCREDENTIALS", "true"))
+	c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
 
-	methods := os.Getenv("CORSALLOWMETHODS")
-	if methods == "" {
-		methods = "POST, PUT, GET, OPTIONS, DELETE, PATCH"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Methods", methods)
-
-	headers := os.Getenv("CORSALLOWHEADERS")
-	if headers == "" {
-		headers = "X-Requested-With, Content-Type, Authorization, session-token"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
-
-	maxAge := os.Getenv("CORSMAXAGE")
-	if maxAge == "" {
-		maxAge = "86400"
-	}
-	c.Writer.Header().Set("Access-Control-Max-Age", maxAge)
-
-	credentials := os.Getenv("CORSALLOWCREDENTIALS")
-	if credentials == "" {
-		credentials = "true"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Credentials", credentials)
-
-	contentType := os.Getenv("CORSCONTENTTYPE")
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	c.Writer.Header().Set("Content-Type", contentType)
-
-	// Add HSTS header for HTTPS security
-	// Only add HSTS header when HTTPS is enabled
+	// Add HSTS header for HTTPS security. Only set when TLS is present or explicitly enabled
 	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {
-		hstsMaxAge := os.Getenv("HSTS_MAX_AGE")
-		if hstsMaxAge == "" {
-			hstsMaxAge = "31536000" // 1 year default
-		}
-		includeSubDomains := os.Getenv("HSTS_INCLUDE_SUBDOMAINS")
-		hstsValue := fmt.Sprintf("max-age=%s", hstsMaxAge)
-		if includeSubDomains == "true" {
-			hstsValue += "; includeSubDomains"
-		}
-		c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
+		setHSTSHeader(c)
 	}
 }
 
@@ -306,22 +293,12 @@ func ValidateLoginToken() gin.HandlerFunc {
 			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.deleted_at IS NULL", sessionToken, time.Now()).
 			Take(&result).Error
 		if err != nil {
-			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Invalid or expired session token")
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Invalid or expired session token",
-				Err: fmt.Errorf("failed to validate session: %w", err),
-			})
-			c.Abort()
+			unauthorizedSession(c, "Invalid or expired session token", "Invalid or expired session token", fmt.Errorf("failed to validate session: %w", err))
 			return
 		}
 
 		if result.UserID == 0 {
-			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "No active session found")
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Invalid or expired session token",
-				Err: fmt.Errorf("no active session found for provided token"),
-			})
-			c.Abort()
+			unauthorizedSession(c, "Invalid or expired session token", "No active session found", fmt.Errorf("no active session found for provided token"))
 			return
 		}
 
