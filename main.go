@@ -116,6 +116,29 @@ func main() {
 		}
 	}
 
+	// If the patients table already exists, ensure `phone_number` values are
+	// valid JSON so that converting the column to JSON (or setting the GORM
+	// tag `type:json`) does not fail.  Handle three cases:
+	//  - NULL or empty string -> replace with JSON empty array []
+	//  - already JSON (starts with '[') -> leave as-is
+	//  - comma-separated/plain value -> convert to JSON array ["a","b"]
+	if db.Migrator().HasTable(&model.Patient{}) {
+		// Convert NULL or empty strings to JSON empty array
+		if err := db.Exec("UPDATE patients SET phone_number = '[]' WHERE phone_number IS NULL OR TRIM(phone_number) = ''").Error; err != nil {
+			log.Printf("Warning: failed to set empty phone_number to []: %v", err)
+		} else {
+			log.Println("Converted empty phone_number to JSON array [] (if any)")
+		}
+
+		// Convert plain or comma-separated values to a JSON array, but skip
+		// rows that already appear to be JSON (start with '[').
+		if err := db.Exec("UPDATE patients SET phone_number = CONCAT('[\"', REPLACE(TRIM(phone_number), ',', '\",\"'), '\"]') WHERE phone_number IS NOT NULL AND TRIM(phone_number) != '' AND LEFT(TRIM(phone_number),1) != '['").Error; err != nil {
+			log.Printf("Warning: failed to convert phone_number to JSON array: %v", err)
+		} else {
+			log.Println("Converted non-JSON phone_number values to JSON arrays (if any)")
+		}
+	}
+
 	// Proceed with auto-migration for all models
 	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}, &model.SecurityLog{})
 	if err != nil {

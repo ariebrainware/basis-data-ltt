@@ -198,8 +198,10 @@ func CreatePatient(c *gin.Context) {
 	}
 	if len(normalizedPhones) > 0 {
 		// Fetch any patients with the same full_name and perform phone matching in Go
-		var matches []model.Patient
-		if err := db.Where("full_name = ?", patientRequest.FullName).Find(&matches).Error; err != nil {
+		var matches []struct {
+			PhoneNumber string `gorm:"column:phone_number"`
+		}
+		if err := db.Model(&model.Patient{}).Select("phone_number").Where("full_name = ?", patientRequest.FullName).Find(&matches).Error; err != nil {
 			util.CallServerError(c, util.APIErrorParams{
 				Msg: "Failed to check existing patient",
 				Err: err,
@@ -229,8 +231,10 @@ func CreatePatient(c *gin.Context) {
 
 		// Re-check for duplicate patient inside the transaction to avoid race conditions.
 		if len(normalizedPhones) > 0 {
-			var matchesTx []model.Patient
-			if err := tx.Where("full_name = ?", patientRequest.FullName).Find(&matchesTx).Error; err != nil {
+			var matchesTx []struct {
+				PhoneNumber string `gorm:"column:phone_number"`
+			}
+			if err := tx.Model(&model.Patient{}).Select("phone_number").Where("full_name = ?", patientRequest.FullName).Find(&matchesTx).Error; err != nil {
 				return err
 			}
 			for _, ph := range normalizedPhones {
@@ -297,19 +301,21 @@ func CreatePatient(c *gin.Context) {
 			}
 		}
 
-		if err := tx.Create(&model.Patient{
-			FullName:       patientRequest.FullName,
-			Gender:         patientRequest.Gender,
-			Age:            patientRequest.Age,
-			Job:            patientRequest.Job,
-			Address:        patientRequest.Address,
-			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
-			PatientCode:    patientCode,
-			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
-			SurgeryHistory: patientRequest.SurgeryHistory,
-			Email:          patientRequest.Email,
-			Password:       util.HashPassword(patientRequest.Password),
-		}).Error; err != nil {
+		createData := map[string]interface{}{
+			"full_name":       patientRequest.FullName,
+			"gender":          patientRequest.Gender,
+			"age":             patientRequest.Age,
+			"job":             patientRequest.Job,
+			"address":         patientRequest.Address,
+			"phone_number":    strings.Join(patientRequest.PhoneNumber, ","),
+			"patient_code":    patientCode,
+			"health_history":  strings.Join(patientRequest.HealthHistory, ","),
+			"surgery_history": patientRequest.SurgeryHistory,
+			"email":           patientRequest.Email,
+			"password":        util.HashPassword(patientRequest.Password),
+		}
+
+		if err := tx.Model(&model.Patient{}).Create(createData).Error; err != nil {
 			return err
 		}
 		return nil
