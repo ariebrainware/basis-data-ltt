@@ -311,16 +311,6 @@ func TestNormalizePhoneNumbers(t *testing.T) {
 func TestUpdatePatientPhoneNumbers(t *testing.T) {
 	db := setupTestDB(t)
 
-	// Create a patient with initial phone number
-	initialPatient := model.Patient{
-		FullName:    "Test Patient",
-		PatientCode: "T001",
-		PhoneNumber: "081234567890",
-	}
-	if err := db.Create(&initialPatient).Error; err != nil {
-		t.Fatalf("create initial patient: %v", err)
-	}
-
 	// Set up Gin router with the UpdatePatient endpoint
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -367,6 +357,16 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Create a patient for this test case to ensure test isolation
+			patient := model.Patient{
+				FullName:    "Test Patient",
+				PatientCode: fmt.Sprintf("T%03d", time.Now().UnixNano()%1000),
+				PhoneNumber: "081234567890",
+			}
+			if err := db.Create(&patient).Error; err != nil {
+				t.Fatalf("create patient: %v", err)
+			}
+
 			// Create request body with phone numbers
 			reqBody := map[string]interface{}{
 				"phone_number": tt.phoneNumbers,
@@ -377,7 +377,7 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 			}
 
 			// Create HTTP request
-			url := fmt.Sprintf("/patient/%d", initialPatient.ID)
+			url := fmt.Sprintf("/patient/%d", patient.ID)
 			req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonBody))
 			if err != nil {
 				t.Fatalf("create request: %v", err)
@@ -395,7 +395,7 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 
 			// Reload the patient to verify the stored value
 			var reloadedPatient model.Patient
-			if err := db.First(&reloadedPatient, initialPatient.ID).Error; err != nil {
+			if err := db.First(&reloadedPatient, patient.ID).Error; err != nil {
 				t.Fatalf("reload patient: %v", err)
 			}
 
