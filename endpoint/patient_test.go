@@ -356,7 +356,7 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create UpdatePatientRequest with phone numbers
 			updateReq := model.UpdatePatientRequest{
-				PhoneNumbers: tt.phoneNumbers,
+				PhoneNumber: tt.phoneNumbers,
 			}
 
 			// Load the patient
@@ -366,8 +366,8 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 			}
 
 			// Apply the phone number update logic (same as UpdatePatient endpoint)
-			if len(updateReq.PhoneNumbers) > 0 {
-				normalizedPhones := normalizePhoneNumbers(updateReq.PhoneNumbers)
+			if len(updateReq.PhoneNumber) > 0 {
+				normalizedPhones := normalizePhoneNumbers(updateReq.PhoneNumber)
 				if len(normalizedPhones) > 0 {
 					patient.PhoneNumber = strings.Join(normalizedPhones, ",")
 				}
