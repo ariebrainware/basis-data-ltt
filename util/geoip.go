@@ -119,8 +119,17 @@ func downloadToTemp(ctx context.Context, dl DownloadRequest) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// ensure file is closed; we'll close explicitly before returning
-	defer func() { _ = tmpFile.Close() }()
+	tmpPath := tmpFile.Name()
+	
+	// Track success to determine if cleanup is needed
+	success := false
+	defer func() {
+		_ = tmpFile.Close()
+		// If function didn't succeed, remove the temporary file
+		if !success {
+			_ = os.Remove(tmpPath)
+		}
+	}()
 
 	reader, gzCloser, err := chooseResponseReader(dl, resp)
 	if err != nil {
@@ -137,7 +146,10 @@ func downloadToTemp(ctx context.Context, dl DownloadRequest) (string, error) {
 	if err := tmpFile.Close(); err != nil {
 		return "", err
 	}
-	return tmpFile.Name(), nil
+	
+	// Mark as successful before returning
+	success = true
+	return tmpPath, nil
 }
 
 func getHTTPResponse(ctx context.Context, dl DownloadRequest) (*http.Response, error) {

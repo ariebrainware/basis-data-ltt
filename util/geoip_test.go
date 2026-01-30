@@ -187,3 +187,52 @@ func TestGetIPLocation_InvalidIP(t *testing.T) {
 		t.Errorf("Expected empty strings for invalid IP, got city=%q, country=%q", city, country)
 	}
 }
+
+func TestDownloadGeoIP_TempFileCleanupOnError(t *testing.T) {
+	// Create a test server that returns an invalid response after headers
+	// This will cause an error during the copy phase, after temp file is created
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Write some data then close connection abruptly
+		w.Write([]byte("partial data"))
+		// Force connection close by panicking (httptest will handle this)
+		panic("simulated connection error")
+	}))
+	defer server.Close()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	destPath := filepath.Join(tmpDir, "geoip.mmdb")
+
+	// Count files before download attempt
+	beforeFiles, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to read temp dir: %v", err)
+	}
+	beforeCount := len(beforeFiles)
+
+	// Attempt download - should fail
+	_, err = DownloadGeoIPWithRequest(ctx, DownloadRequest{URL: server.URL, DestPath: destPath})
+	if err == nil {
+		t.Error("Expected error due to simulated connection error")
+	}
+
+	// Give a moment for cleanup
+	time.Sleep(10 * time.Millisecond)
+
+	// Count files after download attempt
+	afterFiles, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("Failed to read temp dir: %v", err)
+	}
+	afterCount := len(afterFiles)
+
+	// Should have no additional files (temp file should be cleaned up)
+	if afterCount != beforeCount {
+		t.Errorf("Expected no new files in temp dir after error, before=%d, after=%d", beforeCount, afterCount)
+		// Log what files remain for debugging
+		for _, f := range afterFiles {
+			t.Logf("Remaining file: %s", f.Name())
+		}
+	}
+}
