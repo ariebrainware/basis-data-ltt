@@ -217,10 +217,7 @@ func TestDownloadGeoIP_TempFileCleanupOnError(t *testing.T) {
 		t.Error("Expected error due to simulated connection error")
 	}
 
-	// Give a moment for cleanup
-	time.Sleep(10 * time.Millisecond)
-
-	// Count files after download attempt
+	// Count files after download attempt - cleanup is synchronous in defer
 	afterFiles, err := os.ReadDir(tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to read temp dir: %v", err)

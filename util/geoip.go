@@ -142,10 +142,6 @@ func downloadToTemp(ctx context.Context, dl DownloadRequest) (string, error) {
 	if err := copyResponseToTemp(reader, tmpFile); err != nil {
 		return "", err
 	}
-
-	if err := tmpFile.Close(); err != nil {
-		return "", err
-	}
 	
 	// Mark as successful before returning
 	success = true
