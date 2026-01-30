@@ -54,6 +54,62 @@ func ListDiseases(c *gin.Context) {
 	})
 }
 
+// helper: check whether a disease exists for a given WHERE clause
+func diseaseExists(db *gorm.DB, where string, args ...interface{}) (bool, error) {
+	var d model.Disease
+	err := db.Where(where, args...).First(&d).Error
+	if err == gorm.ErrRecordNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// helper: normalize inputs for create/update
+func normalizeDiseaseInput(req createDiseaseRequest) (name, codename, description string) {
+	name = strings.TrimSpace(req.Name)
+	codename = strings.ToLower(strings.TrimSpace(req.Codename))
+	description = strings.TrimSpace(req.Description)
+	return
+}
+
+// helper: ensure DB is available in context or respond with server error
+func ensureDB(c *gin.Context) (*gorm.DB, bool) {
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return nil, false
+	}
+	return db, true
+}
+
+// helper: get and validate id param from path
+func getIDParam(c *gin.Context) (string, bool) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing disease ID",
+			Err: fmt.Errorf("disease ID is required"),
+		})
+		return "", false
+	}
+	return id, true
+}
+
+// helper: fetch disease by id
+func fetchDiseaseByID(db *gorm.DB, id string) (model.Disease, error) {
+	var d model.Disease
+	if err := db.First(&d, id).Error; err != nil {
+		return model.Disease{}, err
+	}
+	return d, nil
+}
+
 type createDiseaseRequest struct {
 	Name        string `json:"name" example:"Diabetes"`
 	Codename    string `json:"codename" example:"diabetes"`
@@ -77,8 +133,7 @@ type createDiseaseRequest struct {
 func CreateDisease(c *gin.Context) {
 	diseaseRequest := createDiseaseRequest{}
 
-	err := c.ShouldBindJSON(&diseaseRequest)
-	if err != nil {
+	if err := c.ShouldBindJSON(&diseaseRequest); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
 			Err: err,
@@ -95,8 +150,7 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
-	// Normalize and validate name
-	name := strings.TrimSpace(diseaseRequest.Name)
+	name, codename, description := normalizeDiseaseInput(diseaseRequest)
 	if name == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body: name is required",
@@ -104,9 +158,6 @@ func CreateDisease(c *gin.Context) {
 		})
 		return
 	}
-
-	// Normalize and validate codename
-	codename := strings.ToLower(strings.TrimSpace(diseaseRequest.Codename))
 	if codename == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body: codename is required",
@@ -115,34 +166,36 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
-	// Check for existing disease with same (case-insensitive) name
-	var existing model.Disease
-	if err := db.Where("LOWER(name) = ?", strings.ToLower(name)).First(&existing).Error; err == nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Disease with similar name already exists",
-			Err: fmt.Errorf("disease already exists"),
-		})
-		return
-	} else if err != nil && err != gorm.ErrRecordNotFound {
+	// Check for existing name
+	exists, err := diseaseExists(db, "LOWER(name) = ?", strings.ToLower(name))
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to check existing diseases",
 			Err: err,
 		})
 		return
 	}
-
-	// Check for existing disease with same codename (case-insensitive)
-	var existingCodename model.Disease
-	if err := db.Where("LOWER(codename) = ?", strings.ToLower(codename)).First(&existingCodename).Error; err == nil {
+	if exists {
 		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Disease with this codename already exists",
-			Err: fmt.Errorf("codename already exists"),
+			Msg: "Disease with similar name already exists",
+			Err: fmt.Errorf("disease already exists"),
 		})
 		return
-	} else if err != nil && err != gorm.ErrRecordNotFound {
+	}
+
+	// Check for existing codename
+	exists, err = diseaseExists(db, "LOWER(codename) = ?", strings.ToLower(codename))
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to check existing codenames",
 			Err: err,
+		})
+		return
+	}
+	if exists {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Disease with this codename already exists",
+			Err: fmt.Errorf("codename already exists"),
 		})
 		return
 	}
@@ -150,8 +203,9 @@ func CreateDisease(c *gin.Context) {
 	disease := model.Disease{
 		Name:        name,
 		Codename:    codename,
-		Description: diseaseRequest.Description,
+		Description: description,
 	}
+
 	if err := db.Create(&disease).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create disease",
@@ -182,19 +236,14 @@ func CreateDisease(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /disease/{id} [patch]
 func UpdateDisease(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing disease ID",
-			Err: fmt.Errorf("disease ID is required"),
-		})
+	id, ok := getIDParam(c)
+	if !ok {
 		return
 	}
 
 	diseaseRequest := createDiseaseRequest{}
 
-	err := c.ShouldBindJSON(&diseaseRequest)
-	if err != nil {
+	if err := c.ShouldBindJSON(&diseaseRequest); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
 			Err: err,
@@ -202,17 +251,13 @@ func UpdateDisease(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := ensureDB(c)
+	if !ok {
 		return
 	}
 
-	var existingDisease model.Disease
-	if err := db.First(&existingDisease, id).Error; err != nil {
+	existingDisease, err := fetchDiseaseByID(db, id)
+	if err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Disease not found",
 			Err: err,
@@ -259,26 +304,18 @@ func UpdateDisease(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /disease/{id} [delete]
 func DeleteDisease(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing disease ID",
-			Err: fmt.Errorf("disease ID is required"),
-		})
+	id, ok := getIDParam(c)
+	if !ok {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := ensureDB(c)
+	if !ok {
 		return
 	}
 
-	var existingDisease model.Disease
-	if err := db.First(&existingDisease, id).Error; err != nil {
+	existingDisease, err := fetchDiseaseByID(db, id)
+	if err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Disease not found",
 			Err: err,
@@ -315,26 +352,18 @@ func DeleteDisease(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /disease/{id} [get]
 func GetDiseaseInfo(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing disease ID",
-			Err: fmt.Errorf("disease ID is required"),
-		})
+	id, ok := getIDParam(c)
+	if !ok {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := ensureDB(c)
+	if !ok {
 		return
 	}
 
-	var existingDisease model.Disease
-	if err := db.First(&existingDisease, id).Error; err != nil {
+	existingDisease, err := fetchDiseaseByID(db, id)
+	if err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Disease not found",
 			Err: err,
