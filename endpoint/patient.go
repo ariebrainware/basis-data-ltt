@@ -438,7 +438,22 @@ func UpdatePatient(c *gin.Context) {
 
 	// Merge provided fields into existingPatient, converting phone numbers slice to comma-separated string.
 	if len(patient.PhoneNumbers) > 0 {
-		existingPatient.PhoneNumber = strings.Join(patient.PhoneNumbers, ",")
+		normalizedPhones := make([]string, 0, len(patient.PhoneNumbers))
+		seen := make(map[string]struct{}, len(patient.PhoneNumbers))
+		for _, raw := range patient.PhoneNumbers {
+			phone := strings.TrimSpace(raw)
+			if phone == "" {
+				continue
+			}
+			if _, ok := seen[phone]; ok {
+				continue
+			}
+			seen[phone] = struct{}{}
+			normalizedPhones = append(normalizedPhones, phone)
+		}
+		if len(normalizedPhones) > 0 {
+			existingPatient.PhoneNumber = strings.Join(normalizedPhones, ",")
+		}
 	}
 	if patient.FullName != "" {
 		existingPatient.FullName = util.NormalizeName(patient.FullName)
