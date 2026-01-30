@@ -53,6 +53,14 @@ func unauthorizedAbort(c *gin.Context, msg string, err error) {
 	c.Abort()
 }
 
+// logUnauthorizedWithUser logs an unauthorized access event, including the
+// authenticated user id when available. This consolidates repeated logic
+// found in RequireRole and other middleware helpers.
+func logUnauthorizedWithUser(c *gin.Context, logMsg string) {
+	userID, _ := GetUserID(c)
+	util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, logMsg)
+}
+
 // isRoleAllowed checks whether the current request's role is among allowedRoles.
 // It returns (allowed, roleID, exists).
 func isRoleAllowed(c *gin.Context, allowedRoles ...uint32) (bool, uint32, bool) {
@@ -191,14 +199,12 @@ func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allowed, roleID, exists := isRoleAllowed(c, allowedRoles...)
 		if !exists {
-			userID, _ := GetUserID(c)
-			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, "Role information not available")
+			logUnauthorizedWithUser(c, "Role information not available")
 			unauthorizedAbort(c, "Role information not available", fmt.Errorf("role information not available in context"))
 			return
 		}
 		if !allowed {
-			userID, _ := GetUserID(c)
-			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, fmt.Sprintf("Insufficient permissions (role %d)", roleID))
+			logUnauthorizedWithUser(c, fmt.Sprintf("Insufficient permissions (role %d)", roleID))
 			unauthorizedAbort(c, "Insufficient permissions to access this resource", fmt.Errorf("user role %d not authorized", roleID))
 			return
 		}
@@ -220,12 +226,14 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 		// Otherwise check ownership: compare context user id with URL param `id`
 		userID, ok := GetUserID(c)
 		if !ok {
+			logUnauthorizedWithUser(c, "User not authenticated")
 			unauthorizedAbort(c, "User not authenticated", fmt.Errorf("user id not found in context"))
 			return
 		}
 
 		idParam := c.Param("id")
 		if idParam == "" {
+			logUnauthorizedWithUser(c, "Resource id required")
 			unauthorizedAbort(c, "Resource id required", fmt.Errorf("resource id parameter missing"))
 			return
 		}
@@ -233,6 +241,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 		// Parse id param to unsigned integer, constrained to platform uint size
 		uid, err := strconv.ParseUint(idParam, 10, 0)
 		if err != nil {
+			logUnauthorizedWithUser(c, "Invalid resource id")
 			unauthorizedAbort(c, "Invalid resource id", err)
 			return
 		}
@@ -240,6 +249,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 		// Ensure the parsed id fits into the platform-dependent uint type to avoid overflow
 		maxUint := ^uint(0)
 		if uid > uint64(maxUint) {
+			logUnauthorizedWithUser(c, "Invalid resource id")
 			unauthorizedAbort(c, "Invalid resource id", fmt.Errorf("resource id out of range"))
 			return
 		}
@@ -248,6 +258,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 			return
 		}
 
+		logUnauthorizedWithUser(c, fmt.Sprintf("User %d not owner nor allowed role", userID))
 		unauthorizedAbort(c, "Insufficient permissions to access this resource", fmt.Errorf("user %d not owner nor allowed role", userID))
 	}
 }

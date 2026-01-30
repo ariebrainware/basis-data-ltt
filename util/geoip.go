@@ -159,21 +159,24 @@ func ValidateGeoIP(path string) error {
 // local GeoIP database with an in-memory cache. Returns empty strings when
 // a lookup is not available.
 func GetIPLocation(ip string) (string, string) {
-	if ip == "" {
+	if ip == "" || isLikelyLocalOrPrivate(ip) {
 		return "", ""
 	}
 
-	// Quick reject for local/private addresses
-	if isLikelyLocalOrPrivate(ip) {
-		return "", ""
+	if city, country, ok := getCachedOrResolve(ip); ok {
+		return city, country
 	}
+	return "", ""
+}
 
-	// Try cache first
+// getCachedOrResolve checks cache for IP and falls back to resolving via the
+// GeoIP DB. It updates cache metrics and stores successful lookups. Returns
+// found=true when a city/country value is available.
+func getCachedOrResolve(ip string) (string, string, bool) {
 	if ccity, ccountry, ok := cacheGetIP(ip); ok {
-		return ccity, ccountry
+		return ccity, ccountry, true
 	}
 
-	// Cache miss
 	atomic.AddInt64(&geoipCacheMiss, 1)
 	if securityLogger != nil {
 		securityLogger.Printf("GeoIP cache miss for %s", ip)
@@ -181,10 +184,10 @@ func GetIPLocation(ip string) (string, string) {
 
 	city, country := resolveCityCountryFromIP(ip)
 	if city == "" && country == "" {
-		return "", ""
+		return "", "", false
 	}
 	cacheSetIP(ip, city, country)
-	return city, country
+	return city, country, true
 }
 
 // resolveCityCountryFromIP performs the GeoIP lookup for an IP and returns
