@@ -293,30 +293,12 @@ func TestNormalizePhoneNumbers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			normalized := normalizePhoneNumbers(tt.input)
-			result := ""
-			if len(normalized) > 0 {
-				result = joinPhoneNumbers(normalized)
-			}
+			result := strings.Join(normalized, ",")
 			if result != tt.expected {
 				t.Errorf("normalizePhoneNumbers(%v) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
-}
-
-// joinPhoneNumbers joins a slice of phone numbers into a comma-separated string
-func joinPhoneNumbers(phones []string) string {
-	if len(phones) == 0 {
-		return ""
-	}
-	result := ""
-	for i, phone := range phones {
-		if i > 0 {
-			result += ","
-		}
-		result += phone
-	}
-	return result
 }
 
 func TestUpdatePatientPhoneNumbers(t *testing.T) {
@@ -383,23 +365,11 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 				t.Fatalf("load patient: %v", err)
 			}
 
-			// Apply the phone number update logic (simulating UpdatePatient endpoint logic)
+			// Apply the phone number update logic (same as UpdatePatient endpoint)
 			if len(updateReq.PhoneNumbers) > 0 {
-				normalizedPhones := make([]string, 0, len(updateReq.PhoneNumbers))
-				seen := make(map[string]struct{}, len(updateReq.PhoneNumbers))
-				for _, raw := range updateReq.PhoneNumbers {
-					phone := strings.TrimSpace(raw)
-					if phone == "" {
-						continue
-					}
-					if _, ok := seen[phone]; ok {
-						continue
-					}
-					seen[phone] = struct{}{}
-					normalizedPhones = append(normalizedPhones, phone)
-				}
+				normalizedPhones := normalizePhoneNumbers(updateReq.PhoneNumbers)
 				if len(normalizedPhones) > 0 {
-					patient.PhoneNumber = joinPhoneNumbers(normalizedPhones)
+					patient.PhoneNumber = strings.Join(normalizedPhones, ",")
 				}
 			}
 
