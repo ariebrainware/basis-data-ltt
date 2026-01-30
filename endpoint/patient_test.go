@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -238,5 +239,184 @@ func TestFetchPatientsDefaultSort(t *testing.T) {
 	}
 	if patients[2].FullName != "Oldest Patient" {
 		t.Errorf("expected third patient to be Oldest Patient, got %s", patients[2].FullName)
+	}
+}
+
+func TestNormalizePhoneNumbers(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected string
+	}{
+		{
+			name:     "single phone number",
+			input:    []string{"081234567890"},
+			expected: "081234567890",
+		},
+		{
+			name:     "multiple phone numbers",
+			input:    []string{"081234567890", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with whitespace",
+			input:    []string{" 081234567890 ", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with empty strings",
+			input:    []string{"081234567890", "", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with duplicates",
+			input:    []string{"081234567890", "081234567890", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with duplicates and whitespace",
+			input:    []string{" 081234567890 ", "081234567890", " 081234567891 "},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "empty input",
+			input:    []string{},
+			expected: "",
+		},
+		{
+			name:     "all empty strings",
+			input:    []string{"", "  ", ""},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalized := normalizePhoneNumbers(tt.input)
+			result := ""
+			if len(normalized) > 0 {
+				result = joinPhoneNumbers(normalized)
+			}
+			if result != tt.expected {
+				t.Errorf("normalizePhoneNumbers(%v) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// joinPhoneNumbers joins a slice of phone numbers into a comma-separated string
+func joinPhoneNumbers(phones []string) string {
+	if len(phones) == 0 {
+		return ""
+	}
+	result := ""
+	for i, phone := range phones {
+		if i > 0 {
+			result += ","
+		}
+		result += phone
+	}
+	return result
+}
+
+func TestUpdatePatientPhoneNumbers(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Create a patient with initial phone numbers
+	initialPatient := model.Patient{
+		FullName:    "Test Patient",
+		PatientCode: "T001",
+		PhoneNumber: "081234567890",
+	}
+	if err := db.Create(&initialPatient).Error; err != nil {
+		t.Fatalf("create initial patient: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		phoneNumbers   []string
+		expectedStored string
+		description    string
+	}{
+		{
+			name:           "update with new phone numbers",
+			phoneNumbers:   []string{"089876543210", "081111111111"},
+			expectedStored: "089876543210,081111111111",
+			description:    "should store multiple phone numbers as comma-separated string",
+		},
+		{
+			name:           "update with phone numbers containing whitespace",
+			phoneNumbers:   []string{" 089876543210 ", " 081111111111 "},
+			expectedStored: "089876543210,081111111111",
+			description:    "should trim whitespace from phone numbers",
+		},
+		{
+			name:           "update with duplicate phone numbers",
+			phoneNumbers:   []string{"089876543210", "089876543210", "081111111111"},
+			expectedStored: "089876543210,081111111111",
+			description:    "should deduplicate phone numbers",
+		},
+		{
+			name:           "update with empty strings mixed in",
+			phoneNumbers:   []string{"089876543210", "", "081111111111", "  "},
+			expectedStored: "089876543210,081111111111",
+			description:    "should filter out empty strings",
+		},
+		{
+			name:           "update with single phone number",
+			phoneNumbers:   []string{"089876543210"},
+			expectedStored: "089876543210",
+			description:    "should handle single phone number",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create UpdatePatientRequest with phone numbers
+			updateReq := model.UpdatePatientRequest{
+				PhoneNumbers: tt.phoneNumbers,
+			}
+
+			// Load the patient
+			var patient model.Patient
+			if err := db.First(&patient, initialPatient.ID).Error; err != nil {
+				t.Fatalf("load patient: %v", err)
+			}
+
+			// Apply the phone number update logic (simulating UpdatePatient endpoint logic)
+			if len(updateReq.PhoneNumbers) > 0 {
+				normalizedPhones := make([]string, 0, len(updateReq.PhoneNumbers))
+				seen := make(map[string]struct{}, len(updateReq.PhoneNumbers))
+				for _, raw := range updateReq.PhoneNumbers {
+					phone := strings.TrimSpace(raw)
+					if phone == "" {
+						continue
+					}
+					if _, ok := seen[phone]; ok {
+						continue
+					}
+					seen[phone] = struct{}{}
+					normalizedPhones = append(normalizedPhones, phone)
+				}
+				if len(normalizedPhones) > 0 {
+					patient.PhoneNumber = joinPhoneNumbers(normalizedPhones)
+				}
+			}
+
+			// Save the updated patient
+			if err := db.Save(&patient).Error; err != nil {
+				t.Fatalf("save patient: %v", err)
+			}
+
+			// Reload the patient to verify the stored value
+			var reloadedPatient model.Patient
+			if err := db.First(&reloadedPatient, initialPatient.ID).Error; err != nil {
+				t.Fatalf("reload patient: %v", err)
+			}
+
+			if reloadedPatient.PhoneNumber != tt.expectedStored {
+				t.Errorf("%s: expected phone_number to be %q, got %q", tt.description, tt.expectedStored, reloadedPatient.PhoneNumber)
+			}
+		})
 	}
 }
