@@ -360,7 +360,7 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 			// Create a patient for this test case to ensure test isolation
 			patient := model.Patient{
 				FullName:    "Test Patient",
-				PatientCode: fmt.Sprintf("T%03d", time.Now().UnixNano()%1000),
+				PatientCode: fmt.Sprintf("T%d", time.Now().UnixNano()),
 				PhoneNumber: "081234567890",
 			}
 			if err := db.Create(&patient).Error; err != nil {
