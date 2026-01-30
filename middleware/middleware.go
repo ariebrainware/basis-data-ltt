@@ -83,7 +83,7 @@ func tryParseRedisSession(val string) (uint, uint32, bool) {
 	if uid64 == 0 {
 		return 0, 0, false
 	}
-	var maxUint uint64 = uint64(^uint(0))
+	maxUint := uint64(^uint(0))
 	if uid64 > maxUint {
 		return 0, 0, false
 	}

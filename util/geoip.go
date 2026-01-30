@@ -67,7 +67,13 @@ func DownloadGeoIP(ctx context.Context, url, destPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			if securityLogger != nil {
+				securityLogger.Printf("failed to close response body: %v", cerr)
+			}
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to download, status: %d", resp.StatusCode)
 	}
@@ -90,7 +96,13 @@ func DownloadGeoIP(ctx context.Context, url, destPath string) (string, error) {
 		return "", err
 	}
 	if gzCloser != nil {
-		defer gzCloser.Close()
+		defer func() {
+			if cerr := gzCloser.Close(); cerr != nil {
+				if securityLogger != nil {
+					securityLogger.Printf("failed to close gzip reader: %v", cerr)
+				}
+			}
+		}()
 	}
 
 	if err := copyResponseToTemp(reader, tmpFile); err != nil {

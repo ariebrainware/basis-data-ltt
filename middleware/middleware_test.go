@@ -44,8 +44,10 @@ func TestTokenValidator(t *testing.T) {
 
 	// Non-OPTIONS must match expected token
 	expected := "Bearer secret-token"
-	os.Setenv("APITOKEN", "secret-token")
-	defer os.Unsetenv("APITOKEN")
+	if err := os.Setenv("APITOKEN", "secret-token"); err != nil {
+		t.Fatalf("failed to set APITOKEN: %v", err)
+	}
+	defer func() { _ = os.Unsetenv("APITOKEN") }()
 
 	c.Request = httptest.NewRequest("GET", "/", nil)
 	c.Request.Header.Set("Authorization", expected)
@@ -203,7 +205,9 @@ func TestValidateLoginToken_RedisMalformedValue_NonNumeric(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
@@ -278,7 +282,9 @@ func TestValidateLoginToken_RedisInvalidFormat_MissingColon(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
@@ -345,7 +351,9 @@ func TestValidateLoginToken_RedisZeroUserID(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
@@ -412,7 +420,9 @@ func TestValidateLoginToken_RedisRoleIDParseError(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
@@ -483,7 +493,9 @@ func TestValidateLoginToken_RedisNotAvailable_DBFallback(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
@@ -550,7 +562,9 @@ func TestValidateLoginToken_DBFallback_ExpiredSession(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data with expired session
 	user := model.User{
@@ -606,7 +620,9 @@ func TestValidateLoginToken_RedisKeyNotFound_DBFallback(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
