@@ -70,6 +70,7 @@ func main() {
 
 	// Initialize optional services (GeoIP, user email cache, Redis)
 	initServices()
+	defer util.CloseGeoIP()
 
 	if err := migrateAndSeed(db); err != nil {
 		log.Fatalf("Migration/seed failed: %v", err)
@@ -258,8 +259,6 @@ func isTLSEnabled() (bool, string, string) {
 func initServices() {
 	if err := util.InitGeoIP(os.Getenv("GEOIP_DB_PATH")); err != nil {
 		log.Printf("Warning: could not initialize GeoIP DB: %v", err)
-	} else {
-		defer util.CloseGeoIP()
 	}
 
 	util.InitUserEmailCacheFromEnv()
