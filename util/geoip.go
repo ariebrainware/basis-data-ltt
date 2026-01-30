@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -54,8 +55,8 @@ func CloseGeoIP() {
 }
 
 // DownloadGeoIP downloads a GeoIP MMDB file from `url` and writes it to `destPath`.
-// If the downloaded content is gzip-compressed (URL ends with .gz), it will be
-// decompressed automatically. Returns the final path written.
+// If the downloaded content is gzip-compressed (URL ends with .gz or the server
+// indicates gzip encoding), it will be decompressed automatically. Returns the final path written.
 func DownloadGeoIP(ctx context.Context, url, destPath string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -80,27 +81,23 @@ func DownloadGeoIP(ctx context.Context, url, destPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// ensure file is closed; we'll close explicitly before rename
 	defer func() { _ = tmpFile.Close() }()
 
-	// If URL looks like a gzipped file, decompress on the fly
-	if filepath.Ext(url) == ".gz" {
-		gzReader, err := gzip.NewReader(resp.Body)
-		if err != nil {
-			return "", err
-		}
-		defer gzReader.Close()
-		if _, err := io.Copy(tmpFile, gzReader); err != nil {
-			return "", err
-		}
-	} else {
-		if _, err := io.Copy(tmpFile, resp.Body); err != nil {
-			return "", err
-		}
-	}
-
-	if err := tmpFile.Sync(); err != nil {
+	// Choose reader: possibly a gzip reader wrapped around resp.Body
+	reader, gzCloser, err := chooseResponseReader(url, resp)
+	if err != nil {
 		return "", err
 	}
+	if gzCloser != nil {
+		defer gzCloser.Close()
+	}
+
+	if err := copyResponseToTemp(reader, tmpFile); err != nil {
+		return "", err
+	}
+
+	// Ensure data is flushed and file is closed before rename.
 	if err := tmpFile.Close(); err != nil {
 		return "", err
 	}
@@ -109,6 +106,31 @@ func DownloadGeoIP(ctx context.Context, url, destPath string) (string, error) {
 		return "", err
 	}
 	return destPath, nil
+}
+
+// chooseResponseReader returns an io.Reader for the response body, and an optional closer
+// to be closed by the caller (e.g., gzip.Reader). It decides gzip usage based on URL
+// extension or Content-Encoding header.
+func chooseResponseReader(url string, resp *http.Response) (io.Reader, io.Closer, error) {
+	if strings.EqualFold(resp.Header.Get("Content-Encoding"), "gzip") || filepath.Ext(url) == ".gz" {
+		gzReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, nil, err
+		}
+		return gzReader, gzReader, nil
+	}
+	return resp.Body, nil, nil
+}
+
+// copyResponseToTemp copies from reader to tmpFile and ensures the file is synced.
+func copyResponseToTemp(reader io.Reader, tmpFile *os.File) error {
+	if _, err := io.Copy(tmpFile, reader); err != nil {
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ValidateGeoIP attempts to open the MMDB file to ensure it's a valid DB.
@@ -129,47 +151,55 @@ func GetIPLocation(ip string) (string, string) {
 		return "", ""
 	}
 
-	// Skip common private/local ranges quickly
-	if ip == "127.0.0.1" || ip == "::1" ||
-		(len(ip) >= 4 && ip[:4] == "10.") ||
-		(len(ip) >= 8 && ip[:8] == "192.168") ||
-		(len(ip) >= 2 && ip[:2] == "::") {
+	// Quick reject for local/private addresses
+	if isLikelyLocalOrPrivate(ip) {
 		return "", ""
 	}
 
-	if geoipCache != nil {
-		if v, ok := geoipCache.Get(ip); ok {
-			atomic.AddInt64(&geoipCacheHits, 1)
-			// Log cache hit for observability
-			if securityLogger != nil {
-				securityLogger.Printf("GeoIP cache hit for %s", ip)
-			}
-			if arr, ok := v.([]string); ok && len(arr) == 2 {
-				return arr[0], arr[1]
-			}
-		}
+	// Try cache first
+	if ccity, ccountry, ok := cacheGetIP(ip); ok {
+		return ccity, ccountry
 	}
+
+	// Cache miss
 	atomic.AddInt64(&geoipCacheMiss, 1)
 	if securityLogger != nil {
 		securityLogger.Printf("GeoIP cache miss for %s", ip)
 	}
 
+	city, country := resolveCityCountryFromIP(ip)
+	if city == "" && country == "" {
+		return "", ""
+	}
+	cacheSetIP(ip, city, country)
+	return city, country
+}
+
+// resolveCityCountryFromIP performs the GeoIP lookup for an IP and returns
+// the extracted city and country. It returns empty strings on any error or
+// if the lookup is unavailable.
+func resolveCityCountryFromIP(ip string) (string, string) {
 	if geoipDB == nil {
 		return "", ""
 	}
-
 	netip := net.ParseIP(ip)
 	if netip == nil {
 		return "", ""
 	}
-
 	rec, err := geoipDB.City(netip)
-	if err != nil {
+	if err != nil || rec == nil {
 		return "", ""
 	}
+	return extractCityCountry(rec)
+}
 
-	city := ""
-	country := ""
+// extractCityCountry returns the English city and country names from a GeoIP record,
+// falling back to ISO country code when a localized name is unavailable.
+func extractCityCountry(rec *geoip2.City) (string, string) {
+	if rec == nil {
+		return "", ""
+	}
+	var city, country string
 	if rec.City.Names != nil {
 		if v, ok := rec.City.Names["en"]; ok {
 			city = v
@@ -183,15 +213,56 @@ func GetIPLocation(ip string) (string, string) {
 	if country == "" {
 		country = rec.Country.IsoCode
 	}
+	return city, country
+}
 
-	if geoipCache != nil {
-		geoipCache.Set(ip, []string{city, country}, cache.DefaultExpiration)
-		if securityLogger != nil {
-			securityLogger.Printf("GeoIP cached for %s -> %s/%s", ip, city, country)
+// isLikelyLocalOrPrivate checks a few common local/private IP forms quickly.
+func isLikelyLocalOrPrivate(ip string) bool {
+	if ip == "" {
+		return true
+	}
+	// canonical simple checks
+	if ip == "127.0.0.1" || ip == "::1" {
+		return true
+	}
+	prefixes := []string{"10.", "192.168", "::"}
+	for _, p := range prefixes {
+		if strings.HasPrefix(ip, p) {
+			return true
 		}
 	}
+	return false
+}
 
-	return city, country
+// cacheGetIP returns cached city/country for ip when present.
+func cacheGetIP(ip string) (string, string, bool) {
+	if geoipCache == nil {
+		return "", "", false
+	}
+	v, ok := geoipCache.Get(ip)
+	if !ok {
+		return "", "", false
+	}
+	atomic.AddInt64(&geoipCacheHits, 1)
+	if securityLogger != nil {
+		securityLogger.Printf("GeoIP cache hit for %s", ip)
+	}
+	arr, ok := v.([]string)
+	if !ok || len(arr) != 2 {
+		return "", "", false
+	}
+	return arr[0], arr[1], true
+}
+
+// cacheSetIP stores city/country in cache if available.
+func cacheSetIP(ip, city, country string) {
+	if geoipCache == nil {
+		return
+	}
+	geoipCache.Set(ip, []string{city, country}, cache.DefaultExpiration)
+	if securityLogger != nil {
+		securityLogger.Printf("GeoIP cached for %s -> %s/%s", ip, city, country)
+	}
 }
 
 // GetGeoIPCacheMetrics returns the cache hits and misses and current cache size.
