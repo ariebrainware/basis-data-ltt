@@ -65,12 +65,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error connecting to DB: %v", err)
 	}
-	// ensure DB closed on exit
-	defer func() {
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	}()
 
 	util.SetSecurityLoggerDB(db)
 
