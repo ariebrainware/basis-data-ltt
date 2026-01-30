@@ -87,6 +87,8 @@ func DownloadGeoIPWithRequest(ctx context.Context, req DownloadRequest) (string,
 	}
 
 	if err := os.Rename(tmpPath, req.DestPath); err != nil {
+		// Best-effort cleanup of temporary file on failure to avoid orphaned files.
+		_ = os.Remove(tmpPath)
 		return "", err
 	}
 	return req.DestPath, nil
