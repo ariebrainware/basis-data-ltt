@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"gorm.io/gorm"
 )
 
 // @title           LTT Backend API
@@ -49,66 +50,70 @@ import (
 // @description Session token for authenticated requests
 
 func main() {
-	// Load the configuration
+	// Keep main small: delegate work to helper functions
 	cfg := config.LoadConfig()
 
-	// Initialize JWT secret from environment and validate it.
-	util.InitJWTSecretFromEnv()
-	if cfg.AppEnv != "test" {
-		if err := util.ValidateJWTSecret(); err != nil {
-			log.Fatalf("%v", err)
-		}
+	if err := initJWT(cfg); err != nil {
+		log.Fatalf("JWT init failed: %v", err)
 	}
 
-	// Set the timezone to Asia/Jakarta
-	location, err := time.LoadLocation("Asia/Jakarta")
+	if err := setTimezone(); err != nil {
+		log.Fatalf("Timezone init failed: %v", err)
+	}
+
+	db, err := initDB()
 	if err != nil {
-		log.Fatalf("Error loading timezone: %v", err)
-	}
-	time.Local = location
-
-	// Initialize database once
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		log.Fatalf("Error connecting to MySQL: %v", err)
+		log.Fatalf("Error connecting to DB: %v", err)
 	}
 
-	// Provide DB to security logger for persistence of security events
 	util.SetSecurityLoggerDB(db)
 
-	// Initialize local GeoIP database if provided (GEOIP_DB_PATH)
-	if err := util.InitGeoIP(os.Getenv("GEOIP_DB_PATH")); err != nil {
-		log.Printf("Warning: could not initialize GeoIP DB: %v", err)
-	} else {
-		// Ensure we close the reader on shutdown
-		defer util.CloseGeoIP()
+	// Initialize optional services (GeoIP, user email cache, Redis)
+	initServices()
+	defer util.CloseGeoIP()
+
+	if err := migrateAndSeed(db); err != nil {
+		log.Fatalf("Migration/seed failed: %v", err)
 	}
 
-	// Initialize in-memory user email cache (LRU) from env
-	util.InitUserEmailCacheFromEnv()
+	r := setupRouter(cfg, db)
 
-	// Initialize Redis (optional, warn on failure)
-	if _, err := config.ConnectRedis(); err != nil {
-		log.Printf("Warning: could not connect to Redis: %v", err)
-	} else {
-		log.Println("Redis initialization complete")
+	srv := createServer(cfg, r)
+
+	go startServer(srv)
+
+	waitForShutdown(srv, cfg, db)
+}
+
+func initJWT(cfg *config.Config) error {
+	util.InitJWTSecretFromEnv()
+	if cfg.AppEnv != "test" {
+		return util.ValidateJWTSecret()
 	}
-	// If the diseases table already exists, there may be rows with empty
-	// `codename` values which will cause a unique-index creation to fail
-	// (duplicate entry '' for unique index). To avoid that, first alter the
-	// column to allow NULLs and convert empty strings to NULL, then run
-	// AutoMigrate which will (re)create indexes safely.
+	return nil
+}
+
+func setTimezone() error {
+	location, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return err
+	}
+	time.Local = location
+	return nil
+}
+
+func initDB() (*gorm.DB, error) {
+	return config.ConnectMySQL()
+}
+
+func migrateAndSeed(db *gorm.DB) error {
+	// Pre-migration fix for diseases.codename to avoid unique-index failures
 	if db.Migrator().HasTable(&model.Disease{}) {
-		// Make column nullable to allow converting empty strings to NULL.
 		if err := db.Exec("ALTER TABLE diseases MODIFY codename varchar(191) NULL").Error; err != nil {
 			log.Printf("Warning: failed to alter diseases.codename to NULL-able: %v", err)
 		} else {
 			log.Println("Converted diseases.codename to allow NULLs (if applicable)")
 		}
-
-		// Convert any existing empty-string codename values to NULL so they
-		// won't violate the unique index constraint (MySQL treats NULLs as
-		// distinct, allowing multiple NULLs).
 		if err := db.Exec("UPDATE diseases SET codename = NULL WHERE codename = ''").Error; err != nil {
 			log.Printf("Warning: failed to nullify empty codename values: %v", err)
 		} else {
@@ -116,53 +121,34 @@ func main() {
 		}
 	}
 
-	// Proceed with auto-migration for all models
-	err = db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}, &model.SecurityLog{})
-	if err != nil {
-		log.Fatalf("Error migrating database: %v", err)
+	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}, &model.SecurityLog{}); err != nil {
+		return err
 	}
 
-	// Seed data example.
-	if err := model.SeedRoles(db); err != nil {
-		log.Fatalf("Seeding failed: %v", err)
-	}
+	return model.SeedRoles(db)
+}
 
-	// Set Gin mode from config
+func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	gin.SetMode(cfg.GinMode)
-
-	// Create a Gin router with default middleware
 	r := gin.Default()
-
-	// Use custom CORS middleware
 	r.Use(middleware.CORSMiddleware())
-	// Pass db to all handlers via context middleware
 	r.Use(middleware.DatabaseMiddleware(db))
-	// Log endpoint calls (persisted to SecurityLog when DB available)
 	r.Use(middleware.EndpointCallLogger())
 
-	// Basic HTTP handler for root path
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": fmt.Sprintf("Welcome to %s!", cfg.AppName),
-		})
+		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Welcome to %s!", cfg.AppName)})
 	})
 
-	// Swagger documentation route
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	// Group routes that require a valid login token
+
+	// Authenticated routes
 	auth := r.Group("/")
 	auth.Use(middleware.ValidateLoginToken())
 	{
-		// Logout is available to all authenticated users
 		auth.DELETE("/logout", endpoint.Logout)
-
-		// Current user profile update
 		auth.PATCH("/user", endpoint.UpdateUser)
-
-		// Verify current password before allowing password change in frontend
 		auth.POST("/verify-password", endpoint.VerifyPassword)
 
-		// Admin-only user management
 		userAdmin := auth.Group("/user")
 		userAdmin.Use(middleware.RequireRole(model.RoleAdmin))
 		{
@@ -170,11 +156,9 @@ func main() {
 			userAdmin.DELETE("/:id", endpoint.DeleteUser)
 		}
 
-		// Allow Admins or the resource owner to GET a user by id; only Admins may PATCH by id
 		auth.GET("/user/:id", middleware.RequireRoleOrOwner(model.RoleAdmin), endpoint.GetUserInfo)
 		auth.PATCH("/user/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateUserByID)
 
-		// Patient routes - accessible by Admin only
 		patient := auth.Group("/patient")
 		patient.Use(middleware.RequireRole(model.RoleAdmin))
 		{
@@ -184,7 +168,6 @@ func main() {
 			patient.DELETE("/:id", endpoint.DeletePatient)
 		}
 
-		// Treatment routes - accessible by Admin and Therapist
 		treatment := auth.Group("/treatment")
 		treatment.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
 		{
@@ -194,7 +177,6 @@ func main() {
 			treatment.DELETE("/:id", endpoint.DeleteTreatment)
 		}
 
-		// Disease routes - accessible by Admin only
 		disease := auth.Group("/disease")
 		disease.Use(middleware.RequireRole(model.RoleAdmin))
 		{
@@ -205,12 +187,10 @@ func main() {
 			disease.DELETE("/:id", endpoint.DeleteDisease)
 		}
 
-		// Therapist routes - allow Admin and Therapist to GET; Admin-only for mutations
 		therapist := auth.Group("/therapist")
 		{
 			therapist.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.ListTherapist)
 			therapist.GET("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.GetTherapistInfo)
-
 			therapist.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateTherapist)
 			therapist.PATCH("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateTherapist)
 			therapist.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTherapist)
@@ -218,52 +198,79 @@ func main() {
 		}
 	}
 
-	// the exception for create patient so it can be accessed without login
 	r.POST("/patient", endpoint.CreatePatient)
 
-	// Apply rate limiting to authentication endpoints (5 attempts per 15 minutes)
-	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{
-		Limit:  5,
-		Window: 15 * time.Minute,
-	})
-
+	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 5, Window: 15 * time.Minute})
 	r.POST("/login", authRateLimit, endpoint.Login)
 	r.POST("/signup", authRateLimit, endpoint.Signup)
 	r.GET("/token/validate", endpoint.ValidateToken)
 
-	// Start server on specified port with graceful shutdown
+	return r
+}
+
+func createServer(cfg *config.Config, handler http.Handler) *http.Server {
 	address := fmt.Sprintf(":%d", cfg.AppPort)
-	srv := &http.Server{
+	return &http.Server{
 		Addr:              address,
-		Handler:           r,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
+}
 
-	// Check if TLS is enabled
-	tlsCertFile := os.Getenv("TLS_CERT_FILE")
-	tlsKeyFile := os.Getenv("TLS_KEY_FILE")
-	enableTLS := os.Getenv("ENABLE_TLS")
-
-	go func() {
-		if enableTLS == "true" && tlsCertFile != "" && tlsKeyFile != "" {
-			log.Printf("Starting HTTPS server on %s", address)
-			if err := srv.ListenAndServeTLS(tlsCertFile, tlsKeyFile); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("error starting HTTPS server: %v", err)
-			}
-		} else {
-			log.Printf("Starting HTTP server on %s", address)
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("error starting HTTP server: %v", err)
-			}
+func startServer(srv *http.Server) {
+	address := srv.Addr
+	enabled, cert, key := isTLSEnabled()
+	if enabled {
+		log.Printf("Starting HTTPS server on %s", address)
+		if err := srv.ListenAndServeTLS(cert, key); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("error starting HTTPS server: %v", err)
 		}
-	}()
+		return
+	}
 
-	log.Printf("Server is listening on %s", address)
+	log.Printf("Starting HTTP server on %s", address)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("error starting HTTP server: %v", err)
+	}
+}
 
-	// Wait for interrupt signal to gracefully shutdown the server with a timeout
+// isTLSEnabled returns whether TLS should be used and the cert/key paths
+func isTLSEnabled() (bool, string, string) {
+	cert := os.Getenv("TLS_CERT_FILE")
+	key := os.Getenv("TLS_KEY_FILE")
+
+	enabledEnv := os.Getenv("ENABLE_TLS") == "true"
+	if !enabledEnv {
+		return false, "", ""
+	}
+
+	// Ensure both certificate and key are provided
+	if cert == "" || key == "" {
+		return false, "", ""
+	}
+
+	return true, cert, key
+}
+
+// initServices initializes optional runtime services like GeoIP, user cache, and Redis.
+func initServices() {
+	if err := util.InitGeoIP(os.Getenv("GEOIP_DB_PATH")); err != nil {
+		log.Printf("Warning: could not initialize GeoIP DB: %v", err)
+	}
+
+	util.InitUserEmailCacheFromEnv()
+
+	if _, err := config.ConnectRedis(); err != nil {
+		log.Printf("Warning: could not connect to Redis: %v", err)
+	} else {
+		log.Println("Redis initialization complete")
+	}
+}
+
+func waitForShutdown(srv *http.Server, cfg *config.Config, db *gorm.DB) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -275,9 +282,7 @@ func main() {
 		log.Printf("Server forced to shutdown: %v", err)
 	}
 
-	// Close DB connection pool
-	sqlDB, err := db.DB()
-	if err == nil {
+	if sqlDB, err := db.DB(); err == nil {
 		if err := sqlDB.Close(); err != nil {
 			log.Printf("Error closing database: %v", err)
 		}

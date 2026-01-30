@@ -21,6 +21,75 @@ const (
 	RoleIDKey = "role_id"
 )
 
+// getenvOrDefault returns the environment value for key or the provided default.
+func getenvOrDefault(key, def string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	return v
+}
+
+// setHSTSHeader sets the Strict-Transport-Security header when appropriate.
+func setHSTSHeader(c *gin.Context) {
+	hstsMaxAge := getenvOrDefault("HSTS_MAX_AGE", "31536000")
+	includeSubDomains := os.Getenv("HSTS_INCLUDE_SUBDOMAINS")
+	hstsValue := fmt.Sprintf("max-age=%s", hstsMaxAge)
+	if includeSubDomains == "true" {
+		hstsValue += "; includeSubDomains"
+	}
+	c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
+}
+
+// unauthorizedSession logs and returns a standardized unauthorized session response.
+func unauthorizedSession(c *gin.Context, msg, logMsg string, err error) {
+	util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, logMsg)
+	unauthorizedAbort(c, msg, err)
+}
+
+// unauthorizedAbort calls the standardized unauthorized response and aborts the context.
+func unauthorizedAbort(c *gin.Context, msg string, err error) {
+	util.CallUserNotAuthorized(c, util.APIErrorParams{Msg: msg, Err: err})
+	c.Abort()
+}
+
+// isRoleAllowed checks whether the current request's role is among allowedRoles.
+// It returns (allowed, roleID, exists).
+func isRoleAllowed(c *gin.Context, allowedRoles ...uint32) (bool, uint32, bool) {
+	roleID, exists := GetRoleID(c)
+	if !exists {
+		return false, 0, false
+	}
+	for _, allowed := range allowedRoles {
+		if roleID == allowed {
+			return true, roleID, true
+		}
+	}
+	return false, roleID, true
+}
+
+// tryParseRedisSession parses a Redis session value of the form "userID:roleID".
+// It returns parsed userID, roleID and whether parsing succeeded.
+func tryParseRedisSession(val string) (uint, uint32, bool) {
+	parts := strings.Split(val, ":")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	uid64, errUID := strconv.ParseUint(parts[0], 10, strconv.IntSize)
+	rid64, errRID := strconv.ParseUint(parts[1], 10, 32)
+	if errUID != nil || errRID != nil {
+		return 0, 0, false
+	}
+	if uid64 == 0 {
+		return 0, 0, false
+	}
+	var maxUint uint64 = uint64(^uint(0))
+	if uid64 > maxUint {
+		return 0, 0, false
+	}
+	return uint(uid64), uint32(rid64), true
+}
+
 func tokenValidator(c *gin.Context, expectedToken string) bool {
 	if c.Request.Method == http.MethodOptions {
 		return true
@@ -34,55 +103,16 @@ func tokenValidator(c *gin.Context, expectedToken string) bool {
 }
 
 func setCorsHeaders(c *gin.Context) {
-	origin := os.Getenv("CORSALLOWORIGIN")
-	if origin == "" {
-		origin = "http://localhost:3000"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+	c.Writer.Header().Set("Access-Control-Allow-Origin", getenvOrDefault("CORSALLOWORIGIN", "http://localhost:3000"))
+	c.Writer.Header().Set("Access-Control-Allow-Methods", getenvOrDefault("CORSALLOWMETHODS", "POST, PUT, GET, OPTIONS, DELETE, PATCH"))
+	c.Writer.Header().Set("Access-Control-Allow-Headers", getenvOrDefault("CORSALLOWHEADERS", "X-Requested-With, Content-Type, Authorization, session-token"))
+	c.Writer.Header().Set("Access-Control-Max-Age", getenvOrDefault("CORSMAXAGE", "86400"))
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", getenvOrDefault("CORSALLOWCREDENTIALS", "true"))
+	c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
 
-	methods := os.Getenv("CORSALLOWMETHODS")
-	if methods == "" {
-		methods = "POST, PUT, GET, OPTIONS, DELETE, PATCH"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Methods", methods)
-
-	headers := os.Getenv("CORSALLOWHEADERS")
-	if headers == "" {
-		headers = "X-Requested-With, Content-Type, Authorization, session-token"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Headers", headers)
-
-	maxAge := os.Getenv("CORSMAXAGE")
-	if maxAge == "" {
-		maxAge = "86400"
-	}
-	c.Writer.Header().Set("Access-Control-Max-Age", maxAge)
-
-	credentials := os.Getenv("CORSALLOWCREDENTIALS")
-	if credentials == "" {
-		credentials = "true"
-	}
-	c.Writer.Header().Set("Access-Control-Allow-Credentials", credentials)
-
-	contentType := os.Getenv("CORSCONTENTTYPE")
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	c.Writer.Header().Set("Content-Type", contentType)
-
-	// Add HSTS header for HTTPS security
-	// Only add HSTS header when HTTPS is enabled
+	// Add HSTS header for HTTPS security. Only set when TLS is present or explicitly enabled
 	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {
-		hstsMaxAge := os.Getenv("HSTS_MAX_AGE")
-		if hstsMaxAge == "" {
-			hstsMaxAge = "31536000" // 1 year default
-		}
-		includeSubDomains := os.Getenv("HSTS_INCLUDE_SUBDOMAINS")
-		hstsValue := fmt.Sprintf("max-age=%s", hstsMaxAge)
-		if includeSubDomains == "true" {
-			hstsValue += "; includeSubDomains"
-		}
-		c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
+		setHSTSHeader(c)
 	}
 }
 
@@ -159,38 +189,19 @@ func GetRoleID(c *gin.Context) (uint32, bool) {
 // RequireRole creates a middleware that checks if the user has one of the specified roles
 func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		roleID, exists := GetRoleID(c)
+		allowed, roleID, exists := isRoleAllowed(c, allowedRoles...)
 		if !exists {
 			userID, _ := GetUserID(c)
 			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, "Role information not available")
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Role information not available",
-				Err: fmt.Errorf("role information not available in context"),
-			})
-			c.Abort()
+			unauthorizedAbort(c, "Role information not available", fmt.Errorf("role information not available in context"))
 			return
 		}
-
-		// Check if user's role is in the allowed roles
-		roleAllowed := false
-		for _, allowedRole := range allowedRoles {
-			if roleID == allowedRole {
-				roleAllowed = true
-				break
-			}
-		}
-
-		if !roleAllowed {
+		if !allowed {
 			userID, _ := GetUserID(c)
 			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, fmt.Sprintf("Insufficient permissions (role %d)", roleID))
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Insufficient permissions to access this resource",
-				Err: fmt.Errorf("user role %d not authorized", roleID),
-			})
-			c.Abort()
+			unauthorizedAbort(c, "Insufficient permissions to access this resource", fmt.Errorf("user role %d not authorized", roleID))
 			return
 		}
-
 		c.Next()
 	}
 }
@@ -201,55 +212,35 @@ func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// First allow if the user's role is one of the allowed roles
-		if roleID, exists := GetRoleID(c); exists {
-			for _, allowed := range allowedRoles {
-				if roleID == allowed {
-					c.Next()
-					return
-				}
-			}
+		if allowed, _, _ := isRoleAllowed(c, allowedRoles...); allowed {
+			c.Next()
+			return
 		}
 
 		// Otherwise check ownership: compare context user id with URL param `id`
 		userID, ok := GetUserID(c)
 		if !ok {
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "User not authenticated",
-				Err: fmt.Errorf("user id not found in context"),
-			})
-			c.Abort()
+			unauthorizedAbort(c, "User not authenticated", fmt.Errorf("user id not found in context"))
 			return
 		}
 
 		idParam := c.Param("id")
 		if idParam == "" {
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Resource id required",
-				Err: fmt.Errorf("resource id parameter missing"),
-			})
-			c.Abort()
+			unauthorizedAbort(c, "Resource id required", fmt.Errorf("resource id parameter missing"))
 			return
 		}
 
 		// Parse id param to unsigned integer, constrained to platform uint size
 		uid, err := strconv.ParseUint(idParam, 10, 0)
 		if err != nil {
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Invalid resource id",
-				Err: err,
-			})
-			c.Abort()
+			unauthorizedAbort(c, "Invalid resource id", err)
 			return
 		}
 
 		// Ensure the parsed id fits into the platform-dependent uint type to avoid overflow
 		maxUint := ^uint(0)
 		if uid > uint64(maxUint) {
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Invalid resource id",
-				Err: fmt.Errorf("resource id out of range"),
-			})
-			c.Abort()
+			unauthorizedAbort(c, "Invalid resource id", fmt.Errorf("resource id out of range"))
 			return
 		}
 		if uint(uid) == userID {
@@ -257,12 +248,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 			return
 		}
 
-		util.CallUserNotAuthorized(c, util.APIErrorParams{
-			Msg: "Insufficient permissions to access this resource",
-			Err: fmt.Errorf("user %d not owner nor allowed role", userID),
-		})
-		c.Abort()
-		return
+		unauthorizedAbort(c, "Insufficient permissions to access this resource", fmt.Errorf("user %d not owner nor allowed role", userID))
 	}
 }
 
@@ -280,46 +266,17 @@ func ValidateLoginToken() gin.HandlerFunc {
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
 			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Session token not provided")
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Session token not provided",
-				Err: fmt.Errorf("session token not provided"),
-			})
-			c.Abort()
+			unauthorizedAbort(c, "Session token not provided", fmt.Errorf("session token not provided"))
 			return
 		}
-
 		// First try Redis for fast session validation: key session:<token> -> "userID:roleID"
 		if rdb := config.GetRedisClient(); rdb != nil {
-			val, err := rdb.Get(context.Background(), fmt.Sprintf("session:%s", sessionToken)).Result()
-			if err == nil {
-				parts := strings.Split(val, ":")
-				if len(parts) == 2 {
-					// Parse user ID and role ID from Redis value. Parse user ID
-					// using the platform's native int size and perform explicit
-					// bounds checks before converting to narrower types to
-					// avoid integer overflow vulnerabilities.
-					uid64, errUID := strconv.ParseUint(parts[0], 10, strconv.IntSize)
-					rid64, errRID := strconv.ParseUint(parts[1], 10, 32)
-
-					// Fail fast on parse errors.
-					if errUID != nil || errRID != nil {
-						// malformed value -> fallback to DB validation.
-					} else {
-						// Ensure uid is non-zero.
-						if uid64 == 0 {
-							// invalid user id -> fallback to DB validation.
-						} else {
-							// Verify uid64 fits into native `uint` on this platform.
-							var maxUint uint64 = uint64(^uint(0))
-							if uid64 <= maxUint {
-								c.Set(UserIDKey, uint(uid64))
-								c.Set(RoleIDKey, uint32(rid64))
-								c.Next()
-								return
-							}
-							// If uid is out of range, fallthrough to DB validation.
-						}
-					}
+			if val, err := rdb.Get(context.Background(), fmt.Sprintf("session:%s", sessionToken)).Result(); err == nil {
+				if uid, rid, ok := tryParseRedisSession(val); ok {
+					c.Set(UserIDKey, uid)
+					c.Set(RoleIDKey, rid)
+					c.Next()
+					return
 				}
 			}
 			// any Redis error, malformed value, or missing key -> fallback to DB
@@ -336,22 +293,12 @@ func ValidateLoginToken() gin.HandlerFunc {
 			Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.deleted_at IS NULL", sessionToken, time.Now()).
 			Take(&result).Error
 		if err != nil {
-			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Invalid or expired session token")
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Invalid or expired session token",
-				Err: fmt.Errorf("failed to validate session: %w", err),
-			})
-			c.Abort()
+			unauthorizedSession(c, "Invalid or expired session token", "Invalid or expired session token", fmt.Errorf("failed to validate session: %w", err))
 			return
 		}
 
 		if result.UserID == 0 {
-			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "No active session found")
-			util.CallUserNotAuthorized(c, util.APIErrorParams{
-				Msg: "Invalid or expired session token",
-				Err: fmt.Errorf("no active session found for provided token"),
-			})
-			c.Abort()
+			unauthorizedSession(c, "Invalid or expired session token", "No active session found", fmt.Errorf("no active session found for provided token"))
 			return
 		}
 
