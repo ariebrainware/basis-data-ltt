@@ -1,13 +1,21 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -65,7 +73,7 @@ func TestFetchPatientsDateFilter(t *testing.T) {
 		t.Fatalf("create recent patient: %v", err)
 	}
 
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "last_3_months", "", "")
+	patients, _, err := fetchPatients(db, 0, 0, "", "last_3_months", "", "")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -96,7 +104,7 @@ func TestFetchPatientsSortByFullName(t *testing.T) {
 	}
 
 	// Test ascending order
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "", "full_name", "asc")
+	patients, _, err := fetchPatients(db, 0, 0, "", "", "full_name", "asc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -114,7 +122,7 @@ func TestFetchPatientsSortByFullName(t *testing.T) {
 	}
 
 	// Test descending order
-	patients, _, err = fetchPatients(db, 0, 0, 0, "", "", "full_name", "desc")
+	patients, _, err = fetchPatients(db, 0, 0, "", "", "full_name", "desc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -151,7 +159,7 @@ func TestFetchPatientsSortByPatientCode(t *testing.T) {
 	}
 
 	// Test ascending order
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "", "patient_code", "asc")
+	patients, _, err := fetchPatients(db, 0, 0, "", "", "patient_code", "asc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -169,7 +177,7 @@ func TestFetchPatientsSortByPatientCode(t *testing.T) {
 	}
 
 	// Test descending order
-	patients, _, err = fetchPatients(db, 0, 0, 0, "", "", "patient_code", "desc")
+	patients, _, err = fetchPatients(db, 0, 0, "", "", "patient_code", "desc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -222,7 +230,7 @@ func TestFetchPatientsDefaultSort(t *testing.T) {
 	}
 
 	// Test default sort (should be created_at DESC)
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "", "", "")
+	patients, _, err := fetchPatients(db, 0, 0, "", "", "", "")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -238,5 +246,162 @@ func TestFetchPatientsDefaultSort(t *testing.T) {
 	}
 	if patients[2].FullName != "Oldest Patient" {
 		t.Errorf("expected third patient to be Oldest Patient, got %s", patients[2].FullName)
+	}
+}
+
+func TestNormalizePhoneNumbers(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected string
+	}{
+		{
+			name:     "single phone number",
+			input:    []string{"081234567890"},
+			expected: "081234567890",
+		},
+		{
+			name:     "multiple phone numbers",
+			input:    []string{"081234567890", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with whitespace",
+			input:    []string{" 081234567890 ", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with empty strings",
+			input:    []string{"081234567890", "", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with duplicates",
+			input:    []string{"081234567890", "081234567890", "081234567891"},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "phone numbers with duplicates and whitespace",
+			input:    []string{" 081234567890 ", "081234567890", " 081234567891 "},
+			expected: "081234567890,081234567891",
+		},
+		{
+			name:     "empty input",
+			input:    []string{},
+			expected: "",
+		},
+		{
+			name:     "all empty strings",
+			input:    []string{"", "  ", ""},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			normalized := normalizePhoneNumbers(tt.input)
+			result := strings.Join(normalized, ",")
+			if result != tt.expected {
+				t.Errorf("normalizePhoneNumbers(%v) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestUpdatePatientPhoneNumbers(t *testing.T) {
+	db := setupTestDB(t)
+
+	// Set up Gin router with the UpdatePatient endpoint
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(middleware.DatabaseMiddleware(db))
+	r.PATCH("/patient/:id", UpdatePatient)
+
+	tests := []struct {
+		name           string
+		phoneNumbers   []string
+		expectedStored string
+		description    string
+	}{
+		{
+			name:           "update with new phone numbers",
+			phoneNumbers:   []string{"089876543210", "081111111111"},
+			expectedStored: "089876543210,081111111111",
+			description:    "should store multiple phone numbers as comma-separated string",
+		},
+		{
+			name:           "update with phone numbers containing whitespace",
+			phoneNumbers:   []string{" 089876543210 ", " 081111111111 "},
+			expectedStored: "089876543210,081111111111",
+			description:    "should trim whitespace from phone numbers",
+		},
+		{
+			name:           "update with duplicate phone numbers",
+			phoneNumbers:   []string{"089876543210", "089876543210", "081111111111"},
+			expectedStored: "089876543210,081111111111",
+			description:    "should deduplicate phone numbers",
+		},
+		{
+			name:           "update with empty strings mixed in",
+			phoneNumbers:   []string{"089876543210", "", "081111111111", "  "},
+			expectedStored: "089876543210,081111111111",
+			description:    "should filter out empty strings",
+		},
+		{
+			name:           "update with single phone number",
+			phoneNumbers:   []string{"089876543210"},
+			expectedStored: "089876543210",
+			description:    "should handle single phone number",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a patient for this test case to ensure test isolation
+			patient := model.Patient{
+				FullName:    "Test Patient",
+				PatientCode: fmt.Sprintf("T%d", time.Now().UnixNano()),
+				PhoneNumber: "081234567890",
+			}
+			if err := db.Create(&patient).Error; err != nil {
+				t.Fatalf("create patient: %v", err)
+			}
+
+			// Create request body with phone numbers
+			reqBody := map[string]interface{}{
+				"phone_number": tt.phoneNumbers,
+			}
+			jsonBody, err := json.Marshal(reqBody)
+			if err != nil {
+				t.Fatalf("marshal request body: %v", err)
+			}
+
+			// Create HTTP request
+			url := fmt.Sprintf("/patient/%d", patient.ID)
+			req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonBody))
+			if err != nil {
+				t.Fatalf("create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			// Execute request
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
+
+			// Check response status
+			if rr.Code != http.StatusOK {
+				t.Errorf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
+			}
+
+			// Reload the patient to verify the stored value
+			var reloadedPatient model.Patient
+			if err := db.First(&reloadedPatient, patient.ID).Error; err != nil {
+				t.Fatalf("reload patient: %v", err)
+			}
+
+			if reloadedPatient.PhoneNumber != tt.expectedStored {
+				t.Errorf("%s: expected phone_number to be %q, got %q", tt.description, tt.expectedStored, reloadedPatient.PhoneNumber)
+			}
+		})
 	}
 }

@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,7 +159,29 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /treatment [get]
 func ListTreatments(c *gin.Context) {
-	limit, offset, therapistID, keyword, groupByDate, _, _ := parseQueryParams(c)
+	// Parse query params manually to avoid depending on parseQueryParams signature.
+	limit := 0
+	offset := 0
+	therapistID := 0
+	keyword := c.Query("keyword")
+	groupByDate := c.Query("group_by_date")
+
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v > 0 {
+			offset = v
+		}
+	}
+	if t := c.Query("therapist_id"); t != "" {
+		if v, err := strconv.Atoi(t); err == nil && v >= 0 {
+			therapistID = v
+		}
+	}
+
 	filterByTherapist := c.Query("filter_by_therapist") == "true"
 
 	db := middleware.GetDB(c)

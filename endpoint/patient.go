@@ -13,15 +13,30 @@ import (
 	"gorm.io/gorm"
 )
 
-func parseQueryParams(c *gin.Context) (int, int, int, string, string, string, string) {
+type listQuery struct {
+	Limit       int
+	Offset      int
+	Keyword     string
+	GroupByDate string
+	SortBy      string
+	SortDir     string
+}
+
+func parseQueryParams(c *gin.Context) listQuery {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
-	therapistID, _ := strconv.Atoi(c.Query("therapist_id"))
 	keyword := c.Query("keyword")
 	groupByDate := c.Query("group_by_date")
 	sortBy := c.Query("sort")                       // supported values: full_name, patient_code
 	sortDir := strings.ToLower(c.Query("sort_dir")) // supported values: asc, desc
-	return limit, offset, therapistID, keyword, groupByDate, sortBy, sortDir
+	return listQuery{
+		Limit:       limit,
+		Offset:      offset,
+		Keyword:     keyword,
+		GroupByDate: groupByDate,
+		SortBy:      sortBy,
+		SortDir:     sortDir,
+	}
 }
 
 // applyCreatedAtFilter applies a created_at filter for supported ranges.
@@ -43,7 +58,7 @@ func applyCreatedAtFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	return query
 }
 
-func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate, sortBy, sortDir string) ([]model.Patient, int64, error) {
+func fetchPatients(db *gorm.DB, limit, offset int, keyword, groupByDate, sortBy, sortDir string) ([]model.Patient, int64, error) {
 	var patients []model.Patient
 	var totalPatient int64
 	query := db
@@ -103,7 +118,7 @@ func fetchPatients(db *gorm.DB, limit, offset, therapistID int, keyword, groupBy
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /patient [get]
 func ListPatients(c *gin.Context) {
-	limit, offset, therapistID, keyword, groupByDate, sortBy, sortDir := parseQueryParams(c)
+	query := parseQueryParams(c)
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -114,7 +129,7 @@ func ListPatients(c *gin.Context) {
 		return
 	}
 
-	patients, totalPatient, err := fetchPatients(db, limit, offset, therapistID, keyword, groupByDate, sortBy, sortDir)
+	patients, totalPatient, err := fetchPatients(db, query.Limit, query.Offset, query.Keyword, query.GroupByDate, query.SortBy, query.SortDir)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve patients",
@@ -141,6 +156,122 @@ type createPatientRequest struct {
 	PatientCode    string   `json:"patient_code" example:"J001"`
 	Password       string   `json:"password,omitempty" example:"password123"`
 	Email          string   `json:"email,omitempty" example:"john@example.com"`
+}
+
+func normalizePhoneNumbers(numbers []string) []string {
+	result := make([]string, 0, len(numbers))
+	seen := make(map[string]struct{}, len(numbers))
+	for _, n := range numbers {
+		trimmed := strings.TrimSpace(n)
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		result = append(result, trimmed)
+	}
+	return result
+}
+
+func hasDuplicatePatientByNameAndPhone(db *gorm.DB, fullName string, phoneNumbers []string) (bool, error) {
+	if len(phoneNumbers) == 0 {
+		return false, nil
+	}
+	phoneSet := make(map[string]struct{}, len(phoneNumbers))
+	for _, p := range phoneNumbers {
+		phoneSet[p] = struct{}{}
+	}
+
+	var matches []model.Patient
+	if err := db.Where("full_name = ?", fullName).Find(&matches).Error; err != nil {
+		return false, err
+	}
+
+	for _, m := range matches {
+		stored := strings.Split(m.PhoneNumber, ",")
+		for _, sp := range stored {
+			if _, ok := phoneSet[strings.TrimSpace(sp)]; ok {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
+}
+
+func buildPatientCode(tx *gorm.DB, fullName, requestedCode string) (string, error) {
+	if requestedCode != "" {
+		return requestedCode, nil
+	}
+
+	initials := getInitials(fullName)
+	var patientCodeTable model.PatientCode
+	if err := tx.Order("id DESC").Where("alphabet = ?", initials).First(&patientCodeTable).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return "", fmt.Errorf("patient code not found")
+		}
+		return "", err
+	}
+
+	newNumber := patientCodeTable.Number + 1
+	patientCode := fmt.Sprintf("%s%d", initials, newNumber)
+	if err := tx.Where("alphabet = ?", initials).Updates(&model.PatientCode{
+		Number:   newNumber,
+		Alphabet: initials,
+		Code:     patientCode,
+	}).Error; err != nil {
+		return "", err
+	}
+
+	return patientCode, nil
+}
+
+func ensurePatientCodeAvailable(tx *gorm.DB, patientCode string) error {
+	var existing model.Patient
+	if err := tx.Where("patient_code = ?", patientCode).First(&existing).Error; err == nil {
+		return fmt.Errorf("patient_code already registered")
+	} else if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	return nil
+}
+
+func maybeCreateUser(tx *gorm.DB, req createPatientRequest) error {
+	if req.Email == "" || req.Email == "-" || req.Password == "" {
+		return nil
+	}
+
+	var existingUser model.User
+	if err := tx.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+		return fmt.Errorf("email already registered")
+	} else if err != gorm.ErrRecordNotFound {
+		return err
+	}
+
+	return tx.Create(&model.User{
+		Name:     req.FullName,
+		Email:    req.Email,
+		Password: util.HashPassword(req.Password),
+		RoleID:   2,
+	}).Error
+}
+
+func buildPatientModel(req createPatientRequest, patientCode string, phoneNumbers []string) model.Patient {
+	return model.Patient{
+		FullName:       req.FullName,
+		Gender:         req.Gender,
+		Age:            req.Age,
+		Job:            req.Job,
+		Address:        req.Address,
+		PhoneNumber:    strings.Join(phoneNumbers, ","),
+		PatientCode:    patientCode,
+		HealthHistory:  strings.Join(req.HealthHistory, ","),
+		SurgeryHistory: req.SurgeryHistory,
+		Email:          req.Email,
+		Password:       util.HashPassword(req.Password),
+	}
 }
 
 // CreatePatient godoc
@@ -175,6 +306,14 @@ func CreatePatient(c *gin.Context) {
 
 	// Normalize full_name to prevent duplicate detection bypass via whitespace variations
 	patientRequest.FullName = util.NormalizeName(patientRequest.FullName)
+	normalizedPhones := normalizePhoneNumbers(patientRequest.PhoneNumber)
+	if len(normalizedPhones) == 0 {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Patient payload is empty or missing required fields",
+			Err: fmt.Errorf("invalid payload"),
+		})
+		return
+	}
 
 	db := middleware.GetDB(c)
 	if db == nil {
@@ -185,131 +324,47 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
-	// Prevent duplicate registration: check by full_name + any phone_number.
-	// Normalize phone numbers (trim spaces, drop empties), fetch patients with the same
-	// full_name, then split the stored comma-separated phone_number column and compare
-	// in Go using string operations.
-	normalizedPhones := []string{}
-	for _, p := range patientRequest.PhoneNumber {
-		ph := strings.TrimSpace(p)
-		if ph != "" {
-			normalizedPhones = append(normalizedPhones, ph)
-		}
+	duplicate, err := hasDuplicatePatientByNameAndPhone(db, patientRequest.FullName, normalizedPhones)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to check existing patient",
+			Err: err,
+		})
+		return
 	}
-	if len(normalizedPhones) > 0 {
-		// Fetch any patients with the same full_name and perform phone matching in Go
-		var matches []model.Patient
-		if err := db.Where("full_name = ?", patientRequest.FullName).Find(&matches).Error; err != nil {
-			util.CallServerError(c, util.APIErrorParams{
-				Msg: "Failed to check existing patient",
-				Err: err,
-			})
-			return
-		}
-		for _, ph := range normalizedPhones {
-			for _, m := range matches {
-				stored := strings.Split(m.PhoneNumber, ",")
-				for _, sp := range stored {
-					if strings.TrimSpace(sp) == ph {
-						util.CallUserError(c, util.APIErrorParams{
-							Msg: "Patient already exists with same name and phone number",
-							Err: fmt.Errorf("patient duplicate detected"),
-						})
-						return
-					}
-				}
-			}
-		}
+	if duplicate {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Patient already exists with same name and phone number",
+			Err: fmt.Errorf("patient duplicate detected"),
+		})
+		return
 	}
-
-	var existingPatient model.Patient
-	var existingUser model.User
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-
 		// Re-check for duplicate patient inside the transaction to avoid race conditions.
-		if len(normalizedPhones) > 0 {
-			var matchesTx []model.Patient
-			if err := tx.Where("full_name = ?", patientRequest.FullName).Find(&matchesTx).Error; err != nil {
-				return err
-			}
-			for _, ph := range normalizedPhones {
-				for _, m := range matchesTx {
-					stored := strings.Split(m.PhoneNumber, ",")
-					for _, sp := range stored {
-						if strings.TrimSpace(sp) == ph {
-							// Abort the transaction if a duplicate is detected.
-							return fmt.Errorf("patient already exists with same name and phone number")
-						}
-					}
-				}
-			}
-		}
-		// determine the patient code by fullname initials + incremented number
-		initials := getInitials(patientRequest.FullName)
-
-		// generate patient.patient_code based on patient_codes table
-		var patientCodeTable model.PatientCode
-		err := tx.Order("id DESC").Where("alphabet = ?", initials).First(&patientCodeTable).Error
+		duplicate, err := hasDuplicatePatientByNameAndPhone(tx, patientRequest.FullName, normalizedPhones)
 		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("patient code not found")
-			} else {
-				return err
-			}
+			return err
+		}
+		if duplicate {
+			return fmt.Errorf("patient already exists with same name and phone number")
 		}
 
-		var patientCode string
-		if patientRequest.PatientCode != "" {
-			patientCode = patientRequest.PatientCode
-		} else {
-			newNumber := patientCodeTable.Number + 1
-			patientCode = fmt.Sprintf("%s%d", initials, newNumber)
-			if err := tx.Where("alphabet = ?", initials).Updates(&model.PatientCode{
-				Number:   newNumber,
-				Alphabet: initials,
-				Code:     patientCode,
-			}).Error; err != nil {
-				return err
-			}
+		patientCode, err := buildPatientCode(tx, patientRequest.FullName, patientRequest.PatientCode)
+		if err != nil {
+			return err
 		}
 
-		// Check if patients.patient_code already registered
-		if err := tx.Where("patient_code = ?", patientCode).First(&existingPatient).Error; err == nil {
-			return fmt.Errorf("patient_code already registered")
+		if err := ensurePatientCodeAvailable(tx, patientCode); err != nil {
+			return err
 		}
 
-		if patientRequest.Email != "" && patientRequest.Email != "-" {
-			if patientRequest.Password != "" {
-				// Check if users already registered
-				if err := tx.Where("email = ?", patientRequest.Email).First(&existingUser).Error; err == nil {
-					return fmt.Errorf("email already registered")
-				}
-				// Create user
-				if err := tx.Create(&model.User{
-					Name:     patientRequest.FullName,
-					Email:    patientRequest.Email,
-					Password: util.HashPassword(patientRequest.Password),
-					RoleID:   2,
-				}).Error; err != nil {
-					return err
-				}
-			}
+		if err := maybeCreateUser(tx, patientRequest); err != nil {
+			return err
 		}
 
-		if err := tx.Create(&model.Patient{
-			FullName:       patientRequest.FullName,
-			Gender:         patientRequest.Gender,
-			Age:            patientRequest.Age,
-			Job:            patientRequest.Job,
-			Address:        patientRequest.Address,
-			PhoneNumber:    strings.Join(patientRequest.PhoneNumber, ","),
-			PatientCode:    patientCode,
-			HealthHistory:  strings.Join(patientRequest.HealthHistory, ","),
-			SurgeryHistory: patientRequest.SurgeryHistory,
-			Email:          patientRequest.Email,
-			Password:       util.HashPassword(patientRequest.Password),
-		}).Error; err != nil {
+		patient := buildPatientModel(patientRequest, patientCode, normalizedPhones)
+		if err := tx.Create(&patient).Error; err != nil {
 			return err
 		}
 		return nil
@@ -338,7 +393,7 @@ func CreatePatient(c *gin.Context) {
 // @Security     BearerAuth
 // @Security     SessionToken
 // @Param        id path string true "Patient ID"
-// @Param        request body model.Patient true "Updated patient information"
+// @Param        request body model.UpdatePatientRequest true "Updated patient information"
 // @Success      200 {object} util.APIResponse{data=model.Patient} "Patient updated"
 // @Failure      400 {object} util.APIResponse "Invalid request or patient not found"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
@@ -354,7 +409,7 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	patient := model.Patient{}
+	patient := model.UpdatePatientRequest{}
 	if err := c.ShouldBindJSON(&patient); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
@@ -381,7 +436,45 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&existingPatient).Updates(patient).Error; err != nil {
+	// Merge provided fields into existingPatient, converting phone numbers slice to comma-separated string.
+	if len(patient.PhoneNumber) > 0 {
+		normalizedPhones := normalizePhoneNumbers(patient.PhoneNumber)
+		if len(normalizedPhones) > 0 {
+			existingPatient.PhoneNumber = strings.Join(normalizedPhones, ",")
+		}
+	}
+	if patient.FullName != "" {
+		existingPatient.FullName = util.NormalizeName(patient.FullName)
+	}
+	if patient.Gender != "" {
+		existingPatient.Gender = patient.Gender
+	}
+	if patient.Age != 0 {
+		existingPatient.Age = patient.Age
+	}
+	if patient.Job != "" {
+		existingPatient.Job = patient.Job
+	}
+	if patient.Address != "" {
+		existingPatient.Address = patient.Address
+	}
+	if patient.HealthHistory != "" {
+		existingPatient.HealthHistory = patient.HealthHistory
+	}
+	if patient.SurgeryHistory != "" {
+		existingPatient.SurgeryHistory = patient.SurgeryHistory
+	}
+	if patient.PatientCode != "" {
+		existingPatient.PatientCode = patient.PatientCode
+	}
+	if patient.Email != "" {
+		existingPatient.Email = patient.Email
+	}
+	if patient.Password != "" {
+		existingPatient.Password = util.HashPassword(patient.Password)
+	}
+
+	if err := db.Save(&existingPatient).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update patient",
 			Err: err,
