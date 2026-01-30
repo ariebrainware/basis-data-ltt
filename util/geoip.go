@@ -120,7 +120,7 @@ func downloadToTemp(ctx context.Context, dl DownloadRequest) (string, error) {
 		return "", err
 	}
 	tmpPath := tmpFile.Name()
-	
+
 	// Track success to determine if cleanup is needed
 	success := false
 	defer func() {
@@ -142,7 +142,7 @@ func downloadToTemp(ctx context.Context, dl DownloadRequest) (string, error) {
 	if err := copyResponseToTemp(reader, tmpFile); err != nil {
 		return "", err
 	}
-	
+
 	// Mark as successful before returning
 	success = true
 	return tmpPath, nil
