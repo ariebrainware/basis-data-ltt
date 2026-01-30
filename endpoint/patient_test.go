@@ -65,7 +65,7 @@ func TestFetchPatientsDateFilter(t *testing.T) {
 		t.Fatalf("create recent patient: %v", err)
 	}
 
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "last_3_months", "", "")
+	patients, _, err := fetchPatients(db, 0, 0, "", "last_3_months", "", "")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestFetchPatientsSortByFullName(t *testing.T) {
 	}
 
 	// Test ascending order
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "", "full_name", "asc")
+	patients, _, err := fetchPatients(db, 0, 0, "", "", "full_name", "asc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestFetchPatientsSortByFullName(t *testing.T) {
 	}
 
 	// Test descending order
-	patients, _, err = fetchPatients(db, 0, 0, 0, "", "", "full_name", "desc")
+	patients, _, err = fetchPatients(db, 0, 0, "", "", "full_name", "desc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestFetchPatientsSortByPatientCode(t *testing.T) {
 	}
 
 	// Test ascending order
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "", "patient_code", "asc")
+	patients, _, err := fetchPatients(db, 0, 0, "", "", "patient_code", "asc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestFetchPatientsSortByPatientCode(t *testing.T) {
 	}
 
 	// Test descending order
-	patients, _, err = fetchPatients(db, 0, 0, 0, "", "", "patient_code", "desc")
+	patients, _, err = fetchPatients(db, 0, 0, "", "", "patient_code", "desc")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestFetchPatientsDefaultSort(t *testing.T) {
 	}
 
 	// Test default sort (should be created_at DESC)
-	patients, _, err := fetchPatients(db, 0, 0, 0, "", "", "", "")
+	patients, _, err := fetchPatients(db, 0, 0, "", "", "", "")
 	if err != nil {
 		t.Fatalf("fetchPatients error: %v", err)
 	}

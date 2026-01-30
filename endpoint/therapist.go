@@ -52,7 +52,11 @@ func fetchTherapist(db *gorm.DB, limit, offset int, keyword, groupByDate string)
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist [get]
 func ListTherapist(c *gin.Context) {
-	limit, offset, _, keyword, groupByDate, _, _ := parseQueryParams(c)
+	q := parseQueryParams(c)
+	limit := q.Limit
+	offset := q.Offset
+	keyword := q.Keyword
+	groupByDate := q.GroupByDate
 
 	db := middleware.GetDB(c)
 	if db == nil {
