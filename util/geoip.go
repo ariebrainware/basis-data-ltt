@@ -294,20 +294,36 @@ func fallbackCountry(name, iso string) string {
 	return iso
 }
 
-// isLikelyLocalOrPrivate checks a few common local/private IP forms quickly.
+// isLikelyLocalOrPrivate checks whether an IP is local, private or link-local.
+// It is used to short-circuit GeoIP lookups for addresses that will not have
+// meaningful GeoIP information.
 func isLikelyLocalOrPrivate(ip string) bool {
 	if ip == "" {
+		// Treat empty IP as non-routable.
 		return true
 	}
-	// canonical simple checks
-	if ip == "127.0.0.1" || ip == "::1" {
-		return true
-	}
-	prefixes := []string{"10.", "192.168", "::"}
-	for _, p := range prefixes {
-		if strings.HasPrefix(ip, p) {
+
+	parsed := net.ParseIP(ip)
+	if parsed != nil {
+		// Use Go's standard helpers to cover IPv4 and IPv6:
+		// - loopback (127.0.0.0/8, ::1)
+		// - private ranges (10/8, 172.16/12, 192.168/16, IPv6 ULA)
+		// - link-local (169.254/16, fe80::/10)
+		// - unspecified (0.0.0.0, ::)
+		if parsed.IsLoopback() ||
+			parsed.IsPrivate() ||
+			parsed.IsLinkLocalUnicast() ||
+			parsed.IsLinkLocalMulticast() ||
+			parsed.IsUnspecified() {
 			return true
 		}
+		return false
+	}
+
+	// Fallback for malformed or non-standard IP strings: retain the legacy
+	// quick prefix checks for the most common private IPv4 ranges.
+	if strings.HasPrefix(ip, "10.") || strings.HasPrefix(ip, "192.168.") {
+		return true
 	}
 	return false
 }
