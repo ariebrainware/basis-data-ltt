@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type patientListQuery struct {
+type listQuery struct {
 	Limit       int
 	Offset      int
 	Keyword     string
@@ -22,14 +22,14 @@ type patientListQuery struct {
 	SortDir     string
 }
 
-func parseQueryParams(c *gin.Context) patientListQuery {
+func parseQueryParams(c *gin.Context) listQuery {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 	keyword := c.Query("keyword")
 	groupByDate := c.Query("group_by_date")
 	sortBy := c.Query("sort")                       // supported values: full_name, patient_code
 	sortDir := strings.ToLower(c.Query("sort_dir")) // supported values: asc, desc
-	return patientListQuery{
+	return listQuery{
 		Limit:       limit,
 		Offset:      offset,
 		Keyword:     keyword,
