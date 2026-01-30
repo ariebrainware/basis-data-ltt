@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type patientListQuery struct {
+type listQuery struct {
 	Limit       int
 	Offset      int
 	Keyword     string
@@ -22,14 +22,14 @@ type patientListQuery struct {
 	SortDir     string
 }
 
-func parseQueryParams(c *gin.Context) patientListQuery {
+func parseQueryParams(c *gin.Context) listQuery {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	offset, _ := strconv.Atoi(c.Query("offset"))
 	keyword := c.Query("keyword")
 	groupByDate := c.Query("group_by_date")
 	sortBy := c.Query("sort")                       // supported values: full_name, patient_code
 	sortDir := strings.ToLower(c.Query("sort_dir")) // supported values: asc, desc
-	return patientListQuery{
+	return listQuery{
 		Limit:       limit,
 		Offset:      offset,
 		Keyword:     keyword,
@@ -437,20 +437,8 @@ func UpdatePatient(c *gin.Context) {
 	}
 
 	// Merge provided fields into existingPatient, converting phone numbers slice to comma-separated string.
-	if len(patient.PhoneNumbers) > 0 {
-		normalizedPhones := make([]string, 0, len(patient.PhoneNumbers))
-		seen := make(map[string]struct{}, len(patient.PhoneNumbers))
-		for _, raw := range patient.PhoneNumbers {
-			phone := strings.TrimSpace(raw)
-			if phone == "" {
-				continue
-			}
-			if _, ok := seen[phone]; ok {
-				continue
-			}
-			seen[phone] = struct{}{}
-			normalizedPhones = append(normalizedPhones, phone)
-		}
+	if len(patient.PhoneNumber) > 0 {
+		normalizedPhones := normalizePhoneNumbers(patient.PhoneNumber)
 		if len(normalizedPhones) > 0 {
 			existingPatient.PhoneNumber = strings.Join(normalizedPhones, ",")
 		}
