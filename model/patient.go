@@ -27,7 +27,7 @@ type UpdatePatientRequest struct {
 	Job            string   `json:"job" example:"Engineer"`
 	Address        string   `json:"address" example:"123 Main St"`
 	Email          string   `json:"email" example:"john@example.com"`
-	PhoneNumbers   []string `json:"phone_number" example:"081234567890,081234567891"`
+	PhoneNumbers   []string `json:"phone_number" example:"[\"081234567890\",\"081234567891\"]"`
 	HealthHistory  string   `json:"health_history" example:"Diabetes,Hypertension"`
 	SurgeryHistory string   `json:"surgery_history" example:"Appendectomy 2020"`
 	PatientCode    string   `json:"patient_code" example:"J001"`
