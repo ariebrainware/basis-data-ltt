@@ -346,8 +346,6 @@ func createJWTToken(user model.User) (string, error) {
 	return token.SignedString(util.GetJWTSecretByte())
 }
 
-// (removed old recordSession with many args)
-
 // SessionInfo groups parameters for creating a session to avoid long argument lists.
 type SessionInfo struct {
 	UserID  uint
