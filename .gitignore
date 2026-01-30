@@ -13,3 +13,5 @@ basis-data-ltt
 # Test coverage files
 coverage.out
 *.out
+data/
+.DS_Store
