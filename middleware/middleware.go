@@ -175,24 +175,32 @@ func GetDB(c *gin.Context) *gorm.DB {
 
 // GetUserID retrieves the user ID from the Gin context
 func GetUserID(c *gin.Context) (uint, bool) {
-	userID, exists := c.Get(UserIDKey)
+	return getUintFromContext(c, UserIDKey)
+}
+
+// GetRoleID retrieves the role ID from the Gin context
+func GetRoleID(c *gin.Context) (uint32, bool) {
+	return getUint32FromContext(c, RoleIDKey)
+}
+
+func getUintFromContext(c *gin.Context, key string) (uint, bool) {
+	val, exists := c.Get(key)
 	if !exists {
 		return 0, false
 	}
-	id, ok := userID.(uint)
+	id, ok := val.(uint)
 	if !ok {
 		return 0, false
 	}
 	return id, true
 }
 
-// GetRoleID retrieves the role ID from the Gin context
-func GetRoleID(c *gin.Context) (uint32, bool) {
-	roleID, exists := c.Get(RoleIDKey)
+func getUint32FromContext(c *gin.Context, key string) (uint32, bool) {
+	val, exists := c.Get(key)
 	if !exists {
 		return 0, false
 	}
-	id, ok := roleID.(uint32)
+	id, ok := val.(uint32)
 	if !ok {
 		return 0, false
 	}
