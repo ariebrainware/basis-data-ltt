@@ -1,14 +1,21 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/config"
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
+	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
@@ -304,7 +311,7 @@ func TestNormalizePhoneNumbers(t *testing.T) {
 func TestUpdatePatientPhoneNumbers(t *testing.T) {
 	db := setupTestDB(t)
 
-	// Create a patient with initial phone numbers
+	// Create a patient with initial phone number
 	initialPatient := model.Patient{
 		FullName:    "Test Patient",
 		PatientCode: "T001",
@@ -313,6 +320,12 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 	if err := db.Create(&initialPatient).Error; err != nil {
 		t.Fatalf("create initial patient: %v", err)
 	}
+
+	// Set up Gin router with the UpdatePatient endpoint
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(middleware.DatabaseMiddleware(db))
+	r.PATCH("/patient/:id", UpdatePatient)
 
 	tests := []struct {
 		name           string
@@ -354,28 +367,30 @@ func TestUpdatePatientPhoneNumbers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create UpdatePatientRequest with phone numbers
-			updateReq := model.UpdatePatientRequest{
-				PhoneNumber: tt.phoneNumbers,
+			// Create request body with phone numbers
+			reqBody := map[string]interface{}{
+				"phone_number": tt.phoneNumbers,
+			}
+			jsonBody, err := json.Marshal(reqBody)
+			if err != nil {
+				t.Fatalf("marshal request body: %v", err)
 			}
 
-			// Load the patient
-			var patient model.Patient
-			if err := db.First(&patient, initialPatient.ID).Error; err != nil {
-				t.Fatalf("load patient: %v", err)
+			// Create HTTP request
+			url := fmt.Sprintf("/patient/%d", initialPatient.ID)
+			req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonBody))
+			if err != nil {
+				t.Fatalf("create request: %v", err)
 			}
+			req.Header.Set("Content-Type", "application/json")
 
-			// Apply the phone number update logic (same as UpdatePatient endpoint)
-			if len(updateReq.PhoneNumber) > 0 {
-				normalizedPhones := normalizePhoneNumbers(updateReq.PhoneNumber)
-				if len(normalizedPhones) > 0 {
-					patient.PhoneNumber = strings.Join(normalizedPhones, ",")
-				}
-			}
+			// Execute request
+			rr := httptest.NewRecorder()
+			r.ServeHTTP(rr, req)
 
-			// Save the updated patient
-			if err := db.Save(&patient).Error; err != nil {
-				t.Fatalf("save patient: %v", err)
+			// Check response status
+			if rr.Code != http.StatusOK {
+				t.Errorf("expected status 200, got %d: %s", rr.Code, rr.Body.String())
 			}
 
 			// Reload the patient to verify the stored value
