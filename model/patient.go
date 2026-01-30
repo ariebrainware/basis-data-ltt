@@ -18,3 +18,18 @@ type Patient struct {
 	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
 	PatientCode    string `json:"patient_code" gorm:"column:patient_code" example:"J001"`
 }
+
+type UpdatePatientRequest struct {
+	gorm.Model
+	FullName       string   `json:"full_name" example:"John Doe"`
+	Password       string   `json:"password" example:"hashed_password"`
+	Gender         string   `json:"gender" example:"Male"`
+	Age            int      `json:"age" example:"30"`
+	Job            string   `json:"job" example:"Engineer"`
+	Address        string   `json:"address" example:"123 Main St"`
+	Email          string   `json:"email" example:"john@example.com"`
+	PhoneNumbers   []string `json:"phone_number" example:"081234567890,082345678901"`
+	HealthHistory  string   `json:"health_history" example:"Diabetes,Hypertension"`
+	SurgeryHistory string   `json:"surgery_history" example:"Appendectomy 2020"`
+	PatientCode    string   `json:"patient_code" example:"J001"`
+}

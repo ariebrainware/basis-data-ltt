@@ -338,7 +338,7 @@ func CreatePatient(c *gin.Context) {
 // @Security     BearerAuth
 // @Security     SessionToken
 // @Param        id path string true "Patient ID"
-// @Param        request body model.Patient true "Updated patient information"
+// @Param        request body model.UpdatePatientRequest true "Updated patient information"
 // @Success      200 {object} util.APIResponse{data=model.Patient} "Patient updated"
 // @Failure      400 {object} util.APIResponse "Invalid request or patient not found"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
@@ -354,7 +354,7 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	patient := model.Patient{}
+	patient := model.UpdatePatientRequest{}
 	if err := c.ShouldBindJSON(&patient); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
@@ -381,7 +381,42 @@ func UpdatePatient(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&existingPatient).Updates(patient).Error; err != nil {
+	// Merge provided fields into existingPatient, converting phone numbers slice to comma-separated string.
+	if len(patient.PhoneNumbers) > 0 {
+		existingPatient.PhoneNumber = strings.Join(patient.PhoneNumbers, ",")
+	}
+	if patient.FullName != "" {
+		existingPatient.FullName = util.NormalizeName(patient.FullName)
+	}
+	if patient.Gender != "" {
+		existingPatient.Gender = patient.Gender
+	}
+	if patient.Age != 0 {
+		existingPatient.Age = patient.Age
+	}
+	if patient.Job != "" {
+		existingPatient.Job = patient.Job
+	}
+	if patient.Address != "" {
+		existingPatient.Address = patient.Address
+	}
+	if patient.HealthHistory != "" {
+		existingPatient.HealthHistory = patient.HealthHistory
+	}
+	if patient.SurgeryHistory != "" {
+		existingPatient.SurgeryHistory = patient.SurgeryHistory
+	}
+	if patient.PatientCode != "" {
+		existingPatient.PatientCode = patient.PatientCode
+	}
+	if patient.Email != "" {
+		existingPatient.Email = patient.Email
+	}
+	if patient.Password != "" {
+		existingPatient.Password = util.HashPassword(patient.Password)
+	}
+
+	if err := db.Save(&existingPatient).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update patient",
 			Err: err,
