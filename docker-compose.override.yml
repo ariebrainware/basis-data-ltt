@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  ltt:
+    build: .
+    environment:
+      - GEOIP_DB_PATH=/etc/geoip/GeoLite2-Country.mmdb
+      # Provide either a presigned URL or public HTTPS URL to download the DB
+      - GEOIP_URL=${GEOIP_URL}
+      # Optional: full sha256 hash (hex) or a string of the form "<hex>  <filename>"
+      - GEOIP_SHA256=${GEOIP_SHA256}
+      # Or provide a URL to a .sha256 file
+      - GEOIP_SHA256_URL=${GEOIP_SHA256_URL}
+    volumes:
+      - geoip-data:/etc/geoip
+    restart: unless-stopped
+
+volumes:
+  geoip-data:
+    driver: local

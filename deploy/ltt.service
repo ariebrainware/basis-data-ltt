@@ -1,0 +1,26 @@
+[Unit]
+Description=LTT Backend service
+After=network.target
+
+[Service]
+# Optional env file to set GEOIP_URL, GEOIP_SHA256, etc. (place at /etc/default/ltt)
+EnvironmentFile=-/etc/default/ltt
+User=ltt
+Group=ltt
+WorkingDirectory=/var/lib/ltt
+
+# Ensure GeoIP DB is present before starting
+ExecStartPre=/usr/local/bin/download_geoip.sh
+
+# Start the service binary (install your binary to /usr/local/bin/basis-data-ltt)
+ExecStart=/usr/local/bin/basis-data-ltt
+Restart=on-failure
+RestartSec=5s
+
+# Limit privileges
+ProtectSystem=full
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
