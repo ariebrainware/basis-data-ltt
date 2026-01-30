@@ -87,7 +87,7 @@ func TestDownloadGeoIP_InvalidURL(t *testing.T) {
 	tmpDir := t.TempDir()
 	destPath := filepath.Join(tmpDir, "geoip.mmdb")
 
-	_, err := DownloadGeoIP(ctx, "http://invalid-url-that-does-not-exist-12345.com/file.mmdb", destPath)
+	_, err := DownloadGeoIPWithRequest(ctx, DownloadRequest{URL: "http://invalid-url-that-does-not-exist-12345.com/file.mmdb", DestPath: destPath})
 	if err == nil {
 		t.Error("Expected error for invalid URL")
 	}
@@ -104,7 +104,7 @@ func TestDownloadGeoIP_HTTPError(t *testing.T) {
 	tmpDir := t.TempDir()
 	destPath := filepath.Join(tmpDir, "geoip.mmdb")
 
-	_, err := DownloadGeoIP(ctx, server.URL, destPath)
+	_, err := DownloadGeoIPWithRequest(ctx, DownloadRequest{URL: server.URL, DestPath: destPath})
 	if err == nil {
 		t.Error("Expected error for HTTP 404")
 	}
@@ -125,7 +125,7 @@ func TestDownloadGeoIP_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	destPath := filepath.Join(tmpDir, "geoip.mmdb")
 
-	resultPath, err := DownloadGeoIP(ctx, server.URL, destPath)
+	resultPath, err := DownloadGeoIPWithRequest(ctx, DownloadRequest{URL: server.URL, DestPath: destPath})
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -160,7 +160,7 @@ func TestDownloadGeoIP_ContextCancellation(t *testing.T) {
 	tmpDir := t.TempDir()
 	destPath := filepath.Join(tmpDir, "geoip.mmdb")
 
-	_, err := DownloadGeoIP(ctx, server.URL, destPath)
+	_, err := DownloadGeoIPWithRequest(ctx, DownloadRequest{URL: server.URL, DestPath: destPath})
 	if err == nil {
 		t.Error("Expected error due to context cancellation")
 	}
