@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -315,27 +316,50 @@ func isLikelyLocalOrPrivate(ip string) bool {
 
 	parsed := net.ParseIP(ip)
 	if parsed != nil {
-		// Use Go's standard helpers to cover IPv4 and IPv6:
-		// - loopback (127.0.0.0/8, ::1)
-		// - private ranges (10/8, 172.16/12, 192.168/16, IPv6 ULA)
-		// - link-local (169.254/16, fe80::/10)
-		// - unspecified (0.0.0.0, ::)
-		if parsed.IsLoopback() ||
-			parsed.IsPrivate() ||
-			parsed.IsLinkLocalUnicast() ||
-			parsed.IsLinkLocalMulticast() ||
-			parsed.IsUnspecified() {
+		if isNonRoutableIP(parsed) {
 			return true
 		}
 		return false
 	}
 
-	// Fallback for malformed or non-standard IP strings: retain the legacy
-	// quick prefix checks for the most common private IPv4 ranges.
+	// Fallback for malformed or non-standard IP strings: check common private
+	// IPv4 prefixes (10.*, 192.168.*) and the 172.16-31.* range.
+	return hasPrivateIPv4Prefix(ip)
+}
+
+// isNonRoutableIP reports whether the parsed IP is loopback, private,
+// link-local, unspecified, or otherwise non-routable.
+func isNonRoutableIP(p net.IP) bool {
+	return p.IsLoopback() || p.IsPrivate() || p.IsLinkLocalUnicast() || p.IsLinkLocalMulticast() || p.IsUnspecified()
+}
+
+// hasPrivateIPv4Prefix does a lightweight check for common private IPv4
+// prefixes when the input couldn't be parsed into a net.IP. It accepts
+// 10.*, 192.168.*, and 172.16.* - 172.31.* ranges.
+func hasPrivateIPv4Prefix(ip string) bool {
 	if strings.HasPrefix(ip, "10.") || strings.HasPrefix(ip, "192.168.") {
 		return true
 	}
+	if strings.HasPrefix(ip, "172.") {
+		return is172PrivateRange(ip)
+	}
 	return false
+}
+
+// is172PrivateRange checks if an input starting with "172." falls into the
+// private range 172.16.0.0 - 172.31.255.255. It performs a lightweight
+// parse of the second octet and avoids deep nesting by returning early on
+// errors.
+func is172PrivateRange(ip string) bool {
+	parts := strings.SplitN(ip, ".", 3)
+	if len(parts) < 2 {
+		return false
+	}
+	n, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return false
+	}
+	return n >= 16 && n <= 31
 }
 
 // cacheGetIP returns a cached IPLocation for ip when present.
