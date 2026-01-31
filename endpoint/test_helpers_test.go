@@ -220,3 +220,36 @@ func AssertTotalFetched(t *testing.T, data map[string]interface{}, want int) {
 		t.Errorf("expected total_fetched %d, got %d", want, got)
 	}
 }
+
+// EmailUpdateRequest groups parameters for email update requests.
+type EmailUpdateRequest struct {
+	Token string // Session token
+	Path  string // Endpoint path (defaults to /user if empty)
+	Email string // New email address
+}
+
+// PatchUserEmail sends a PATCH request to update a user's email.
+func PatchUserEmail(t *testing.T, r http.Handler, req EmailUpdateRequest) *httptest.ResponseRecorder {
+	path := req.Path
+	if path == "" {
+		path = "/user"
+	}
+	updateBody := map[string]string{"email": req.Email}
+	b, _ := json.Marshal(updateBody)
+	rr, err := doRequest(r, "PATCH", path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": req.Token})
+	if err != nil {
+		t.Fatalf("email update failed: %v", err)
+	}
+	return rr
+}
+
+// AssertUserEmail verifies the user's email in the database.
+func AssertUserEmail(t *testing.T, db *gorm.DB, userID uint, want string) {
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		t.Fatalf("failed to query user: %v", err)
+	}
+	if user.Email != want {
+		t.Fatalf("expected email to be %s; got %s", want, user.Email)
+	}
+}

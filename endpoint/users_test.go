@@ -83,89 +83,58 @@ func TestSelfPasswordUpdate(t *testing.T) {
 	}
 }
 
-func TestUserEmailUpdate(t *testing.T) {
-	r, db, userToken, userID := SetupServerWithUser(t, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
+func TestEmailUpdateCases(t *testing.T) {
+	t.Run("user updates email", func(t *testing.T) {
+		r, db, userToken, userID := SetupServerWithUser(t, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
 
-	emailUpdate := map[string]string{"email": "user3-updated@example.com"}
-	b, _ := json.Marshal(emailUpdate)
-	rr, err := doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken})
-	if err != nil {
-		t.Fatalf("email update failed: %v", err)
-	}
-	if rr.Code != http.StatusOK {
-		t.Fatalf("email update non-200: %d %s", rr.Code, rr.Body.String())
-	}
+		rr := PatchUserEmail(t, r, EmailUpdateRequest{Token: userToken, Path: "/user", Email: "user3-updated@example.com"})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("email update non-200: %d %s", rr.Code, rr.Body.String())
+		}
 
-	var user3 model.User
-	if err := db.First(&user3, userID).Error; err != nil {
-		t.Fatalf("failed to query user3 after email update: %v", err)
-	}
-	if user3.Email != "user3-updated@example.com" {
-		t.Fatalf("expected email to be user3-updated@example.com; got %s", user3.Email)
-	}
-}
+		AssertUserEmail(t, db, userID, "user3-updated@example.com")
+	})
 
-func TestDuplicateEmailUpdateFails(t *testing.T) {
-	r, _, _, userToken, _ := SetupServerWithAdminAndUser(t, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
+	t.Run("user duplicate email fails", func(t *testing.T) {
+		r, _, _, userToken, _ := SetupServerWithAdminAndUser(t, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
 
-	duplicateEmailUpdate := map[string]string{"email": "admin@example.com"}
-	b, _ := json.Marshal(duplicateEmailUpdate)
-	rr, err := doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken})
-	if err != nil {
-		t.Fatalf("duplicate email update request failed: %v", err)
-	}
-	if rr.Code == http.StatusOK {
-		t.Fatalf("expected duplicate email update to fail but got 200: %s", rr.Body.String())
-	}
-	resp := ParseAPIResp(t, rr)
-	if resp.Msg != "Email already exists" {
-		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
-	}
+		rr := PatchUserEmail(t, r, EmailUpdateRequest{Token: userToken, Path: "/user", Email: "admin@example.com"})
+		if rr.Code == http.StatusOK {
+			t.Fatalf("expected duplicate email update to fail but got 200: %s", rr.Body.String())
+		}
+		resp := ParseAPIResp(t, rr)
+		if resp.Msg != "Email already exists" {
+			t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
+		}
+	})
 
-}
+	t.Run("admin updates user email", func(t *testing.T) {
+		r, db, adminToken := SetupServerWithAdmin(t)
+		_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
+		user4Path := "/user/" + strconv.Itoa(int(user4ID))
 
-func TestAdminEmailUpdate(t *testing.T) {
-	r, db, adminToken := SetupServerWithAdmin(t)
-	_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
-	user4Path := "/user/" + strconv.Itoa(int(user4ID))
+		rr := PatchUserEmail(t, r, EmailUpdateRequest{Token: adminToken, Path: user4Path, Email: "user4-admin-updated@example.com"})
+		if rr.Code != http.StatusOK {
+			t.Fatalf("admin email update non-200: %d %s", rr.Code, rr.Body.String())
+		}
 
-	adminEmailUpdate := map[string]string{"email": "user4-admin-updated@example.com"}
-	b, _ := json.Marshal(adminEmailUpdate)
-	rr, err := doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
-	if err != nil {
-		t.Fatalf("admin email update failed: %v", err)
-	}
-	if rr.Code != http.StatusOK {
-		t.Fatalf("admin email update non-200: %d %s", rr.Code, rr.Body.String())
-	}
+		AssertUserEmail(t, db, user4ID, "user4-admin-updated@example.com")
+	})
 
-	var user4 model.User
-	if err := db.First(&user4, user4ID).Error; err != nil {
-		t.Fatalf("failed to query user4 after admin email update: %v", err)
-	}
-	if user4.Email != "user4-admin-updated@example.com" {
-		t.Fatalf("expected email to be user4-admin-updated@example.com; got %s", user4.Email)
-	}
-}
+	t.Run("admin duplicate email fails", func(t *testing.T) {
+		r, _, adminToken := SetupServerWithAdmin(t)
+		_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
+		user4Path := "/user/" + strconv.Itoa(int(user4ID))
 
-func TestAdminDuplicateEmailUpdateFails(t *testing.T) {
-	r, _, adminToken := SetupServerWithAdmin(t)
-	_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
-	user4Path := "/user/" + strconv.Itoa(int(user4ID))
-
-	adminDuplicateEmailUpdate := map[string]string{"email": "admin@example.com"}
-	b, _ := json.Marshal(adminDuplicateEmailUpdate)
-	rr, err := doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
-	if err != nil {
-		t.Fatalf("admin duplicate email update request failed: %v", err)
-	}
-	if rr.Code == http.StatusOK {
-		t.Fatalf("expected admin duplicate email update to fail but got 200: %s", rr.Body.String())
-	}
-	resp := ParseAPIResp(t, rr)
-	if resp.Msg != "Email already exists" {
-		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
-	}
+		rr := PatchUserEmail(t, r, EmailUpdateRequest{Token: adminToken, Path: user4Path, Email: "admin@example.com"})
+		if rr.Code == http.StatusOK {
+			t.Fatalf("expected admin duplicate email update to fail but got 200: %s", rr.Body.String())
+		}
+		resp := ParseAPIResp(t, rr)
+		if resp.Msg != "Email already exists" {
+			t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
+		}
+	})
 }
 
 // TestListUsersPaginationAndSearch tests ListUsers pagination and search functionality
