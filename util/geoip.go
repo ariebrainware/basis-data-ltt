@@ -248,7 +248,14 @@ func getCachedOrResolve(ip string) (IPLocation, bool) {
 		securityLogger.Printf("GeoIP cache miss for %s", ip)
 	}
 
-	loc := resolveCityCountryFromIP(ip)
+	// Parse IP once, then perform GeoIP lookup using the parsed net.IP to avoid repeated string handling.
+	netip := net.ParseIP(ip)
+	if netip == nil {
+		// If parsing fails, we can't resolve via geoip DB; treat as miss but avoid further processing.
+		return IPLocation{}, false
+	}
+
+	loc := resolveCityCountryFromNetIP(netip)
 	if loc.City == "" && loc.Country == "" {
 		return IPLocation{}, false
 	}
@@ -256,15 +263,11 @@ func getCachedOrResolve(ip string) (IPLocation, bool) {
 	return loc, true
 }
 
-// resolveCityCountryFromIP performs the GeoIP lookup for an IP and returns
+// resolveCityCountryFromNetIP performs the GeoIP lookup for a parsed net.IP and returns
 // the extracted city and country. It returns empty values on any error or
 // if the lookup is unavailable.
-func resolveCityCountryFromIP(ip string) IPLocation {
-	if geoipDB == nil {
-		return IPLocation{}
-	}
-	netip := net.ParseIP(ip)
-	if netip == nil {
+func resolveCityCountryFromNetIP(netip net.IP) IPLocation {
+	if geoipDB == nil || netip == nil {
 		return IPLocation{}
 	}
 	rec, err := geoipDB.City(netip)
@@ -322,10 +325,7 @@ func isLikelyLocalOrPrivate(ip string) bool {
 
 	parsed := net.ParseIP(ip)
 	if parsed != nil {
-		if isNonRoutableIP(parsed) {
-			return true
-		}
-		return false
+		return isNonRoutableIP(parsed)
 	}
 
 	// Fallback for malformed or non-standard IP strings: check common private
