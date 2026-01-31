@@ -187,36 +187,26 @@ func GetDB(c *gin.Context) *gorm.DB {
 
 // GetUserID retrieves the user ID from the Gin context
 func GetUserID(c *gin.Context) (uint, bool) {
-	return getUintFromContext(c, UserIDKey)
+	return getTypedValueFromContext[uint](c, UserIDKey)
 }
 
 // GetRoleID retrieves the role ID from the Gin context
 func GetRoleID(c *gin.Context) (uint32, bool) {
-	return getUint32FromContext(c, RoleIDKey)
+	return getTypedValueFromContext[uint32](c, RoleIDKey)
 }
 
-func getUintFromContext(c *gin.Context, key string) (uint, bool) {
+// getTypedValueFromContext is a generic helper to retrieve typed values from Gin context
+func getTypedValueFromContext[T any](c *gin.Context, key string) (T, bool) {
+	var zero T
 	val, exists := c.Get(key)
 	if !exists {
-		return 0, false
+		return zero, false
 	}
-	id, ok := val.(uint)
+	typedVal, ok := val.(T)
 	if !ok {
-		return 0, false
+		return zero, false
 	}
-	return id, true
-}
-
-func getUint32FromContext(c *gin.Context, key string) (uint32, bool) {
-	val, exists := c.Get(key)
-	if !exists {
-		return 0, false
-	}
-	id, ok := val.(uint32)
-	if !ok {
-		return 0, false
-	}
-	return id, true
+	return typedVal, true
 }
 
 // RequireRole creates a middleware that checks if the user has one of the specified roles
