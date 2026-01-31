@@ -3,29 +3,28 @@ package endpoint
 import (
 	"fmt"
 
-	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-func fetchTherapist(db *gorm.DB, limit, offset int, keyword, groupByDate string) ([]model.Therapist, int64, error) {
+func fetchTherapist(db *gorm.DB, q listQuery) ([]model.Therapist, int64, error) {
 	var therapist []model.Therapist
 	var totalTherapist int64
 
-	query := db.Offset(offset).Order("created_at ASC")
-	if limit > 0 {
-		query = query.Limit(limit)
+	query := db.Offset(q.Offset).Order("created_at ASC")
+	if q.Limit > 0 {
+		query = query.Limit(q.Limit)
 	}
-	if offset > 0 {
-		query = query.Offset(offset)
+	if q.Offset > 0 {
+		query = query.Offset(q.Offset)
 	}
-	if keyword != "" {
-		kw := "%" + keyword + "%"
+	if q.Keyword != "" {
+		kw := "%" + q.Keyword + "%"
 		query = query.Where("full_name LIKE ? OR NIK LIKE ?", kw, kw)
 	}
-	query = applyCreatedAtFilter(query, groupByDate)
+	query = applyCreatedAtFilter(query, q.GroupByDate)
 
 	if err := query.Find(&therapist).Error; err != nil {
 		return nil, 0, err
@@ -53,21 +52,13 @@ func fetchTherapist(db *gorm.DB, limit, offset int, keyword, groupByDate string)
 // @Router       /therapist [get]
 func ListTherapist(c *gin.Context) {
 	q := parseQueryParams(c)
-	limit := q.Limit
-	offset := q.Offset
-	keyword := q.Keyword
-	groupByDate := q.GroupByDate
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
-	therapist, totalTherapist, err := fetchTherapist(db, limit, offset, keyword, groupByDate)
+	therapist, totalTherapist, err := fetchTherapist(db, q)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to retrieve therapist",
@@ -82,14 +73,23 @@ func ListTherapist(c *gin.Context) {
 	})
 }
 
-func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, error) {
+// validateTherapistID extracts and validates the therapist ID from the URL parameter
+func validateTherapistID(c *gin.Context) (string, error) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing therapist ID",
 			Err: fmt.Errorf("therapist ID is required"),
 		})
-		return "", model.Therapist{}, fmt.Errorf("therapist ID is required")
+		return "", fmt.Errorf("therapist ID is required")
+	}
+	return id, nil
+}
+
+func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, error) {
+	id, err := validateTherapistID(c)
+	if err != nil {
+		return "", model.Therapist{}, err
 	}
 
 	var therapist model.Therapist
@@ -119,12 +119,8 @@ func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, err
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist/{id} [get]
 func GetTherapistInfo(c *gin.Context) {
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
@@ -242,12 +238,8 @@ func CreateTherapist(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
@@ -281,12 +273,8 @@ func CreateTherapist(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist/{id} [patch]
 func UpdateTherapist(c *gin.Context) {
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
@@ -322,12 +310,8 @@ func UpdateTherapist(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist/{id} [put]
 func TherapistApproval(c *gin.Context) {
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
@@ -380,13 +364,9 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 }
 
 func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing therapist ID",
-			Err: fmt.Errorf("therapist ID is required"),
-		})
-		return "", model.Therapist{}, fmt.Errorf("therapist ID is required")
+	id, err := validateTherapistID(c)
+	if err != nil {
+		return "", model.Therapist{}, err
 	}
 
 	therapist := model.Therapist{}
@@ -416,21 +396,13 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist/{id} [delete]
 func DeleteTherapist(c *gin.Context) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing therapist ID",
-			Err: fmt.Errorf("therapist ID is required"),
-		})
+	id, err := validateTherapistID(c)
+	if err != nil {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
