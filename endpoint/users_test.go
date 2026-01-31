@@ -10,15 +10,14 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/util"
 )
 
-// This test covers admin user management and self-profile update flows.
-func TestAdminPasswordUpdateAndDelete(t *testing.T) {
+// Admin updates another user's password
+func TestAdminUpdateTargetPassword(t *testing.T) {
 	r, db, cleanup := SetupTestServer(t)
 	t.Cleanup(cleanup)
 
 	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
 	_, targetID := CreateAndLoginUser(t, r, SignupCreds{Name: "Target User", Email: "target@example.com", Password: "targetpass"})
 
-	// Admin updates target's password
 	path := "/user/" + strconv.Itoa(int(targetID))
 	updateBody := map[string]string{"password": "newtargetpass", "name": "Target Updated"}
 	b, _ := json.Marshal(updateBody)
@@ -30,7 +29,6 @@ func TestAdminPasswordUpdateAndDelete(t *testing.T) {
 		t.Fatalf("admin update non-200: %d %s", rr.Code, rr.Body.String())
 	}
 
-	// Verify password changed in DB
 	var targetUser model.User
 	if err := db.First(&targetUser, targetID).Error; err != nil {
 		t.Fatalf("failed to query target user from DB: %v", err)
@@ -39,9 +37,18 @@ func TestAdminPasswordUpdateAndDelete(t *testing.T) {
 	if err != nil || !ok {
 		t.Fatalf("updated password did not verify for target user: %v", err)
 	}
+}
 
-	// Admin deletes target
-	rr, err = doRequest(r, "DELETE", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+// Admin deletes another user
+func TestAdminDeleteTarget(t *testing.T) {
+	r, _, cleanup := SetupTestServer(t)
+	t.Cleanup(cleanup)
+
+	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	_, targetID := CreateAndLoginUser(t, r, SignupCreds{Name: "Target User", Email: "target@example.com", Password: "targetpass"})
+
+	path := "/user/" + strconv.Itoa(int(targetID))
+	rr, err := doRequest(r, "DELETE", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
 	if err != nil {
 		t.Fatalf("delete user failed: %v", err)
 	}
@@ -49,7 +56,6 @@ func TestAdminPasswordUpdateAndDelete(t *testing.T) {
 		t.Fatalf("delete user non-200: %d %s", rr.Code, rr.Body.String())
 	}
 
-	// Ensure user removed
 	rr, err = doRequest(r, "GET", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
 	if err != nil {
 		t.Fatalf("get user after delete failed: %v", err)
@@ -86,14 +92,12 @@ func TestSelfPasswordUpdate(t *testing.T) {
 	}
 }
 
-func TestEmailUpdateAndUniqueness(t *testing.T) {
+func TestUserEmailUpdate(t *testing.T) {
 	r, db, cleanup := SetupTestServer(t)
 	t.Cleanup(cleanup)
 
-	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
 	userToken, userID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
 
-	// User updates own email successfully
 	emailUpdate := map[string]string{"email": "user3-updated@example.com"}
 	b, _ := json.Marshal(emailUpdate)
 	rr, err := doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken})
@@ -111,11 +115,18 @@ func TestEmailUpdateAndUniqueness(t *testing.T) {
 	if user3.Email != "user3-updated@example.com" {
 		t.Fatalf("expected email to be user3-updated@example.com; got %s", user3.Email)
 	}
+}
 
-	// Attempt duplicate email update should fail
+func TestDuplicateEmailUpdateFails(t *testing.T) {
+	r, _, cleanup := SetupTestServer(t)
+	t.Cleanup(cleanup)
+
+	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	userToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
+
 	duplicateEmailUpdate := map[string]string{"email": "admin@example.com"}
-	b, _ = json.Marshal(duplicateEmailUpdate)
-	rr, err = doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken})
+	b, _ := json.Marshal(duplicateEmailUpdate)
+	rr, err := doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken})
 	if err != nil {
 		t.Fatalf("duplicate email update request failed: %v", err)
 	}
@@ -127,12 +138,21 @@ func TestEmailUpdateAndUniqueness(t *testing.T) {
 		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
 	}
 
-	// Admin updates another user's email and verifies uniqueness enforcement
+	// ensure admin exists for later tests
+	_ = adminToken
+}
+
+func TestAdminEmailUpdate(t *testing.T) {
+	r, db, cleanup := SetupTestServer(t)
+	t.Cleanup(cleanup)
+
+	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
 	_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
 	user4Path := "/user/" + strconv.Itoa(int(user4ID))
+
 	adminEmailUpdate := map[string]string{"email": "user4-admin-updated@example.com"}
-	b, _ = json.Marshal(adminEmailUpdate)
-	rr, err = doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	b, _ := json.Marshal(adminEmailUpdate)
+	rr, err := doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
 	if err != nil {
 		t.Fatalf("admin email update failed: %v", err)
 	}
@@ -147,18 +167,26 @@ func TestEmailUpdateAndUniqueness(t *testing.T) {
 	if user4.Email != "user4-admin-updated@example.com" {
 		t.Fatalf("expected email to be user4-admin-updated@example.com; got %s", user4.Email)
 	}
+}
 
-	// Admin duplicate update should fail
+func TestAdminDuplicateEmailUpdateFails(t *testing.T) {
+	r, _, cleanup := SetupTestServer(t)
+	t.Cleanup(cleanup)
+
+	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
+	user4Path := "/user/" + strconv.Itoa(int(user4ID))
+
 	adminDuplicateEmailUpdate := map[string]string{"email": "admin@example.com"}
-	b, _ = json.Marshal(adminDuplicateEmailUpdate)
-	rr, err = doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	b, _ := json.Marshal(adminDuplicateEmailUpdate)
+	rr, err := doRequest(r, "PATCH", user4Path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
 	if err != nil {
 		t.Fatalf("admin duplicate email update request failed: %v", err)
 	}
 	if rr.Code == http.StatusOK {
 		t.Fatalf("expected admin duplicate email update to fail but got 200: %s", rr.Body.String())
 	}
-	resp = ParseAPIResp(t, rr)
+	resp := ParseAPIResp(t, rr)
 	if resp.Msg != "Email already exists" {
 		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
 	}
