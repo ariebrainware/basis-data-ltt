@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Sentinel error for user update operations
+// Sentinel errors for user update operations
 var (
 	ErrEmailAlreadyExists = errors.New("email already exists")
 )
