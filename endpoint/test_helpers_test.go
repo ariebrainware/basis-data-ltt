@@ -114,6 +114,32 @@ func CreateAndLoginUser(t *testing.T, r http.Handler, creds SignupCreds) (string
 	return data.Token, data.UserID
 }
 
+// SetupServerWithUser initializes the server and returns a logged-in user session.
+func SetupServerWithUser(t *testing.T, creds SignupCreds) (*gin.Engine, *gorm.DB, string, uint) {
+	r, db, cleanup := SetupTestServer(t)
+	t.Cleanup(cleanup)
+
+	token, userID := CreateAndLoginUser(t, r, creds)
+	return r, db, token, userID
+}
+
+// SetupServerWithAdmin initializes the server and returns a logged-in admin session.
+func SetupServerWithAdmin(t *testing.T) (*gin.Engine, *gorm.DB, string) {
+	r, db, cleanup := SetupTestServer(t)
+	t.Cleanup(cleanup)
+
+	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	return r, db, adminToken
+}
+
+// SetupServerWithAdminAndUser initializes the server and returns admin and user sessions.
+func SetupServerWithAdminAndUser(t *testing.T, userCreds SignupCreds) (*gin.Engine, *gorm.DB, string, string, uint) {
+	r, db, adminToken := SetupServerWithAdmin(t)
+
+	userToken, userID := CreateAndLoginUser(t, r, userCreds)
+	return r, db, adminToken, userToken, userID
+}
+
 // ParseAPIResp decodes a standard API response from a ResponseRecorder.
 // It fails the test on decoding error.
 func ParseAPIResp(t *testing.T, rr *httptest.ResponseRecorder) apiResp {

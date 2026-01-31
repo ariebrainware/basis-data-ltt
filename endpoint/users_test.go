@@ -12,10 +12,7 @@ import (
 
 // Admin updates another user's password
 func TestAdminUpdateTargetPassword(t *testing.T) {
-	r, db, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	r, db, adminToken := SetupServerWithAdmin(t)
 	_, targetID := CreateAndLoginUser(t, r, SignupCreds{Name: "Target User", Email: "target@example.com", Password: "targetpass"})
 
 	path := "/user/" + strconv.Itoa(int(targetID))
@@ -41,10 +38,7 @@ func TestAdminUpdateTargetPassword(t *testing.T) {
 
 // Admin deletes another user
 func TestAdminDeleteTarget(t *testing.T) {
-	r, _, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	r, _, adminToken := SetupServerWithAdmin(t)
 	_, targetID := CreateAndLoginUser(t, r, SignupCreds{Name: "Target User", Email: "target@example.com", Password: "targetpass"})
 
 	path := "/user/" + strconv.Itoa(int(targetID))
@@ -66,10 +60,7 @@ func TestAdminDeleteTarget(t *testing.T) {
 }
 
 func TestSelfPasswordUpdate(t *testing.T) {
-	r, db, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	userToken, userID := CreateAndLoginUser(t, r, SignupCreds{Name: "Self User", Email: "self@example.com", Password: "initialpass"})
+	r, db, userToken, userID := SetupServerWithUser(t, SignupCreds{Name: "Self User", Email: "self@example.com", Password: "initialpass"})
 
 	// Self update using userToken (use endpoint /user)
 	selfUpdate := map[string]string{"name": "Self Updated", "password": "finalpass"}
@@ -93,10 +84,7 @@ func TestSelfPasswordUpdate(t *testing.T) {
 }
 
 func TestUserEmailUpdate(t *testing.T) {
-	r, db, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	userToken, userID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
+	r, db, userToken, userID := SetupServerWithUser(t, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
 
 	emailUpdate := map[string]string{"email": "user3-updated@example.com"}
 	b, _ := json.Marshal(emailUpdate)
@@ -118,11 +106,7 @@ func TestUserEmailUpdate(t *testing.T) {
 }
 
 func TestDuplicateEmailUpdateFails(t *testing.T) {
-	r, _, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
-	userToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
+	r, _, _, userToken, _ := SetupServerWithAdminAndUser(t, SignupCreds{Name: "Test User 3", Email: "user3@example.com", Password: "user3pass"})
 
 	duplicateEmailUpdate := map[string]string{"email": "admin@example.com"}
 	b, _ := json.Marshal(duplicateEmailUpdate)
@@ -138,15 +122,10 @@ func TestDuplicateEmailUpdateFails(t *testing.T) {
 		t.Fatalf("expected error message 'Email already exists'; got %s", resp.Msg)
 	}
 
-	// ensure admin exists for later tests
-	_ = adminToken
 }
 
 func TestAdminEmailUpdate(t *testing.T) {
-	r, db, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	r, db, adminToken := SetupServerWithAdmin(t)
 	_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
 	user4Path := "/user/" + strconv.Itoa(int(user4ID))
 
@@ -170,10 +149,7 @@ func TestAdminEmailUpdate(t *testing.T) {
 }
 
 func TestAdminDuplicateEmailUpdateFails(t *testing.T) {
-	r, _, cleanup := SetupTestServer(t)
-	t.Cleanup(cleanup)
-
-	adminToken, _ := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+	r, _, adminToken := SetupServerWithAdmin(t)
 	_, user4ID := CreateAndLoginUser(t, r, SignupCreds{Name: "Test User 4", Email: "user4@example.com", Password: "user4pass"})
 	user4Path := "/user/" + strconv.Itoa(int(user4ID))
 
