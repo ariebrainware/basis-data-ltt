@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -21,19 +20,6 @@ type treatmentQueryParams struct {
 	keyword     string
 	groupByDate string
 	jakartaLoc  *time.Location
-}
-
-// Common validation helpers
-func getDBOrAbort(c *gin.Context) (*gorm.DB, bool) {
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
-		return nil, false
-	}
-	return db, true
 }
 
 func validateTreatmentID(c *gin.Context) (string, bool) {
