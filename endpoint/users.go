@@ -17,6 +17,65 @@ type UpdateUserRequest struct {
 	Password string `json:"password" example:"newpassword123"`
 }
 
+// validateUpdateRequest checks whether at least one field is provided for update.
+func validateUpdateRequest(req *UpdateUserRequest) bool {
+	return req.Name != "" || req.Email != "" || req.Password != ""
+}
+
+// hashUserPassword generates a salt and hashes the provided password, updating the user model.
+func hashUserPassword(c *gin.Context, user *model.User, plainPassword string) error {
+	salt, err := util.GenerateSalt()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
+		return err
+	}
+
+	hashedPassword, err := util.HashPasswordArgon2(plainPassword, salt)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
+		return err
+	}
+
+	user.Password = hashedPassword
+	user.PasswordSalt = salt
+	return nil
+}
+
+// updateUserFields applies the changes from an UpdateUserRequest to a user model,
+// handling email uniqueness checks, password hashing, and returning whether password changed.
+func updateUserFields(c *gin.Context, db *gorm.DB, user *model.User, req *UpdateUserRequest) (passwordChanged bool, err error) {
+	if req.Email != "" && req.Email != user.Email {
+		exists, err := emailExists(db, req.Email, user.ID)
+		if err != nil {
+			return false, err
+		}
+		if exists {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
+			return false, fmt.Errorf("email already exists")
+		}
+		user.Email = req.Email
+	}
+
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+
+	if req.Password != "" {
+		if err := hashUserPassword(c, user, req.Password); err != nil {
+			return false, err
+		}
+		passwordChanged = true
+	}
+
+	return passwordChanged, nil
+}
+
+// invalidateUserSessions removes session records from both DB and Redis for a given user.
+func invalidateUserSessions(db *gorm.DB, userID uint) {
+	_ = db.Where("user_id = ?", userID).Delete(&model.Session{}).Error
+	_ = util.InvalidateUserSessions(userID)
+}
+
 // UpdateUser godoc
 // @Summary      Update current user profile
 // @Description  Update authenticated user's name, email, and/or password
@@ -33,17 +92,12 @@ type UpdateUserRequest struct {
 // @Router       /user [patch]
 func UpdateUser(c *gin.Context) {
 	var req UpdateUserRequest
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request payload",
-			Err: err,
-		})
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request payload", Err: err})
 		return
 	}
 
-	// Validate that at least one field is being updated
-	if req.Name == "" && req.Email == "" && req.Password == "" {
+	if !validateUpdateRequest(&req) {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "At least one field (name, email, or password) must be provided",
 			Err: fmt.Errorf("no fields to update"),
@@ -53,19 +107,13 @@ func UpdateUser(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+		util.CallServerError(c, util.APIErrorParams{Msg: "Database connection not available", Err: fmt.Errorf("db is nil")})
 		return
 	}
 
 	userID, ok := middleware.GetUserID(c)
 	if !ok {
-		util.CallUserNotAuthorized(c, util.APIErrorParams{
-			Msg: "User not authenticated",
-			Err: fmt.Errorf("user id not found in context"),
-		})
+		util.CallUserNotAuthorized(c, util.APIErrorParams{Msg: "User not authenticated", Err: fmt.Errorf("user id not found in context")})
 		return
 	}
 
@@ -79,39 +127,10 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	// If email provided and different, ensure uniqueness
-	if req.Email != "" && req.Email != user.Email {
-		exists, err := emailExists(db, req.Email, user.ID)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
-			return
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-			return
-		}
-		user.Email = req.Email
-	}
-
-	if req.Name != "" {
-		user.Name = req.Name
-	}
-
-	if req.Password != "" {
-		salt, err := util.GenerateSalt()
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
-			return
-		}
-
-		hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
-			return
-		}
-
-		user.Password = hashedPassword
-		user.PasswordSalt = salt
+	passwordChanged, err := updateUserFields(c, db, &user, &req)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
+		return
 	}
 
 	if err := db.Save(&user).Error; err != nil {
@@ -119,18 +138,11 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	// If password changed, invalidate all sessions for this user (DB + Redis)
-	if req.Password != "" {
-		// delete sessions in DB
-		_ = db.Where("user_id = ?", user.ID).Delete(&model.Session{}).Error
-		// delete sessions in Redis (best-effort)
-		_ = util.InvalidateUserSessions(user.ID)
+	if passwordChanged {
+		invalidateUserSessions(db, user.ID)
 	}
 
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "User updated successfully",
-		Data: user,
-	})
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
 }
 
 // ListUsers godoc
@@ -283,8 +295,7 @@ func AdminUpdateUser(c *gin.Context) {
 		return
 	}
 
-	// Validate that at least one field is being updated
-	if req.Name == "" && req.Email == "" && req.Password == "" {
+	if !validateUpdateRequest(&req) {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "At least one field (name, email, or password) must be provided",
 			Err: fmt.Errorf("no fields to update"),
@@ -308,39 +319,10 @@ func AdminUpdateUser(c *gin.Context) {
 		return
 	}
 
-	// If email provided and different, ensure uniqueness
-	if req.Email != "" && req.Email != user.Email {
-		exists, err := emailExists(db, req.Email, user.ID)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
-			return
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-			return
-		}
-		user.Email = req.Email
-	}
-
-	if req.Name != "" {
-		user.Name = req.Name
-	}
-
-	if req.Password != "" {
-		salt, err := util.GenerateSalt()
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
-			return
-		}
-
-		hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
-			return
-		}
-
-		user.Password = hashedPassword
-		user.PasswordSalt = salt
+	_, err = updateUserFields(c, db, &user, &req)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
+		return
 	}
 
 	if err := db.Save(&user).Error; err != nil {
@@ -419,6 +401,20 @@ func UpdateUserByID(c *gin.Context) {
 	AdminUpdateUser(c)
 }
 
+// deleteUserTransaction performs the atomic delete of a user and their sessions within a transaction.
+func deleteUserTransaction(tx *gorm.DB, userID uint) error {
+	var user model.User
+	if err := tx.First(&user, userID).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Where("user_id = ?", userID).Delete(&model.Session{}).Error; err != nil {
+		return err
+	}
+
+	return tx.Delete(&user).Error
+}
+
 // DeleteUser godoc
 // @Summary      Delete user (admin only)
 // @Description  Soft-delete a user by ID. Admin-only access.
@@ -447,24 +443,8 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	// Use a transaction to ensure user deletion and session invalidation are atomic.
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		var user model.User
-		if err := tx.First(&user, uid).Error; err != nil {
-			return err
-		}
-
-		// Explicitly delete all sessions associated with this user so that any
-		// active tokens/sessions are invalidated immediately.
-		if err := tx.Where("user_id = ?", uid).Delete(&model.Session{}).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Delete(&user).Error; err != nil {
-			return err
-		}
-
-		return nil
+		return deleteUserTransaction(tx, uid)
 	}); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
@@ -474,8 +454,6 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	// Also remove any Redis session keys for this user (best-effort)
 	_ = util.InvalidateUserSessions(uid)
-
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User deleted"})
 }
