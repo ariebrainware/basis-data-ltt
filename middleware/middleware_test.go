@@ -276,111 +276,96 @@ func TestValidateLoginToken_RedisSuccessfulParse(t *testing.T) {
 	}
 }
 
-func TestValidateLoginToken_RedisMalformedValue_NonNumeric(t *testing.T) {
-	// Test Redis parse error with non-numeric string - should fallback to DB
+func TestValidateLoginToken_RedisFallbackCases(t *testing.T) {
 	setGinTestMode()
 
-	// Create mock Redis client
-	mock := setupRedisMock(t)
-
-	// Set up mock expectations - Redis returns malformed data
-	mock.ExpectGet("session:malformed-token").SetVal("abc:1")
-
-	// Set up in-memory database and test data for fallback
-	db, user, _ := newTestDBWithUserSession(t, testSessionParams{roleID: 1, token: "malformed-token"})
-
-	w := runValidateLoginTokenRequest(db, "malformed-token", func(c *gin.Context) {
-		assertUserContext(t, c, user, " from DB fallback")
-		c.Status(200)
-	})
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 when DB fallback succeeds after Redis parse error, got %d", w.Code)
+	type fallbackCase struct {
+		name       string
+		token      string
+		redisValue string
+		redisNil   bool
+		params     testSessionParams
+		assert     func(t *testing.T, c *gin.Context, user model.User)
+		statusCode int
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("Redis expectations were not met: %v", err)
-	}
-}
-
-func TestValidateLoginToken_RedisInvalidFormat_MissingColon(t *testing.T) {
-	// Test Redis value with invalid format (missing colon separator) - should fallback to DB
-	setGinTestMode()
-
-	// Create mock Redis client
-	mock := setupRedisMock(t)
-
-	// Set up mock expectations - Redis returns invalid format
-	mock.ExpectGet("session:invalid-format-token").SetVal("123")
-
-	// Set up in-memory database and test data for fallback
-	db, user, _ := newTestDBWithUserSession(t, testSessionParams{roleID: 2, token: "invalid-format-token"})
-
-	w := runValidateLoginTokenRequest(db, "invalid-format-token", func(c *gin.Context) {
-		assertUserIDContext(t, c, user, " from DB fallback")
-		c.Status(200)
-	})
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 when DB fallback succeeds after invalid format, got %d", w.Code)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("Redis expectations were not met: %v", err)
-	}
-}
-
-func TestValidateLoginToken_RedisZeroUserID(t *testing.T) {
-	// Test Redis parse with zero user ID - should fallback to DB
-	setGinTestMode()
-
-	// Create mock Redis client
-	mock := setupRedisMock(t)
-
-	// Set up mock expectations - Redis returns zero user ID
-	mock.ExpectGet("session:zero-uid-token").SetVal("0:1")
-
-	// Set up in-memory database and test data for fallback
-	db, user, _ := newTestDBWithUserSession(t, testSessionParams{roleID: 1, token: "zero-uid-token"})
-
-	w := runValidateLoginTokenRequest(db, "zero-uid-token", func(c *gin.Context) {
-		assertUserIDContext(t, c, user, " from DB fallback")
-		c.Status(200)
-	})
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 when DB fallback succeeds after zero UID, got %d", w.Code)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("Redis expectations were not met: %v", err)
-	}
-}
-
-func TestValidateLoginToken_RedisRoleIDParseError(t *testing.T) {
-	// Test Redis parse error on role ID - should fallback to DB
-	setGinTestMode()
-
-	// Create mock Redis client
-	mock := setupRedisMock(t)
-
-	// Set up mock expectations - Redis returns non-numeric role ID
-	mock.ExpectGet("session:bad-rid-token").SetVal("456:xyz")
-
-	// Set up in-memory database for fallback
-	db, user, _ := newTestDBWithUserSession(t, testSessionParams{roleID: 3, token: "bad-rid-token"})
-
-	w := runValidateLoginTokenRequest(db, "bad-rid-token", func(c *gin.Context) {
-		assertUserContext(t, c, user, " from DB fallback")
-		c.Status(200)
-	})
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 when DB fallback succeeds after role ID parse error, got %d", w.Code)
+	cases := []fallbackCase{
+		{
+			name:       "non_numeric_value",
+			token:      "malformed-token",
+			redisValue: "abc:1",
+			params:     testSessionParams{roleID: 1, token: "malformed-token"},
+			assert: func(t *testing.T, c *gin.Context, user model.User) {
+				assertUserContext(t, c, user, " from DB fallback")
+			},
+			statusCode: http.StatusOK,
+		},
+		{
+			name:       "missing_colon",
+			token:      "invalid-format-token",
+			redisValue: "123",
+			params:     testSessionParams{roleID: 2, token: "invalid-format-token"},
+			assert: func(t *testing.T, c *gin.Context, user model.User) {
+				assertUserIDContext(t, c, user, " from DB fallback")
+			},
+			statusCode: http.StatusOK,
+		},
+		{
+			name:       "zero_user_id",
+			token:      "zero-uid-token",
+			redisValue: "0:1",
+			params:     testSessionParams{roleID: 1, token: "zero-uid-token"},
+			assert: func(t *testing.T, c *gin.Context, user model.User) {
+				assertUserIDContext(t, c, user, " from DB fallback")
+			},
+			statusCode: http.StatusOK,
+		},
+		{
+			name:       "bad_role_id",
+			token:      "bad-rid-token",
+			redisValue: "456:xyz",
+			params:     testSessionParams{roleID: 3, token: "bad-rid-token"},
+			assert: func(t *testing.T, c *gin.Context, user model.User) {
+				assertUserContext(t, c, user, " from DB fallback")
+			},
+			statusCode: http.StatusOK,
+		},
+		{
+			name:     "redis_nil",
+			token:    "notfound-token",
+			redisNil: true,
+			params:   testSessionParams{roleID: 1, token: "notfound-token"},
+			assert: func(t *testing.T, c *gin.Context, user model.User) {
+				assertUserIDContext(t, c, user, " from DB fallback")
+			},
+			statusCode: http.StatusOK,
+		},
 	}
 
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("Redis expectations were not met: %v", err)
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			mock := setupRedisMock(t)
+			if tc.redisNil {
+				mock.ExpectGet("session:" + tc.token).RedisNil()
+			} else {
+				mock.ExpectGet("session:" + tc.token).SetVal(tc.redisValue)
+			}
+
+			db, user, _ := newTestDBWithUserSession(t, tc.params)
+			w := runValidateLoginTokenRequest(db, tc.token, func(c *gin.Context) {
+				tc.assert(t, c, user)
+				c.Status(200)
+			})
+
+			if w.Code != tc.statusCode {
+				t.Fatalf("expected %d when DB fallback succeeds, got %d", tc.statusCode, w.Code)
+			}
+
+			if err := mock.ExpectationsWereMet(); err != nil {
+				t.Errorf("Redis expectations were not met: %v", err)
+			}
+		})
 	}
 }
 
@@ -422,32 +407,5 @@ func TestValidateLoginToken_DBFallback_ExpiredSession(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 when session is expired, got %d", w.Code)
-	}
-}
-
-func TestValidateLoginToken_RedisKeyNotFound_DBFallback(t *testing.T) {
-	// Test fallback to DB when Redis key is not found
-	setGinTestMode()
-
-	// Create mock Redis client
-	mock := setupRedisMock(t)
-
-	// Set up mock expectations - Redis returns key not found error
-	mock.ExpectGet("session:notfound-token").RedisNil()
-
-	// Set up in-memory database and test data for fallback
-	db, user, _ := newTestDBWithUserSession(t, testSessionParams{roleID: 1, token: "notfound-token"})
-
-	w := runValidateLoginTokenRequest(db, "notfound-token", func(c *gin.Context) {
-		assertUserIDContext(t, c, user, " from DB fallback")
-		c.Status(200)
-	})
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 when DB fallback succeeds after Redis key not found, got %d", w.Code)
-	}
-
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Errorf("Redis expectations were not met: %v", err)
 	}
 }
