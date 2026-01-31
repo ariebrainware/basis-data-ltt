@@ -58,6 +58,20 @@ func applyCreatedAtFilter(query *gorm.DB, groupByDate string) *gorm.DB {
 	return query
 }
 
+// getDBOrAbort retrieves the database connection or aborts with an error response.
+// Returns the database connection and true if successful, or nil and false if failed.
+func getDBOrAbort(c *gin.Context) (*gorm.DB, bool) {
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database connection not available",
+			Err: fmt.Errorf("db is nil"),
+		})
+		return nil, false
+	}
+	return db, true
+}
+
 func fetchPatients(db *gorm.DB, q listQuery) ([]model.Patient, int64, error) {
 	var patients []model.Patient
 	var totalPatient int64
