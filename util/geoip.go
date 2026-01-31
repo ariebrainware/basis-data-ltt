@@ -223,16 +223,16 @@ func ValidateGeoIP(path string) error {
 }
 
 // GetIPLocation returns city and country name for the provided IP using the
-// local GeoIP database with an in-memory cache. Returns empty strings when
-// a lookup is not available.
-func GetIPLocation(ip string) (string, string) {
+// local GeoIP database with an in-memory cache. Returns an empty IPLocation
+// when a lookup is not available.
+func GetIPLocation(ip string) IPLocation {
 	if ip == "" || isLikelyLocalOrPrivate(ip) {
-		return "", ""
+		return IPLocation{}
 	}
 	if loc, ok := getCachedOrResolve(ip); ok {
-		return loc.City, loc.Country
+		return loc
 	}
-	return "", ""
+	return IPLocation{}
 }
 
 // getCachedOrResolve checks cache for IP and falls back to resolving via the
@@ -248,7 +248,14 @@ func getCachedOrResolve(ip string) (IPLocation, bool) {
 		securityLogger.Printf("GeoIP cache miss for %s", ip)
 	}
 
-	loc := resolveCityCountryFromIP(ip)
+	// Parse IP once, then perform GeoIP lookup using the parsed net.IP to avoid repeated string handling.
+	netip := net.ParseIP(ip)
+	if netip == nil {
+		// If parsing fails, we can't resolve via geoip DB; treat as miss but avoid further processing.
+		return IPLocation{}, false
+	}
+
+	loc := resolveCityCountryFromNetIP(netip)
 	if loc.City == "" && loc.Country == "" {
 		return IPLocation{}, false
 	}
@@ -256,15 +263,11 @@ func getCachedOrResolve(ip string) (IPLocation, bool) {
 	return loc, true
 }
 
-// resolveCityCountryFromIP performs the GeoIP lookup for an IP and returns
+// resolveCityCountryFromNetIP performs the GeoIP lookup for a parsed net.IP and returns
 // the extracted city and country. It returns empty values on any error or
 // if the lookup is unavailable.
-func resolveCityCountryFromIP(ip string) IPLocation {
-	if geoipDB == nil {
-		return IPLocation{}
-	}
-	netip := net.ParseIP(ip)
-	if netip == nil {
+func resolveCityCountryFromNetIP(netip net.IP) IPLocation {
+	if geoipDB == nil || netip == nil {
 		return IPLocation{}
 	}
 	rec, err := geoipDB.City(netip)
@@ -274,35 +277,41 @@ func resolveCityCountryFromIP(ip string) IPLocation {
 	return extractCityCountry(rec)
 }
 
+// LocalizationData groups name mappings and ISO code to extract localized names with fallback.
+type LocalizationData struct {
+	Names   map[string]string
+	IsoCode string
+}
+
+// extractLocalizedName returns the name for the requested language from the
+// localization data, falling back to the ISO code when the localized name is unavailable.
+func extractLocalizedName(data LocalizationData, lang string) string {
+	if data.Names != nil {
+		if v, ok := data.Names[lang]; ok {
+			return v
+		}
+	}
+	return data.IsoCode
+}
+
 // extractCityCountry returns the English city and country names from a GeoIP record,
 // falling back to ISO country code when a localized name is unavailable.
 func extractCityCountry(rec *geoip2.City) IPLocation {
 	if rec == nil {
 		return IPLocation{}
 	}
-	loc := IPLocation{
-		City:    localizedName(rec.City.Names, "en"),
-		Country: localizedName(rec.Country.Names, "en"),
+	cityData := LocalizationData{
+		Names:   rec.City.Names,
+		IsoCode: "",
 	}
-	loc.Country = fallbackCountry(loc.Country, rec.Country.IsoCode)
-	return loc
-}
-
-func localizedName(names map[string]string, lang string) string {
-	if names == nil {
-		return ""
+	countryData := LocalizationData{
+		Names:   rec.Country.Names,
+		IsoCode: rec.Country.IsoCode,
 	}
-	if v, ok := names[lang]; ok {
-		return v
+	return IPLocation{
+		City:    extractLocalizedName(cityData, "en"),
+		Country: extractLocalizedName(countryData, "en"),
 	}
-	return ""
-}
-
-func fallbackCountry(name, iso string) string {
-	if name != "" {
-		return name
-	}
-	return iso
 }
 
 // isLikelyLocalOrPrivate checks whether an IP is local, private or link-local.
@@ -316,10 +325,7 @@ func isLikelyLocalOrPrivate(ip string) bool {
 
 	parsed := net.ParseIP(ip)
 	if parsed != nil {
-		if isNonRoutableIP(parsed) {
-			return true
-		}
-		return false
+		return isNonRoutableIP(parsed)
 	}
 
 	// Fallback for malformed or non-standard IP strings: check common private

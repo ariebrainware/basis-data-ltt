@@ -71,36 +71,54 @@ func TestFetchPatientsDateFilter(t *testing.T) {
 	assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "last_3_months", SortBy: "", SortDir: ""}, func(p model.Patient) string { return p.FullName }, []string{"Recent Patient"})
 }
 
-func TestFetchPatientsSortByFullName(t *testing.T) {
-	db := setupTestDB(t)
-
-	alice := model.Patient{FullName: "Alice Smith", PatientCode: "A001", PhoneNumber: "111"}
-	charlie := model.Patient{FullName: "Charlie Brown", PatientCode: "C001", PhoneNumber: "333"}
-	bob := model.Patient{FullName: "Bob Johnson", PatientCode: "B001", PhoneNumber: "222"}
-
-	createPatients(t, db, []model.Patient{alice, charlie, bob})
-
-	ascExpected := []string{"Alice Smith", "Bob Johnson", "Charlie Brown"}
-	descExpected := []string{"Charlie Brown", "Bob Johnson", "Alice Smith"}
-
-	assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "", SortBy: "full_name", SortDir: "asc"}, func(p model.Patient) string { return p.FullName }, ascExpected)
-	assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "", SortBy: "full_name", SortDir: "desc"}, func(p model.Patient) string { return p.FullName }, descExpected)
+// SortTestCase groups parameters for a sort order test.
+type SortTestCase struct {
+	SortBy       string
+	Patients     []model.Patient
+	Extract      func(model.Patient) string
+	AscExpected  []string
+	DescExpected []string
 }
 
-func TestFetchPatientsSortByPatientCode(t *testing.T) {
-	db := setupTestDB(t)
+func TestFetchPatientsSortOrder(t *testing.T) {
+	tests := []SortTestCase{
+		{
+			SortBy: "full_name",
+			Patients: []model.Patient{
+				{FullName: "Alice Smith", PatientCode: "A001", PhoneNumber: "111"},
+				{FullName: "Charlie Brown", PatientCode: "C001", PhoneNumber: "333"},
+				{FullName: "Bob Johnson", PatientCode: "B001", PhoneNumber: "222"},
+			},
+			Extract:      func(p model.Patient) string { return p.FullName },
+			AscExpected:  []string{"Alice Smith", "Bob Johnson", "Charlie Brown"},
+			DescExpected: []string{"Charlie Brown", "Bob Johnson", "Alice Smith"},
+		},
+		{
+			SortBy: "patient_code",
+			Patients: []model.Patient{
+				{FullName: "Patient One", PatientCode: "P003", PhoneNumber: "111"},
+				{FullName: "Patient Two", PatientCode: "P001", PhoneNumber: "222"},
+				{FullName: "Patient Three", PatientCode: "P002", PhoneNumber: "333"},
+			},
+			Extract:      func(p model.Patient) string { return p.PatientCode },
+			AscExpected:  []string{"P001", "P002", "P003"},
+			DescExpected: []string{"P003", "P002", "P001"},
+		},
+	}
 
-	patient1 := model.Patient{FullName: "Patient One", PatientCode: "P003", PhoneNumber: "111"}
-	patient2 := model.Patient{FullName: "Patient Two", PatientCode: "P001", PhoneNumber: "222"}
-	patient3 := model.Patient{FullName: "Patient Three", PatientCode: "P002", PhoneNumber: "333"}
+	for _, tc := range tests {
+		t.Run("sort by "+tc.SortBy+" asc", func(t *testing.T) {
+			db := setupTestDB(t)
+			createPatients(t, db, tc.Patients)
+			assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "", SortBy: tc.SortBy, SortDir: "asc"}, tc.Extract, tc.AscExpected)
+		})
 
-	createPatients(t, db, []model.Patient{patient1, patient2, patient3})
-
-	ascExpected := []string{"P001", "P002", "P003"}
-	descExpected := []string{"P003", "P002", "P001"}
-
-	assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "", SortBy: "patient_code", SortDir: "asc"}, func(p model.Patient) string { return p.PatientCode }, ascExpected)
-	assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "", SortBy: "patient_code", SortDir: "desc"}, func(p model.Patient) string { return p.PatientCode }, descExpected)
+		t.Run("sort by "+tc.SortBy+" desc", func(t *testing.T) {
+			db := setupTestDB(t)
+			createPatients(t, db, tc.Patients)
+			assertFetchOrder(t, db, listQuery{Limit: 0, Offset: 0, Keyword: "", GroupByDate: "", SortBy: tc.SortBy, SortDir: "desc"}, tc.Extract, tc.DescExpected)
+		})
+	}
 }
 
 func TestFetchPatientsDefaultSort(t *testing.T) {
