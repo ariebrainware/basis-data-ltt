@@ -23,35 +23,33 @@ func validateUpdateRequest(req *UpdateUserRequest) bool {
 }
 
 // validateAndUpdateEmail checks email uniqueness and updates the user model if valid.
-func validateAndUpdateEmail(c *gin.Context, db *gorm.DB, user *model.User, newEmail string) bool {
+// Returns an error without sending HTTP responses, letting the caller handle the response.
+func validateAndUpdateEmail(db *gorm.DB, user *model.User, newEmail string) error {
 	if newEmail == "" || newEmail == user.Email {
-		return true
+		return nil
 	}
 	exists, err := emailExists(db, newEmail, user.ID)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
-		return false
+		return fmt.Errorf("failed to validate email uniqueness: %w", err)
 	}
 	if exists {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-		return false
+		return fmt.Errorf("email already exists")
 	}
 	user.Email = newEmail
-	return true
+	return nil
 }
 
 // hashUserPassword generates a salt and hashes the provided password, updating the user model.
-func hashUserPassword(c *gin.Context, user *model.User, plainPassword string) error {
+// Returns an error without sending HTTP responses, letting the caller handle the response.
+func hashUserPassword(user *model.User, plainPassword string) error {
 	salt, err := util.GenerateSalt()
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
-		return err
+		return fmt.Errorf("failed to generate password salt: %w", err)
 	}
 
 	hashedPassword, err := util.HashPasswordArgon2(plainPassword, salt)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
-		return err
+		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	user.Password = hashedPassword
@@ -61,9 +59,10 @@ func hashUserPassword(c *gin.Context, user *model.User, plainPassword string) er
 
 // updateUserFields applies the changes from an UpdateUserRequest to a user model,
 // handling email uniqueness checks, password hashing, and returning whether password changed.
-func updateUserFields(c *gin.Context, db *gorm.DB, user *model.User, req *UpdateUserRequest) (passwordChanged bool, err error) {
-	if !validateAndUpdateEmail(c, db, user, req.Email) {
-		return false, fmt.Errorf("email validation failed")
+// Returns an error without sending HTTP responses, letting the caller handle the response.
+func updateUserFields(db *gorm.DB, user *model.User, req *UpdateUserRequest) (passwordChanged bool, err error) {
+	if err := validateAndUpdateEmail(db, user, req.Email); err != nil {
+		return false, err
 	}
 
 	if req.Name != "" {
@@ -71,7 +70,7 @@ func updateUserFields(c *gin.Context, db *gorm.DB, user *model.User, req *Update
 	}
 
 	if req.Password != "" {
-		if err := hashUserPassword(c, user, req.Password); err != nil {
+		if err := hashUserPassword(user, req.Password); err != nil {
 			return false, err
 		}
 		passwordChanged = true
@@ -88,9 +87,14 @@ func invalidateUserSessions(db *gorm.DB, userID uint) {
 
 // performUserUpdate updates a user and returns success, handling all error cases and session invalidation.
 func performUserUpdate(c *gin.Context, db *gorm.DB, user *model.User, req *UpdateUserRequest) bool {
-	passwordChanged, err := updateUserFields(c, db, user, req)
+	passwordChanged, err := updateUserFields(db, user, req)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
+		// Check if it's a user error (email exists) or server error
+		if err.Error() == "email already exists" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: err})
+		} else {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
+		}
 		return false
 	}
 
