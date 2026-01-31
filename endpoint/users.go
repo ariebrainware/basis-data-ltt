@@ -312,31 +312,40 @@ func emailExists(db *gorm.DB, email string, excludeID uint) (bool, error) {
 
 // parsePaginationParams extracts and validates limit, cursor, and offset query parameters.
 func parsePaginationParams(c *gin.Context) (limit int, cursor uint, offset int) {
-	limit, _ = strconv.Atoi(c.Query("limit"))
-	if limit <= 0 {
-		limit = 10
-	}
-	if limit > 100 {
-		limit = 100
-	}
-
-	cursorStr := c.Query("cursor")
-	if cursorStr != "" {
-		cursorVal, err := strconv.ParseUint(cursorStr, 10, strconv.IntSize)
-		if err == nil {
-			cursor = uint(cursorVal)
-		}
-	}
-
-	offsetStr := c.Query("offset")
-	if offsetStr != "" {
-		offVal, err := strconv.Atoi(offsetStr)
-		if err == nil && offVal > 0 {
-			offset = offVal
-		}
-	}
-
+	// Use small helpers to keep parsing logic clear and testable
+	limit = parsePositiveInt(c.Query("limit"), 10, 100)
+	cursor = parseUintQuery(c, "cursor")
+	offset = parsePositiveInt(c.Query("offset"), 0, 0)
 	return limit, cursor, offset
+}
+
+// parsePositiveInt parses a positive integer from a query value returning a default
+// when the value is missing or invalid. If max > 0 it caps the returned value.
+func parsePositiveInt(q string, defaultVal, max int) int {
+	if q == "" {
+		return defaultVal
+	}
+	v, err := strconv.Atoi(q)
+	if err != nil || v <= 0 {
+		return defaultVal
+	}
+	if max > 0 && v > max {
+		return max
+	}
+	return v
+}
+
+// parseUintQuery parses an unsigned integer query parameter and returns 0 on error.
+func parseUintQuery(c *gin.Context, name string) uint {
+	s := c.Query(name)
+	if s == "" {
+		return 0
+	}
+	v, err := strconv.ParseUint(s, 10, 32)
+	if err != nil || v == 0 {
+		return 0
+	}
+	return uint(v)
 }
 
 // fetchUserByID retrieves a user by ID, returning appropriate error responses for not found or DB errors.
