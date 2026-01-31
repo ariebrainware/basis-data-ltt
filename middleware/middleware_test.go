@@ -142,6 +142,38 @@ func assertUserIDContext(t *testing.T, c *gin.Context, user model.User, msg stri
 	assertContextID(t, c, contextAssertion{ctx: userIDContext, expected: user.ID, msg: msg})
 }
 
+func runFallbackCaseTest(t *testing.T, tc fallbackCase, mock redismock.ClientMock) {
+	if tc.redisNil {
+		mock.ExpectGet("session:" + tc.token).RedisNil()
+	} else {
+		mock.ExpectGet("session:" + tc.token).SetVal(tc.redisValue)
+	}
+
+	db, user, _ := newTestDBWithUserSession(t, tc.params)
+	w := runValidateLoginTokenRequest(db, tc.token, func(c *gin.Context) {
+		tc.assert(t, c, user)
+		c.Status(200)
+	})
+
+	if w.Code != tc.statusCode {
+		t.Fatalf("expected %d when DB fallback succeeds, got %d", tc.statusCode, w.Code)
+	}
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("Redis expectations were not met: %v", err)
+	}
+}
+
+type fallbackCase struct {
+	name       string
+	token      string
+	redisValue string
+	redisNil   bool
+	params     testSessionParams
+	assert     func(t *testing.T, c *gin.Context, user model.User)
+	statusCode int
+}
+
 func TestSetCorsHeadersDefaults(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -279,16 +311,6 @@ func TestValidateLoginToken_RedisSuccessfulParse(t *testing.T) {
 func TestValidateLoginToken_RedisFallbackCases(t *testing.T) {
 	setGinTestMode()
 
-	type fallbackCase struct {
-		name       string
-		token      string
-		redisValue string
-		redisNil   bool
-		params     testSessionParams
-		assert     func(t *testing.T, c *gin.Context, user model.User)
-		statusCode int
-	}
-
 	cases := []fallbackCase{
 		{
 			name:       "non_numeric_value",
@@ -346,25 +368,7 @@ func TestValidateLoginToken_RedisFallbackCases(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			mock := setupRedisMock(t)
-			if tc.redisNil {
-				mock.ExpectGet("session:" + tc.token).RedisNil()
-			} else {
-				mock.ExpectGet("session:" + tc.token).SetVal(tc.redisValue)
-			}
-
-			db, user, _ := newTestDBWithUserSession(t, tc.params)
-			w := runValidateLoginTokenRequest(db, tc.token, func(c *gin.Context) {
-				tc.assert(t, c, user)
-				c.Status(200)
-			})
-
-			if w.Code != tc.statusCode {
-				t.Fatalf("expected %d when DB fallback succeeds, got %d", tc.statusCode, w.Code)
-			}
-
-			if err := mock.ExpectationsWereMet(); err != nil {
-				t.Errorf("Redis expectations were not met: %v", err)
-			}
+			runFallbackCaseTest(t, tc, mock)
 		})
 	}
 }
