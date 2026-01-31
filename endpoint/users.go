@@ -161,94 +161,44 @@ func UpdateUser(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /user [get]
 func ListUsers(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.Query("limit"))
-	cursorStr := c.Query("cursor")
-	offsetStr := c.Query("offset")
-	keyword := c.Query("keyword")
-
-	// Set default and max limits
-	if limit <= 0 {
-		limit = 10
-	}
-	if limit > 100 {
-		limit = 100
-	}
-
-	// Parse and validate cursor
-	var cursor uint
-	if cursorStr != "" {
-		cursorVal, err := strconv.ParseUint(cursorStr, 10, strconv.IntSize)
-		if err != nil {
-			util.CallUserError(c, util.APIErrorParams{
-				Msg: "Invalid cursor parameter",
-				Err: fmt.Errorf("cursor must be a valid positive integer"),
-			})
-			return
-		}
-		cursor = uint(cursorVal)
-	}
-
-	// Parse offset (optional). Negative offsets are ignored.
-	var offset int
-	if offsetStr != "" {
-		offVal, err := strconv.Atoi(offsetStr)
-		if err == nil && offVal > 0 {
-			offset = offVal
-		}
-	}
-
 	db := middleware.GetDB(c)
 	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+		util.CallServerError(c, util.APIErrorParams{Msg: "Database connection not available", Err: fmt.Errorf("db is nil")})
 		return
 	}
 
-	var users []model.User
-	// GORM automatically excludes soft-deleted records (where deleted_at IS NOT NULL)
-	// when querying models with gorm.Model. No explicit filter is needed here.
+	limit, cursor, offset := parsePaginationParams(c)
+	keyword := c.Query("keyword")
+
+	// Apply filters
 	query := db.Model(&model.User{})
-
-	// Apply keyword filter if provided
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		query = query.Where("name LIKE ? OR email LIKE ?", kw, kw)
+	filterClause, filterArgs := buildKeywordFilter(keyword)
+	if filterClause != "" {
+		query = query.Where(filterClause, filterArgs...)
 	}
 
-	// Compute total number of matching users (without pagination)
+	// Count total matching users
 	var total int64
-	countQuery := db.Model(&model.User{})
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		countQuery = countQuery.Where("name LIKE ? OR email LIKE ?", kw, kw)
-	}
-	if err := countQuery.Count(&total).Error; err != nil {
+	if err := query.Count(&total).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to count users", Err: err})
 		return
 	}
 
-	// Apply cursor-based pagination if provided, otherwise apply offset if provided
-	if cursor > 0 {
-		query = query.Where("id > ?", cursor)
-	} else if offset > 0 {
-		query = query.Offset(offset)
-	}
-
-	// Fetch one extra record to determine if there are more pages
+	// Apply pagination and fetch users (one extra to detect if more pages exist)
+	query = applyPaginationQuery(query, cursor, offset)
+	var users []model.User
 	if err := query.Order("id ASC").Limit(limit + 1).Find(&users).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve users", Err: err})
 		return
 	}
 
-	// Determine if there are more pages
+	// Determine if there are more pages and trim to limit
 	hasMore := len(users) > limit
 	if hasMore {
 		users = users[:limit]
 	}
 
-	// Get the next cursor (only if there are more pages)
+	// Get next cursor only if there are more pages
 	var nextCursor *uint
 	if hasMore {
 		lastID := users[len(users)-1].ID
@@ -355,6 +305,69 @@ func emailExists(db *gorm.DB, email string, excludeID uint) (bool, error) {
 	return count > 0, nil
 }
 
+// parsePaginationParams extracts and validates limit, cursor, and offset query parameters.
+func parsePaginationParams(c *gin.Context) (limit int, cursor uint, offset int) {
+	limit, _ = strconv.Atoi(c.Query("limit"))
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	cursorStr := c.Query("cursor")
+	if cursorStr != "" {
+		cursorVal, err := strconv.ParseUint(cursorStr, 10, strconv.IntSize)
+		if err == nil {
+			cursor = uint(cursorVal)
+		}
+	}
+
+	offsetStr := c.Query("offset")
+	if offsetStr != "" {
+		offVal, err := strconv.Atoi(offsetStr)
+		if err == nil && offVal > 0 {
+			offset = offVal
+		}
+	}
+
+	return limit, cursor, offset
+}
+
+// fetchUserByID retrieves a user by ID, returning appropriate error responses for not found or DB errors.
+func fetchUserByID(c *gin.Context, db *gorm.DB, userID uint) (*model.User, bool) {
+	var user model.User
+	if err := db.First(&user, userID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
+			return nil, false
+		}
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
+		return nil, false
+	}
+	return &user, true
+}
+
+// applyPaginationQuery applies cursor or offset-based pagination to a query.
+func applyPaginationQuery(query *gorm.DB, cursor uint, offset int) *gorm.DB {
+	if cursor > 0 {
+		return query.Where("id > ?", cursor)
+	}
+	if offset > 0 {
+		return query.Offset(offset)
+	}
+	return query
+}
+
+// buildKeywordFilter returns the keyword filter string for search queries.
+func buildKeywordFilter(keyword string) (string, []interface{}) {
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		return "name LIKE ? OR email LIKE ?", []interface{}{kw, kw}
+	}
+	return "", nil
+}
+
 // GetUserInfo godoc
 // @Summary      Get user info (admin only)
 // @Description  Retrieve a user's information by ID. Admin-only access.
@@ -383,13 +396,8 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := db.First(&user, uid).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
-			return
-		}
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
+	user, ok := fetchUserByID(c, db, uid)
+	if !ok {
 		return
 	}
 
@@ -401,18 +409,18 @@ func UpdateUserByID(c *gin.Context) {
 	AdminUpdateUser(c)
 }
 
-// deleteUserTransaction performs the atomic delete of a user and their sessions within a transaction.
-func deleteUserTransaction(tx *gorm.DB, userID uint) error {
-	var user model.User
-	if err := tx.First(&user, userID).Error; err != nil {
-		return err
-	}
-
-	if err := tx.Where("user_id = ?", userID).Delete(&model.Session{}).Error; err != nil {
-		return err
-	}
-
-	return tx.Delete(&user).Error
+// deleteUserWithSessions deletes a user and all their sessions atomically.
+func deleteUserWithSessions(db *gorm.DB, userID uint) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		var user model.User
+		if err := tx.First(&user, userID).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ?", userID).Delete(&model.Session{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&user).Error
+	})
 }
 
 // DeleteUser godoc
@@ -443,9 +451,7 @@ func DeleteUser(c *gin.Context) {
 		return
 	}
 
-	if err := db.Transaction(func(tx *gorm.DB) error {
-		return deleteUserTransaction(tx, uid)
-	}); err != nil {
+	if err := deleteUserWithSessions(db, uid); err != nil {
 		if err == gorm.ErrRecordNotFound {
 			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
 			return
