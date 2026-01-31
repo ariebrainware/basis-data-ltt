@@ -13,20 +13,80 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-func doRequest(r http.Handler, method, path string, body []byte, headers map[string]string) (*httptest.ResponseRecorder, error) {
-	req, err := http.NewRequest(method, path, bytes.NewBuffer(body))
+type requestParams struct {
+	method  string
+	path    string
+	body    []byte
+	headers map[string]string
+}
+
+func doRequest(r http.Handler, params requestParams) (*httptest.ResponseRecorder, error) {
+	req, err := http.NewRequest(params.method, params.path, bytes.NewBuffer(params.body))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	for k, v := range headers {
+	for k, v := range params.headers {
 		req.Header.Set(k, v)
 	}
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
 	return rr, nil
+}
+
+type testSetupParams struct {
+	secret   string
+	apiToken string
+}
+
+func setupTestEnv(t *testing.T, params testSetupParams) (*config.Config, *gorm.DB) {
+	t.Setenv("APPENV", "test")
+	t.Setenv("JWTSECRET", params.secret)
+	t.Setenv("APITOKEN", params.apiToken)
+	util.SetJWTSecret(params.secret)
+
+	cfg := config.LoadConfig()
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		t.Fatalf("connect test db: %v", err)
+	}
+
+	testModels := []interface{}{&model.Patient{}, &model.PatientCode{}, &model.Role{}, &model.User{}}
+	if err := db.AutoMigrate(testModels...); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+	return cfg, db
+}
+
+func cleanupTestData(t *testing.T, db *gorm.DB) {
+	tables := []interface{}{&model.Patient{}, &model.User{}, &model.PatientCode{}}
+	for _, table := range tables {
+		if err := db.Unscoped().Where("1 = 1").Delete(table).Error; err != nil {
+			t.Fatalf("cleanup table: %v", err)
+		}
+	}
+}
+
+func setupTestRouter(cfg *config.Config, db *gorm.DB, apiToken string) *gin.Engine {
+	gin.SetMode(cfg.GinMode)
+	r := gin.Default()
+	r.Use(middleware.CORSMiddleware())
+	r.Use(middleware.DatabaseMiddleware(db))
+	r.POST("/patient", CreatePatient)
+	return r
+}
+
+func sendPatientRequest(t *testing.T, r *gin.Engine, patientData map[string]interface{}, apiToken string) (*httptest.ResponseRecorder, error) {
+	b, _ := json.Marshal(patientData)
+	return doRequest(r, requestParams{
+		method:  "POST",
+		path:    "/patient",
+		body:    b,
+		headers: map[string]string{"Authorization": "Bearer " + apiToken},
+	})
 }
 
 func TestCreatePatient_InMemoryDB(t *testing.T) {
@@ -74,9 +134,7 @@ func TestCreatePatient_InMemoryDB(t *testing.T) {
 		"email":        "johndoe@example.com",
 		"phone_number": []string{"081200000"},
 	}
-	b, _ := json.Marshal(patientBody)
-
-	rr, err := doRequest(r, "POST", "/patient", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr, err := sendPatientRequest(t, r, patientBody, "test-api-token")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -95,36 +153,12 @@ func TestCreatePatient_InMemoryDB(t *testing.T) {
 }
 
 func TestCreatePatient_DuplicateDetection(t *testing.T) {
-	// Setup test env
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-	t.Setenv("APITOKEN", "test-api-token")
-	util.SetJWTSecret("test-secret")
+	cfg, db := setupTestEnv(t, testSetupParams{
+		secret:   "test-secret",
+		apiToken: "test-api-token",
+	})
+	cleanupTestData(t, db)
 
-	cfg := config.LoadConfig()
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-
-	// Migrate necessary models
-	testModels := []interface{}{&model.Patient{}, &model.PatientCode{}, &model.Role{}, &model.User{}}
-	if err := db.AutoMigrate(testModels...); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-
-	// Clean tables to ensure deterministic test
-	if err := db.Unscoped().Where("1 = 1").Delete(&model.Patient{}).Error; err != nil {
-		t.Fatalf("cleanup patients: %v", err)
-	}
-	if err := db.Unscoped().Where("1 = 1").Delete(&model.User{}).Error; err != nil {
-		t.Fatalf("cleanup users: %v", err)
-	}
-	if err := db.Unscoped().Where("1 = 1").Delete(&model.PatientCode{}).Error; err != nil {
-		t.Fatalf("cleanup patient codes: %v", err)
-	}
-
-	// Seed roles and a patient code for initial letter 'J' (for "John Doe")
 	if err := model.SeedRoles(db); err != nil {
 		t.Fatalf("seed roles: %v", err)
 	}
@@ -132,12 +166,7 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 		t.Fatalf("seed patient code: %v", err)
 	}
 
-	// Setup Gin router
-	gin.SetMode(cfg.GinMode)
-	r := gin.Default()
-	r.Use(middleware.CORSMiddleware())
-	r.Use(middleware.DatabaseMiddleware(db))
-	r.POST("/patient", CreatePatient)
+	r := setupTestRouter(cfg, db, "test-api-token")
 
 	// First creation should succeed
 	patientBody := map[string]interface{}{
@@ -149,8 +178,7 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 		"email":        "johndoe@example.com",
 		"phone_number": []string{"081200000"},
 	}
-	b, _ := json.Marshal(patientBody)
-	rr, err := doRequest(r, "POST", "/patient", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr, err := sendPatientRequest(t, r, patientBody, "test-api-token")
 	if err != nil {
 		t.Fatalf("first request failed: %v", err)
 	}
@@ -168,8 +196,7 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 		"email":        "johndoe2@example.com",
 		"phone_number": []string{" 081200000 "},
 	}
-	dbuf, _ := json.Marshal(dupBody)
-	rr2, err := doRequest(r, "POST", "/patient", dbuf, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr2, err := sendPatientRequest(t, r, dupBody, "test-api-token")
 	if err != nil {
 		t.Fatalf("second request failed: %v", err)
 	}
@@ -182,36 +209,12 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 }
 
 func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
-	// Setup test env
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-	t.Setenv("APITOKEN", "test-api-token")
-	util.SetJWTSecret("test-secret")
+	cfg, db := setupTestEnv(t, testSetupParams{
+		secret:   "test-secret",
+		apiToken: "test-api-token",
+	})
+	cleanupTestData(t, db)
 
-	cfg := config.LoadConfig()
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
-	}
-
-	// Migrate necessary models
-	testModels := []interface{}{&model.Patient{}, &model.PatientCode{}, &model.Role{}, &model.User{}}
-	if err := db.AutoMigrate(testModels...); err != nil {
-		t.Fatalf("auto migrate: %v", err)
-	}
-
-	// Clean tables to ensure deterministic test
-	if err := db.Unscoped().Where("1 = 1").Delete(&model.Patient{}).Error; err != nil {
-		t.Fatalf("cleanup patients: %v", err)
-	}
-	if err := db.Unscoped().Where("1 = 1").Delete(&model.User{}).Error; err != nil {
-		t.Fatalf("cleanup users: %v", err)
-	}
-	if err := db.Unscoped().Where("1 = 1").Delete(&model.PatientCode{}).Error; err != nil {
-		t.Fatalf("cleanup patient codes: %v", err)
-	}
-
-	// Seed roles and a patient code for initial letter 'J' (for "Jane Smith")
 	if err := model.SeedRoles(db); err != nil {
 		t.Fatalf("seed roles: %v", err)
 	}
@@ -219,12 +222,7 @@ func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
 		t.Fatalf("seed patient code: %v", err)
 	}
 
-	// Setup Gin router
-	gin.SetMode(cfg.GinMode)
-	r := gin.Default()
-	r.Use(middleware.CORSMiddleware())
-	r.Use(middleware.DatabaseMiddleware(db))
-	r.POST("/patient", CreatePatient)
+	r := setupTestRouter(cfg, db, "test-api-token")
 
 	// First creation with "Jane Smith" should succeed
 	patientBody := map[string]interface{}{
@@ -236,8 +234,7 @@ func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
 		"email":        "janesmith@example.com",
 		"phone_number": []string{"081300000"},
 	}
-	b, _ := json.Marshal(patientBody)
-	rr, err := doRequest(r, "POST", "/patient", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr, err := sendPatientRequest(t, r, patientBody, "test-api-token")
 	if err != nil {
 		t.Fatalf("first request failed: %v", err)
 	}
@@ -264,8 +261,7 @@ func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
 		"email":        "janesmith2@example.com",
 		"phone_number": []string{"081300000"},
 	}
-	dbuf1, _ := json.Marshal(dupBody1)
-	rr2, err := doRequest(r, "POST", "/patient", dbuf1, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr2, err := sendPatientRequest(t, r, dupBody1, "test-api-token")
 	if err != nil {
 		t.Fatalf("second request failed: %v", err)
 	}
@@ -286,8 +282,7 @@ func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
 		"email":        "janesmith3@example.com",
 		"phone_number": []string{"081300000"},
 	}
-	dbuf2, _ := json.Marshal(dupBody2)
-	rr3, err := doRequest(r, "POST", "/patient", dbuf2, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr3, err := sendPatientRequest(t, r, dupBody2, "test-api-token")
 	if err != nil {
 		t.Fatalf("third request failed: %v", err)
 	}
