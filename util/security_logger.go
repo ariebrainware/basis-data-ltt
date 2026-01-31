@@ -96,14 +96,14 @@ func LogSecurityEvent(event SecurityEvent) {
 		}
 
 		// Attempt to resolve city/country for the IP (best-effort, local DB then cache)
-		city, country := GetIPLocation(event.IP)
+		loc := GetIPLocation(event.IP)
 		var location string
-		if city != "" && country != "" {
-			location = fmt.Sprintf("%s/%s", city, country)
-		} else if country != "" {
-			location = country
-		} else if city != "" {
-			location = city
+		if loc.City != "" && loc.Country != "" {
+			location = fmt.Sprintf("%s/%s", loc.City, loc.Country)
+		} else if loc.Country != "" {
+			location = loc.Country
+		} else if loc.City != "" {
+			location = loc.City
 		}
 
 		entry := model.SecurityLog{

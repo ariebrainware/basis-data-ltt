@@ -33,9 +33,9 @@ func TestValidateGeoIP_NonExistentFile(t *testing.T) {
 }
 
 func TestGetIPLocation_EmptyIP(t *testing.T) {
-	city, country := GetIPLocation("")
-	if city != "" || country != "" {
-		t.Errorf("Expected empty strings for empty IP, got city=%q, country=%q", city, country)
+	loc := GetIPLocation("")
+	if loc.City != "" || loc.Country != "" {
+		t.Errorf("Expected empty IPLocation for empty IP, got %+v", loc)
 	}
 }
 
@@ -52,9 +52,9 @@ func TestGetIPLocation_PrivateIPs(t *testing.T) {
 	}
 
 	for _, ip := range testCases {
-		city, country := GetIPLocation(ip)
-		if city != "" || country != "" {
-			t.Errorf("Expected empty strings for private IP %s, got city=%q, country=%q", ip, city, country)
+		loc := GetIPLocation(ip)
+		if loc.City != "" || loc.Country != "" {
+			t.Errorf("Expected empty IPLocation for private IP %s, got %+v", ip, loc)
 		}
 	}
 }
@@ -64,9 +64,9 @@ func TestGetIPLocation_NoDB(t *testing.T) {
 	geoipDB = nil
 	geoipCache = nil
 
-	city, country := GetIPLocation("8.8.8.8")
-	if city != "" || country != "" {
-		t.Errorf("Expected empty strings when DB is nil, got city=%q, country=%q", city, country)
+	loc := GetIPLocation("8.8.8.8")
+	if loc.City != "" || loc.Country != "" {
+		t.Errorf("Expected empty IPLocation when DB is nil, got %+v", loc)
 	}
 }
 
@@ -182,9 +182,9 @@ func TestGetIPLocation_InvalidIP(t *testing.T) {
 	geoipCache = nil
 
 	// Test with invalid IP format
-	city, country := GetIPLocation("not-an-ip")
-	if city != "" || country != "" {
-		t.Errorf("Expected empty strings for invalid IP, got city=%q, country=%q", city, country)
+	loc := GetIPLocation("not-an-ip")
+	if loc.City != "" || loc.Country != "" {
+		t.Errorf("Expected empty IPLocation for invalid IP, got %+v", loc)
 	}
 }
 
