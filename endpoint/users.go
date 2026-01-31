@@ -346,6 +346,7 @@ func parsePositiveInt(q string, defaultVal, max int) int {
 }
 
 // parseUintQuery parses an unsigned integer query parameter and returns 0 on error.
+// A zero value is treated as invalid/missing since cursor-based pagination requires positive IDs.
 func parseUintQuery(c *gin.Context, name string) uint {
 	s := c.Query(name)
 	if s == "" {
