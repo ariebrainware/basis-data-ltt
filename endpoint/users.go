@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -9,6 +10,11 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+)
+
+// Sentinel errors for user update operations
+var (
+	ErrEmailAlreadyExists = errors.New("email already exists")
 )
 
 type UpdateUserRequest struct {
@@ -33,7 +39,7 @@ func validateAndUpdateEmail(db *gorm.DB, user *model.User, newEmail string) erro
 		return fmt.Errorf("failed to validate email uniqueness: %w", err)
 	}
 	if exists {
-		return fmt.Errorf("email already exists")
+		return ErrEmailAlreadyExists
 	}
 	user.Email = newEmail
 	return nil
@@ -90,7 +96,7 @@ func performUserUpdate(c *gin.Context, db *gorm.DB, user *model.User, req *Updat
 	passwordChanged, err := updateUserFields(db, user, req)
 	if err != nil {
 		// Check if it's a user error (email exists) or server error
-		if err.Error() == "email already exists" {
+		if errors.Is(err, ErrEmailAlreadyExists) {
 			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: err})
 		} else {
 			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
