@@ -103,33 +103,64 @@ func setupTestRouter(db *gorm.DB) *gin.Engine {
 	return r
 }
 
-// testSignup performs signup and returns token
-func testSignup(t *testing.T, r http.Handler, apiToken string) string {
-	signupBody := map[string]string{"name": "Test User", "email": "test@example.com", "password": "pass1234"}
-	b, _ := json.Marshal(signupBody)
-	rr, err := doRequest(r, requestParams{
-		method:  "POST",
-		path:    "/signup",
-		body:    b,
-		headers: map[string]string{"Authorization": "Bearer " + apiToken},
-	})
-	if err != nil {
-		t.Fatalf("signup request failed: %v", err)
+// requestOpts groups optional parameters for HTTP requests
+type requestOpts struct {
+	apiToken     string
+	sessionToken string
+}
+
+// performRequest executes an HTTP request and validates response status
+func performRequest(t *testing.T, r http.Handler, params requestParams, opts requestOpts) *httptest.ResponseRecorder {
+	headers := map[string]string{}
+	if opts.apiToken != "" {
+		headers["Authorization"] = "Bearer " + opts.apiToken
 	}
+	if opts.sessionToken != "" {
+		headers["session-token"] = opts.sessionToken
+	}
+
+	// merge provided headers
+	if params.headers == nil {
+		params.headers = headers
+	} else {
+		for k, v := range headers {
+			params.headers[k] = v
+		}
+	}
+
+	rr, err := doRequest(r, params)
+	if err != nil {
+		t.Fatalf("%s %s request failed: %v", params.method, params.path, err)
+	}
+	return rr
+}
+
+// validateAndDecodeResponse checks response success and decodes data
+func validateAndDecodeResponse(t *testing.T, rr *httptest.ResponseRecorder, method, path string) json.RawMessage {
 	if rr.Code != http.StatusOK {
-		t.Fatalf("signup returned non-200: %d %s", rr.Code, rr.Body.String())
+		t.Fatalf("%s %s returned non-200: %d %s", method, path, rr.Code, rr.Body.String())
 	}
 
 	var resp apiResp
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to decode signup response: %v", err)
+		t.Fatalf("failed to decode %s %s response: %v", method, path, err)
 	}
 	if !resp.Success {
-		t.Fatalf("signup returned success=false: %s", string(resp.Data))
+		t.Fatalf("%s %s returned success=false: %s", method, path, string(resp.Data))
 	}
+	return resp.Data
+}
+
+// testSignup performs signup and returns token
+func testSignup(t *testing.T, r http.Handler, apiToken string) string {
+	signupBody := map[string]string{"name": "Test User", "email": "test@example.com", "password": "pass1234"}
+	b, _ := json.Marshal(signupBody)
+
+	rr := performRequest(t, r, requestParams{method: "POST", path: "/signup", body: b}, requestOpts{apiToken: apiToken})
+	data := validateAndDecodeResponse(t, rr, "POST", "/signup")
 
 	var signupToken string
-	if err := json.Unmarshal(resp.Data, &signupToken); err != nil {
+	if err := json.Unmarshal(data, &signupToken); err != nil {
 		t.Fatalf("failed to parse signup token: %v", err)
 	}
 	return signupToken
@@ -139,33 +170,16 @@ func testSignup(t *testing.T, r http.Handler, apiToken string) string {
 func testLogin(t *testing.T, r http.Handler, apiToken string) string {
 	loginBody := map[string]string{"email": "test@example.com", "password": "pass1234"}
 	b, _ := json.Marshal(loginBody)
-	rr, err := doRequest(r, requestParams{
-		method:  "POST",
-		path:    "/login",
-		body:    b,
-		headers: map[string]string{"Authorization": "Bearer " + apiToken},
-	})
-	if err != nil {
-		t.Fatalf("login request failed: %v", err)
-	}
-	if rr.Code != http.StatusOK {
-		t.Fatalf("login returned non-200: %d %s", rr.Code, rr.Body.String())
-	}
 
-	var resp apiResp
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("failed to decode login response: %v", err)
-	}
-	if !resp.Success {
-		t.Fatalf("login returned success=false: %s", string(resp.Data))
-	}
+	rr := performRequest(t, r, requestParams{method: "POST", path: "/login", body: b}, requestOpts{apiToken: apiToken})
+	data := validateAndDecodeResponse(t, rr, "POST", "/login")
 
 	var loginData struct {
 		Token  string `json:"token"`
 		Role   string `json:"role"`
 		UserID uint   `json:"user_id"`
 	}
-	if err := json.Unmarshal(resp.Data, &loginData); err != nil {
+	if err := json.Unmarshal(data, &loginData); err != nil {
 		t.Fatalf("failed to parse login data: %v", err)
 	}
 	if loginData.Token == "" {
@@ -174,25 +188,24 @@ func testLogin(t *testing.T, r http.Handler, apiToken string) string {
 	return loginData.Token
 }
 
-// testValidateToken validates a session token
-func testValidateToken(t *testing.T, r http.Handler, apiToken, sessionToken string, expectSuccess bool) {
-	rr, err := doRequest(r, requestParams{
-		method: "GET",
-		path:   "/token/validate",
-		body:   nil,
-		headers: map[string]string{
-			"Authorization": "Bearer " + apiToken,
-			"session-token": sessionToken,
-		},
-	})
-	if err != nil {
-		t.Fatalf("validate token request failed: %v", err)
-	}
+// validateTokenOpts groups parameters for token validation
+type validateTokenOpts struct {
+	apiToken      string
+	sessionToken  string
+	expectSuccess bool
+}
 
-	if expectSuccess && rr.Code != http.StatusOK {
+// testValidateToken validates a session token
+func testValidateToken(t *testing.T, r http.Handler, opts validateTokenOpts) {
+	rr := performRequest(t, r, requestParams{method: "GET", path: "/token/validate"}, requestOpts{
+		apiToken:     opts.apiToken,
+		sessionToken: opts.sessionToken,
+	})
+
+	if opts.expectSuccess && rr.Code != http.StatusOK {
 		t.Fatalf("token validate returned non-200: %d %s", rr.Code, rr.Body.String())
 	}
-	if !expectSuccess && rr.Code == http.StatusOK {
+	if !opts.expectSuccess && rr.Code == http.StatusOK {
 		t.Fatalf("token validate unexpectedly succeeded: %s", rr.Body.String())
 	}
 }
@@ -209,37 +222,12 @@ func testCreatePatient(t *testing.T, r http.Handler, apiToken string) {
 		"phone_number": []string{"081200000"},
 	}
 	b, _ := json.Marshal(patientBody)
-	rr, err := doRequest(r, requestParams{
-		method:  "POST",
-		path:    "/patient",
-		body:    b,
-		headers: map[string]string{"Authorization": "Bearer " + apiToken},
-	})
-	if err != nil {
-		t.Fatalf("create patient request failed: %v", err)
-	}
-	if rr.Code != http.StatusOK {
-		t.Fatalf("create patient returned non-200: %d %s", rr.Code, rr.Body.String())
-	}
+	_ = performRequest(t, r, requestParams{method: "POST", path: "/patient", body: b}, requestOpts{apiToken: apiToken})
 }
 
 // testLogout performs logout
-func testLogout(t *testing.T, r http.Handler, apiToken, sessionToken string) {
-	rr, err := doRequest(r, requestParams{
-		method: "DELETE",
-		path:   "/logout",
-		body:   nil,
-		headers: map[string]string{
-			"Authorization": "Bearer " + apiToken,
-			"session-token": sessionToken,
-		},
-	})
-	if err != nil {
-		t.Fatalf("logout request failed: %v", err)
-	}
-	if rr.Code != http.StatusOK {
-		t.Fatalf("logout returned non-200: %d %s", rr.Code, rr.Body.String())
-	}
+func testLogout(t *testing.T, r http.Handler, opts requestOpts) {
+	_ = performRequest(t, r, requestParams{method: "DELETE", path: "/logout"}, opts)
 }
 
 func TestIntegrationFlow(t *testing.T) {
@@ -254,14 +242,25 @@ func TestIntegrationFlow(t *testing.T) {
 	sessionToken := testLogin(t, r, apiToken)
 
 	// 3) Validate token (should be valid)
-	testValidateToken(t, r, apiToken, sessionToken, true)
+	testValidateToken(t, r, validateTokenOpts{
+		apiToken:      apiToken,
+		sessionToken:  sessionToken,
+		expectSuccess: true,
+	})
 
 	// 4) Create patient (public)
 	testCreatePatient(t, r, apiToken)
 
 	// 5) Logout
-	testLogout(t, r, apiToken, sessionToken)
+	testLogout(t, r, requestOpts{
+		apiToken:     apiToken,
+		sessionToken: sessionToken,
+	})
 
 	// 6) Validate token again (should fail)
-	testValidateToken(t, r, apiToken, sessionToken, false)
+	testValidateToken(t, r, validateTokenOpts{
+		apiToken:      apiToken,
+		sessionToken:  sessionToken,
+		expectSuccess: false,
+	})
 }
