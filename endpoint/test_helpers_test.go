@@ -160,3 +160,37 @@ func CreateAdminAndTestUsers(t *testing.T, r http.Handler) (string, uint) {
 
 	return adminToken, adminID
 }
+
+// ListUsersData performs a GET /user request with optional query string and
+// returns the decoded response data as map[string]interface{}.
+func ListUsersData(t *testing.T, r http.Handler, adminToken string, query string) map[string]interface{} {
+	path := "/user"
+	if query != "" {
+		path += "?" + query
+	}
+	rr, err := doRequest(r, "GET", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	if err != nil {
+		t.Fatalf("list users request failed: %v", err)
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list users returned non-200: %d %s", rr.Code, rr.Body.String())
+	}
+	resp := ParseAPIResp(t, rr)
+	return ParseDataToMap(t, resp.Data)
+}
+
+// AssertTotal asserts the `total` field in list response data.
+func AssertTotal(t *testing.T, data map[string]interface{}, want int) {
+	got := int(data["total"].(float64))
+	if got != want {
+		t.Errorf("expected total %d, got %d", want, got)
+	}
+}
+
+// AssertTotalFetched asserts the `total_fetched` field in list response data.
+func AssertTotalFetched(t *testing.T, data map[string]interface{}, want int) {
+	got := int(data["total_fetched"].(float64))
+	if got != want {
+		t.Errorf("expected total_fetched %d, got %d", want, got)
+	}
+}
