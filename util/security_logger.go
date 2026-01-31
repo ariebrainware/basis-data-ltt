@@ -165,16 +165,21 @@ type LoginParams struct {
 	Reason    string // For failures only
 }
 
-// LogLoginSuccess logs a successful login event
-func LogLoginSuccess(params LoginParams) {
+// logLoginEventWithUserID is a helper to reduce duplication in login-related logging
+func logLoginEventWithUserID(eventType SecurityEventType, message string, params LoginParams) {
 	LogSecurityEvent(SecurityEvent{
-		EventType: EventLoginSuccess,
+		EventType: eventType,
 		UserID:    fmt.Sprintf("%d", params.UserID),
 		Email:     params.Email,
 		IP:        params.IP,
 		UserAgent: params.UserAgent,
-		Message:   "User logged in successfully",
+		Message:   message,
 	})
+}
+
+// LogLoginSuccess logs a successful login event
+func LogLoginSuccess(params LoginParams) {
+	logLoginEventWithUserID(EventLoginSuccess, "User logged in successfully", params)
 }
 
 // LogLoginFailure logs a failed login attempt
@@ -194,14 +199,7 @@ func LogLoginFailure(params LoginParams) {
 
 // LogLogout logs a logout event
 func LogLogout(params LoginParams) {
-	LogSecurityEvent(SecurityEvent{
-		EventType: EventLogout,
-		UserID:    fmt.Sprintf("%d", params.UserID),
-		Email:     params.Email,
-		IP:        params.IP,
-		UserAgent: params.UserAgent,
-		Message:   "User logged out",
-	})
+	logLoginEventWithUserID(EventLogout, "User logged out", params)
 }
 
 // AccountLockParams groups parameters for account lock logging
