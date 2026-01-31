@@ -283,8 +283,8 @@ type LocalizationData struct {
 	IsoCode string
 }
 
-// extractLocalizedName returns the English name from the localization data,
-// falling back to the ISO code when the localized name is unavailable.
+// extractLocalizedName returns the name for the requested language from the
+// localization data, falling back to the ISO code when the localized name is unavailable.
 func extractLocalizedName(data LocalizationData, lang string) string {
 	if data.Names != nil {
 		if v, ok := data.Names[lang]; ok {
