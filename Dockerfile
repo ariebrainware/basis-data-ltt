@@ -74,6 +74,18 @@ ENV APPNAME=$APPNAME \
 COPY --from=builder /basis-data-ltt ./basis-data-ltt
 RUN chmod +x ./basis-data-ltt
 
+# Add entrypoint script and ensure runtime tools for download+drop-privileges
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Install curl (for downloads) and su-exec to drop privileges when running the app
+RUN apk add --no-cache ca-certificates curl su-exec && \
+    addgroup -S ltt && adduser -S -u 1000 -G ltt ltt && \
+    chown ltt:ltt ./basis-data-ltt
+
 EXPOSE 19091
 
-CMD ["./basis-data-ltt"]
+# Entrypoint will optionally fetch GeoIP DB then exec the command.
+# Default will run the binary as the non-root `ltt` user using `su-exec`.
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["su-exec", "ltt:ltt", "./basis-data-ltt"]

@@ -41,20 +41,12 @@ type LoginResponse struct {
 func Login(c *gin.Context) {
 	var req LoginRequest
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request payload",
-			Err: err,
-		})
+	if !bindJSONOrRespond(c, &req, "Invalid request payload") {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrRespond(c)
+	if !ok {
 		return
 	}
 
@@ -67,184 +59,305 @@ func Login(c *gin.Context) {
 	}
 
 	// Get client info for logging
-	clientIP := c.ClientIP()
-	userAgent := c.Request.UserAgent()
+	ci := clientInfo{IP: c.ClientIP(), Agent: c.Request.UserAgent()}
+	ctx := loginContext{C: c, DB: db, Email: req.Email, CI: ci}
 
-	// Check if user exists
-	var user model.User
-	err := db.Model(&user).Where("email = ?", req.Email).First(&user).Error
+	// Load user
+	user, ok := loadUserForLogin(ctx)
+	if !ok {
+		return
+	}
+
+	// Check lock
+	if !ensureAccountNotLocked(ctx, &user) {
+		return
+	}
+
+	// Verify password
+	if !verifyPasswordOrRespond(ctx, &user, req.Password) {
+		return
+	}
+
+	if !finalizeLogin(ctx, &user, req.Password) {
+		return
+	}
+}
+
+// helper types and functions to simplify Login flow
+type clientInfo struct {
+	IP    string
+	Agent string
+}
+
+type loginContext struct {
+	C     *gin.Context
+	DB    *gorm.DB
+	Email string
+	CI    clientInfo
+}
+
+func bindJSONOrRespond(c *gin.Context, dst interface{}, msg string) bool {
+	if err := c.ShouldBindJSON(dst); err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: msg, Err: err})
+		return false
+	}
+	return true
+}
+
+func getDBOrRespond(c *gin.Context) (*gorm.DB, bool) {
+	db := middleware.GetDB(c)
+	if db == nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Database connection not available", Err: fmt.Errorf("db is nil")})
+		return nil, false
+	}
+	return db, true
+}
+
+func loadUserForLogin(ctx loginContext) (model.User, bool) {
+	user, err := loadUserByEmail(ctx.DB, ctx.Email)
 	if err == gorm.ErrRecordNotFound {
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "user not found")
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid email or password",
-			Err: fmt.Errorf("user not found"),
-		})
-		return
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "user not found")
+		util.CallUserError(ctx.C, util.APIErrorParams{Msg: "Invalid email or password", Err: fmt.Errorf("user not found")})
+		return model.User{}, false
 	}
 	if err != nil {
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "database error")
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database error",
-			Err: err,
-		})
-		return
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "database error")
+		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Database error", Err: err})
+		return model.User{}, false
 	}
+	return user, true
+}
 
-	// Check if account is locked
-	if user.LockedUntil != nil && *user.LockedUntil > time.Now().Unix() {
-		lockExpiry := time.Unix(*user.LockedUntil, 0)
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "account locked")
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: fmt.Sprintf("Account is locked until %s due to multiple failed login attempts", lockExpiry.Format(time.RFC3339)),
-			Err: fmt.Errorf("account locked"),
-		})
-		return
+func ensureAccountNotLocked(ctx loginContext, user *model.User) bool {
+	if locked, expiry := isAccountLocked(user); locked {
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "account locked")
+		util.CallUserError(ctx.C, util.APIErrorParams{Msg: fmt.Sprintf("Account is locked until %s due to multiple failed login attempts", expiry.Format(time.RFC3339)), Err: fmt.Errorf("account locked")})
+		return false
 	}
+	return true
+}
 
-	// Verify password (supports both Argon2id and legacy HMAC)
-	passwordMatch, err := util.VerifyPassword(req.Password, user.Password, user.PasswordSalt)
+func verifyPasswordOrRespond(ctx loginContext, user *model.User, plain string) bool {
+	match, err := util.VerifyPassword(plain, user.Password, user.PasswordSalt)
 	if err != nil {
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "password verification error")
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Password verification failed",
-			Err: err,
-		})
-		return
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "password verification error")
+		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Password verification failed", Err: err})
+		return false
 	}
-
-	if !passwordMatch {
-		// Increment failed attempts
-		user.FailedAttempts++
-
-		// Lock account after 5 failed attempts
-		if user.FailedAttempts >= 5 {
-			lockUntil := time.Now().Add(15 * time.Minute).Unix()
-			user.LockedUntil = &lockUntil
-			util.LogAccountLocked(user.ID, user.Email, clientIP, "too many failed login attempts")
-		}
-
-		if err := db.Save(&user).Error; err != nil {
-			util.LogLoginFailure(req.Email, clientIP, userAgent, "failed to update failed attempts")
-		}
-
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "invalid password")
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid email or password",
-			Err: fmt.Errorf("invalid password"),
-		})
-		return
+	if !match {
+		incrementFailedAttempts(ctx.DB, user, ctx.CI)
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "invalid password")
+		util.CallUserError(ctx.C, util.APIErrorParams{Msg: "Invalid email or password", Err: fmt.Errorf("invalid password")})
+		return false
 	}
+	return true
+}
 
-	// Reset failed attempts on successful login
-	if user.FailedAttempts > 0 || user.LockedUntil != nil {
-		user.FailedAttempts = 0
-		user.LockedUntil = nil
-		if err := db.Save(&user).Error; err != nil {
-			// Log but don't fail the login
-			util.LogSecurityEvent(util.SecurityEvent{
-				EventType: util.EventSuspiciousActivity,
-				UserID:    fmt.Sprintf("%d", user.ID),
-				Email:     user.Email,
-				IP:        clientIP,
-				Message:   fmt.Sprintf("Failed to reset failed attempts: %v", err),
-			})
-		}
-	}
-
-	// If the stored password is a legacy HMAC (non-Argon2), upgrade it
-	// to Argon2id using the plaintext password the user just provided.
-	if !strings.HasPrefix(user.Password, "argon2id$") {
-		salt, err := util.GenerateSalt()
-		if err == nil {
-			hashed, herr := util.HashPasswordArgon2(req.Password, salt)
-			if herr == nil {
-				user.Password = hashed
-				user.PasswordSalt = salt
-				if err := db.Save(&user).Error; err != nil {
-					util.LogSecurityEvent(util.SecurityEvent{
-						EventType: util.EventSuspiciousActivity,
-						UserID:    fmt.Sprintf("%d", user.ID),
-						Email:     user.Email,
-						IP:        clientIP,
-						Message:   fmt.Sprintf("Failed to upgrade password hash: %v", err),
-					})
-				} else {
-					util.LogSecurityEvent(util.SecurityEvent{
-						EventType: util.EventPasswordChanged,
-						UserID:    fmt.Sprintf("%d", user.ID),
-						Email:     user.Email,
-						IP:        clientIP,
-						Message:   "Upgraded password hash to Argon2",
-					})
-				}
-			}
-		}
-	}
-
-	// Check role
-	var role model.Role
-	err = db.Model(&role).Where("id = ?", user.RoleID).First(&role).Error
+func fetchRoleOrRespond(ctx loginContext, roleID uint32) (model.Role, bool) {
+	role, err := fetchRole(ctx.DB, roleID)
 	if err == gorm.ErrRecordNotFound {
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "role not found")
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Role not found",
-			Err: fmt.Errorf("role not found"),
-		})
-		return
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "role not found")
+		util.CallUserError(ctx.C, util.APIErrorParams{Msg: "Role not found", Err: fmt.Errorf("role not found")})
+		return model.Role{}, false
 	}
-
-	// Create JWT token with claims
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email": user.Email,
-		"exp":   time.Now().Add(time.Hour * 1).Unix(),
-		"role":  user.RoleID,
-	})
-
-	tokenString, err := token.SignedString(util.GetJWTSecretByte())
 	if err != nil {
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "token generation failed")
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Could not generate token",
-			Err: err,
-		})
-		return
+		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Database error", Err: err})
+		return model.Role{}, false
+	}
+	return role, true
+}
+
+func createTokenOrRespond(ctx loginContext, user model.User) (string, bool) {
+	tokenString, err := createJWTToken(user)
+	if err != nil {
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "token generation failed")
+		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Could not generate token", Err: err})
+		return "", false
+	}
+	return tokenString, true
+}
+
+func recordSessionOrRespond(ctx loginContext, info SessionInfo) (model.Session, bool) {
+	session, err := recordSession(ctx.DB, info)
+	if err != nil {
+		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "session creation failed")
+		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Failed to record session", Err: err})
+		return model.Session{}, false
+	}
+	return session, true
+}
+
+func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
+	// Reset failed attempts if needed
+	if err := resetFailedAttempts(ctx.DB, user); err != nil {
+		util.LogSecurityEvent(util.SecurityEvent{EventType: util.EventSuspiciousActivity, UserID: fmt.Sprintf("%d", user.ID), Email: user.Email, IP: ctx.CI.IP, Message: fmt.Sprintf("Failed to reset failed attempts: %v", err)})
 	}
 
-	// Record Session
-	session := model.Session{
-		UserID:       user.ID,
-		SessionToken: tokenString,
-		ExpiresAt:    time.Now().Add(time.Hour * 1),
-		ClientIP:     clientIP,
-		Browser:      userAgent,
+	// Upgrade legacy password if needed (best-effort)
+	_ = upgradeLegacyPasswordIfNeeded(ctx.DB, user, plain, ctx.CI)
+
+	// Fetch role
+	role, ok := fetchRoleOrRespond(ctx, user.RoleID)
+	if !ok {
+		return false
 	}
 
-	if err := db.Create(&session).Error; err != nil {
-		util.LogLoginFailure(req.Email, clientIP, userAgent, "session creation failed")
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to record session",
-			Err: err,
-		})
-		return
+	// Create token
+	tokenString, ok := createTokenOrRespond(ctx, *user)
+	if !ok {
+		return false
 	}
 
-	// Also store session in Redis for fast validation (key: session:<token> -> "userID:roleID")
+	// Record session
+	sessionInfo := SessionInfo{UserID: user.ID, Token: tokenString, Client: ctx.CI, Expires: time.Now().Add(time.Hour * 1)}
+	session, ok := recordSessionOrRespond(ctx, sessionInfo)
+	if !ok {
+		return false
+	}
+
+	// Store session in Redis (best-effort)
 	if rdb := config.GetRedisClient(); rdb != nil {
 		exp := time.Until(session.ExpiresAt)
 		val := fmt.Sprintf("%d:%d", session.UserID, role.ID)
 		_ = rdb.Set(context.Background(), fmt.Sprintf("session:%s", tokenString), val, exp).Err()
-		// Also update per-user set via util helper
 		_ = util.AddSessionToUserSet(session.UserID, tokenString, exp)
 	}
 
-	// Log successful login
-	util.LogLoginSuccess(user.ID, user.Email, clientIP, userAgent)
+	util.LogLoginSuccess(user.ID, user.Email, ctx.CI.IP, ctx.CI.Agent)
+	util.CallSuccessOK(ctx.C, util.APISuccessParams{Msg: "Login successful", Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: user.ID}})
+	return true
+}
 
-	// Return the token in a JSON response
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "Login successful",
-		Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: user.ID},
+func ensureEmailAvailable(c *gin.Context, db *gorm.DB, email string) bool {
+	var existingUser model.User
+	err := db.First(&existingUser, "email = ?", email).Error
+	if err != gorm.ErrRecordNotFound {
+		if err == nil {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
+			return false
+		}
+		util.CallServerError(c, util.APIErrorParams{Msg: "Database error", Err: err})
+		return false
+	}
+	return true
+}
+
+func hashPasswordForSignup(c *gin.Context, plain string) (string, string, bool) {
+	salt, err := util.GenerateSalt()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
+		return "", "", false
+	}
+	hashedPassword, err := util.HashPasswordArgon2(plain, salt)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
+		return "", "", false
+	}
+	return hashedPassword, salt, true
+}
+
+func createUserOrRespond(c *gin.Context, db *gorm.DB, user *model.User) bool {
+	if err := db.Create(user).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to create new user", Err: err})
+		return false
+	}
+	return true
+}
+
+func createSignupTokenOrRespond(c *gin.Context, email string, roleID uint32) (string, bool) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"email":   email,
+		"exp":     time.Now().Add(time.Hour * 1).Unix(),
+		"role_id": roleID,
 	})
+
+	tokenString, err := token.SignedString(util.GetJWTSecretByte())
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Could not generate token", Err: err})
+		return "", false
+	}
+	return tokenString, true
+}
+
+func loadUserByEmail(db *gorm.DB, email string) (model.User, error) {
+	var user model.User
+	err := db.Model(&user).Where("email = ?", email).First(&user).Error
+	return user, err
+}
+
+func isAccountLocked(user *model.User) (bool, time.Time) {
+	if user.LockedUntil != nil && *user.LockedUntil > time.Now().Unix() {
+		return true, time.Unix(*user.LockedUntil, 0)
+	}
+	return false, time.Time{}
+}
+
+func incrementFailedAttempts(db *gorm.DB, user *model.User, ci clientInfo) {
+	user.FailedAttempts++
+	if user.FailedAttempts >= 5 {
+		lockUntil := time.Now().Add(15 * time.Minute).Unix()
+		user.LockedUntil = &lockUntil
+		util.LogAccountLocked(user.ID, user.Email, ci.IP, "too many failed login attempts")
+	}
+	if err := db.Save(user).Error; err != nil {
+		util.LogLoginFailure(user.Email, ci.IP, ci.Agent, "failed to update failed attempts")
+	}
+}
+
+func resetFailedAttempts(db *gorm.DB, user *model.User) error {
+	if user.FailedAttempts > 0 || user.LockedUntil != nil {
+		user.FailedAttempts = 0
+		user.LockedUntil = nil
+		return db.Save(user).Error
+	}
+	return nil
+}
+
+func upgradeLegacyPasswordIfNeeded(db *gorm.DB, user *model.User, plain string, ci clientInfo) error {
+	if strings.HasPrefix(user.Password, "argon2id$") {
+		return nil
+	}
+	salt, err := util.GenerateSalt()
+	if err != nil {
+		return err
+	}
+	hashed, herr := util.HashPasswordArgon2(plain, salt)
+	if herr != nil {
+		return herr
+	}
+	user.Password = hashed
+	user.PasswordSalt = salt
+	if err := db.Save(user).Error; err != nil {
+		util.LogSecurityEvent(util.SecurityEvent{EventType: util.EventSuspiciousActivity, UserID: fmt.Sprintf("%d", user.ID), Email: user.Email, IP: ci.IP, Message: fmt.Sprintf("Failed to upgrade password hash: %v", err)})
+		return err
+	}
+	util.LogSecurityEvent(util.SecurityEvent{EventType: util.EventPasswordChanged, UserID: fmt.Sprintf("%d", user.ID), Email: user.Email, IP: ci.IP, Message: "Upgraded password hash to Argon2"})
+	return nil
+}
+
+func fetchRole(db *gorm.DB, roleID uint32) (model.Role, error) {
+	var role model.Role
+	err := db.Model(&role).Where("id = ?", roleID).First(&role).Error
+	return role, err
+}
+
+func createJWTToken(user model.User) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"email": user.Email, "exp": time.Now().Add(time.Hour * 1).Unix(), "role": user.RoleID})
+	return token.SignedString(util.GetJWTSecretByte())
+}
+
+// SessionInfo groups parameters for creating a session to avoid long argument lists.
+type SessionInfo struct {
+	UserID  uint
+	Token   string
+	Client  clientInfo
+	Expires time.Time
+}
+
+func recordSession(db *gorm.DB, info SessionInfo) (model.Session, error) {
+	session := model.Session{UserID: info.UserID, SessionToken: info.Token, ExpiresAt: info.Expires, ClientIP: info.Client.IP, Browser: info.Client.Agent}
+	err := db.Create(&session).Error
+	return session, err
 }
 
 // Logout godoc
@@ -340,56 +453,21 @@ type SignupRequest struct {
 func Signup(c *gin.Context) {
 	var req SignupRequest
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request payload",
-			Err: err,
-		})
+	if !bindJSONOrRespond(c, &req, "Invalid request payload") {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrRespond(c)
+	if !ok {
 		return
 	}
 
-	var existingUser model.User
-	err := db.First(&existingUser, "email = ?", req.Email).Error
-	if err != gorm.ErrRecordNotFound {
-		if err == nil {
-			util.CallUserError(c, util.APIErrorParams{
-				Msg: "Email already exists",
-				Err: fmt.Errorf("email already exists"),
-			})
-			return
-		}
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database error",
-			Err: err,
-		})
+	if !ensureEmailAvailable(c, db, req.Email) {
 		return
 	}
 
-	// Generate salt and hash password using Argon2id
-	salt, err := util.GenerateSalt()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to generate password salt",
-			Err: err,
-		})
-		return
-	}
-
-	hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to hash password",
-			Err: err,
-		})
+	hashedPassword, salt, ok := hashPasswordForSignup(c, req.Password)
+	if !ok {
 		return
 	}
 
@@ -404,11 +482,7 @@ func Signup(c *gin.Context) {
 	}
 
 	// Insert the new user into the database.
-	if err := db.Create(&newUser).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to create new user",
-			Err: err,
-		})
+	if !createUserOrRespond(c, db, &newUser) {
 		return
 	}
 
@@ -423,18 +497,8 @@ func Signup(c *gin.Context) {
 	})
 
 	// Generate a JWT token upon successful signup.
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"email":   req.Email,
-		"exp":     time.Now().Add(time.Hour * 1).Unix(),
-		"role_id": newUser.RoleID,
-	})
-
-	tokenString, err := token.SignedString(util.GetJWTSecretByte())
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Could not generate token",
-			Err: err,
-		})
+	tokenString, ok := createSignupTokenOrRespond(c, req.Email, newUser.RoleID)
+	if !ok {
 		return
 	}
 

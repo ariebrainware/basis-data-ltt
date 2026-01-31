@@ -53,6 +53,19 @@ func unauthorizedAbort(c *gin.Context, msg string, err error) {
 	c.Abort()
 }
 
+// logUnauthorizedWithUser logs an unauthorized access event, including the
+// authenticated user id when available. This consolidates repeated logic
+// found in RequireRole and other middleware helpers.
+func logUnauthorizedWithUser(c *gin.Context, logMsg string) {
+	userID, _ := GetUserID(c)
+	util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, logMsg)
+}
+
+func logAndAbortUnauthorized(c *gin.Context, logMsg, userMsg string, err error) {
+	logUnauthorizedWithUser(c, logMsg)
+	unauthorizedAbort(c, userMsg, err)
+}
+
 // isRoleAllowed checks whether the current request's role is among allowedRoles.
 // It returns (allowed, roleID, exists).
 func isRoleAllowed(c *gin.Context, allowedRoles ...uint32) (bool, uint32, bool) {
@@ -83,7 +96,7 @@ func tryParseRedisSession(val string) (uint, uint32, bool) {
 	if uid64 == 0 {
 		return 0, 0, false
 	}
-	var maxUint uint64 = uint64(^uint(0))
+	maxUint := uint64(^uint(0))
 	if uid64 > maxUint {
 		return 0, 0, false
 	}
@@ -162,24 +175,32 @@ func GetDB(c *gin.Context) *gorm.DB {
 
 // GetUserID retrieves the user ID from the Gin context
 func GetUserID(c *gin.Context) (uint, bool) {
-	userID, exists := c.Get(UserIDKey)
+	return getUintFromContext(c, UserIDKey)
+}
+
+// GetRoleID retrieves the role ID from the Gin context
+func GetRoleID(c *gin.Context) (uint32, bool) {
+	return getUint32FromContext(c, RoleIDKey)
+}
+
+func getUintFromContext(c *gin.Context, key string) (uint, bool) {
+	val, exists := c.Get(key)
 	if !exists {
 		return 0, false
 	}
-	id, ok := userID.(uint)
+	id, ok := val.(uint)
 	if !ok {
 		return 0, false
 	}
 	return id, true
 }
 
-// GetRoleID retrieves the role ID from the Gin context
-func GetRoleID(c *gin.Context) (uint32, bool) {
-	roleID, exists := c.Get(RoleIDKey)
+func getUint32FromContext(c *gin.Context, key string) (uint32, bool) {
+	val, exists := c.Get(key)
 	if !exists {
 		return 0, false
 	}
-	id, ok := roleID.(uint32)
+	id, ok := val.(uint32)
 	if !ok {
 		return 0, false
 	}
@@ -191,15 +212,11 @@ func RequireRole(allowedRoles ...uint32) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		allowed, roleID, exists := isRoleAllowed(c, allowedRoles...)
 		if !exists {
-			userID, _ := GetUserID(c)
-			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, "Role information not available")
-			unauthorizedAbort(c, "Role information not available", fmt.Errorf("role information not available in context"))
+			logAndAbortUnauthorized(c, "Role information not available", "Role information not available", fmt.Errorf("role information not available in context"))
 			return
 		}
 		if !allowed {
-			userID, _ := GetUserID(c)
-			util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, fmt.Sprintf("Insufficient permissions (role %d)", roleID))
-			unauthorizedAbort(c, "Insufficient permissions to access this resource", fmt.Errorf("user role %d not authorized", roleID))
+			logAndAbortUnauthorized(c, fmt.Sprintf("Insufficient permissions (role %d)", roleID), "Insufficient permissions to access this resource", fmt.Errorf("user role %d not authorized", roleID))
 			return
 		}
 		c.Next()
@@ -220,27 +237,27 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 		// Otherwise check ownership: compare context user id with URL param `id`
 		userID, ok := GetUserID(c)
 		if !ok {
-			unauthorizedAbort(c, "User not authenticated", fmt.Errorf("user id not found in context"))
+			logAndAbortUnauthorized(c, "User not authenticated", "User not authenticated", fmt.Errorf("user id not found in context"))
 			return
 		}
 
 		idParam := c.Param("id")
 		if idParam == "" {
-			unauthorizedAbort(c, "Resource id required", fmt.Errorf("resource id parameter missing"))
+			logAndAbortUnauthorized(c, "Resource id required", "Resource id required", fmt.Errorf("resource id parameter missing"))
 			return
 		}
 
 		// Parse id param to unsigned integer, constrained to platform uint size
 		uid, err := strconv.ParseUint(idParam, 10, 0)
 		if err != nil {
-			unauthorizedAbort(c, "Invalid resource id", err)
+			logAndAbortUnauthorized(c, "Invalid resource id", "Invalid resource id", err)
 			return
 		}
 
 		// Ensure the parsed id fits into the platform-dependent uint type to avoid overflow
 		maxUint := ^uint(0)
 		if uid > uint64(maxUint) {
-			unauthorizedAbort(c, "Invalid resource id", fmt.Errorf("resource id out of range"))
+			logAndAbortUnauthorized(c, "Invalid resource id", "Invalid resource id", fmt.Errorf("resource id out of range"))
 			return
 		}
 		if uint(uid) == userID {
@@ -248,7 +265,7 @@ func RequireRoleOrOwner(allowedRoles ...uint32) gin.HandlerFunc {
 			return
 		}
 
-		unauthorizedAbort(c, "Insufficient permissions to access this resource", fmt.Errorf("user %d not owner nor allowed role", userID))
+		logAndAbortUnauthorized(c, fmt.Sprintf("User %d not owner nor allowed role", userID), "Insufficient permissions to access this resource", fmt.Errorf("user %d not owner nor allowed role", userID))
 	}
 }
 

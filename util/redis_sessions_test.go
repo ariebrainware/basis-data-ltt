@@ -11,7 +11,7 @@ import (
 
 func TestAddSessionToUserSet_Success(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	token := "test-token-123"
@@ -48,7 +48,7 @@ func TestAddSessionToUserSet_NilClient(t *testing.T) {
 
 func TestAddSessionToUserSet_SAddError(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	token := "test-token-123"
@@ -76,7 +76,7 @@ func TestAddSessionToUserSet_SAddError(t *testing.T) {
 
 func TestAddSessionToUserSet_ExpireError(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	token := "test-token-123"
@@ -105,7 +105,7 @@ func TestAddSessionToUserSet_ExpireError(t *testing.T) {
 
 func TestRemoveSessionTokenFromUserSet_Success(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	token := "test-token-123"
@@ -139,7 +139,7 @@ func TestRemoveSessionTokenFromUserSet_NilClient(t *testing.T) {
 
 func TestRemoveSessionTokenFromUserSet_Error(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	token := "test-token-123"
@@ -166,7 +166,7 @@ func TestRemoveSessionTokenFromUserSet_Error(t *testing.T) {
 
 func TestInvalidateUserSessions_Success(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
@@ -204,7 +204,7 @@ func TestInvalidateUserSessions_NilClient(t *testing.T) {
 
 func TestInvalidateUserSessions_EmptySet(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
@@ -227,7 +227,7 @@ func TestInvalidateUserSessions_EmptySet(t *testing.T) {
 
 func TestInvalidateUserSessions_SMembersError(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
@@ -253,7 +253,7 @@ func TestInvalidateUserSessions_SMembersError(t *testing.T) {
 
 func TestInvalidateUserSessions_SMembersNil(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)
@@ -277,7 +277,7 @@ func TestInvalidateUserSessions_SMembersNil(t *testing.T) {
 
 func TestInvalidateUserSessions_DelError(t *testing.T) {
 	db, mock := redismock.NewClientMock()
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := uint(123)
 	userSetKey := fmt.Sprintf("user_sessions:%d", userID)

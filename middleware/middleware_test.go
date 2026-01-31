@@ -15,6 +15,45 @@ import (
 	"gorm.io/gorm"
 )
 
+// newInMemoryDB creates an in-memory sqlite DB and runs required migrations for tests.
+func newInMemoryDB(t *testing.T) *gorm.DB {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to create test database: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
+	return db
+}
+
+// createTestUserAndSession creates a user and associated session in the provided DB.
+func createTestUserAndSession(t *testing.T, db *gorm.DB, roleID uint32, token string, expiresAt time.Time) (model.User, model.Session) {
+	user := model.User{
+		Name:     "Test User",
+		Email:    "test@example.com",
+		Password: "hashedpassword",
+		RoleID:   roleID,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("failed to create test user: %v", err)
+	}
+	if expiresAt.IsZero() {
+		expiresAt = time.Now().Add(time.Hour)
+	}
+	session := model.Session{
+		SessionToken: token,
+		UserID:       user.ID,
+		ExpiresAt:    expiresAt,
+		ClientIP:     "127.0.0.1",
+		Browser:      "test-browser",
+	}
+	if err := db.Create(&session).Error; err != nil {
+		t.Fatalf("failed to create test session: %v", err)
+	}
+	return user, session
+}
+
 func TestSetCorsHeadersDefaults(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -44,8 +83,10 @@ func TestTokenValidator(t *testing.T) {
 
 	// Non-OPTIONS must match expected token
 	expected := "Bearer secret-token"
-	os.Setenv("APITOKEN", "secret-token")
-	defer os.Unsetenv("APITOKEN")
+	if err := os.Setenv("APITOKEN", "secret-token"); err != nil {
+		t.Fatalf("failed to set APITOKEN: %v", err)
+	}
+	defer func() { _ = os.Unsetenv("APITOKEN") }()
 
 	c.Request = httptest.NewRequest("GET", "/", nil)
 	c.Request.Header.Set("Authorization", expected)
@@ -196,32 +237,9 @@ func TestValidateLoginToken_RedisMalformedValue_NonNumeric(t *testing.T) {
 	// Set up mock expectations - Redis returns malformed data
 	mock.ExpectGet("session:malformed-token").SetVal("abc:1")
 
-	// Set up in-memory database for fallback
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
-
-	// Create test data
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "hashedpassword",
-		RoleID:   1,
-	}
-	db.Create(&user)
-
-	session := model.Session{
-		SessionToken: "malformed-token",
-		UserID:       user.ID,
-		ExpiresAt:    time.Now().Add(time.Hour),
-		ClientIP:     "127.0.0.1",
-		Browser:      "test-browser",
-	}
-	db.Create(&session)
+	// Set up in-memory database and test data for fallback
+	db := newInMemoryDB(t)
+	user, _ := createTestUserAndSession(t, db, 1, "malformed-token", time.Time{})
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
@@ -271,32 +289,9 @@ func TestValidateLoginToken_RedisInvalidFormat_MissingColon(t *testing.T) {
 	// Set up mock expectations - Redis returns invalid format
 	mock.ExpectGet("session:invalid-format-token").SetVal("123")
 
-	// Set up in-memory database for fallback
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
-
-	// Create test data
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "hashedpassword",
-		RoleID:   2,
-	}
-	db.Create(&user)
-
-	session := model.Session{
-		SessionToken: "invalid-format-token",
-		UserID:       user.ID,
-		ExpiresAt:    time.Now().Add(time.Hour),
-		ClientIP:     "127.0.0.1",
-		Browser:      "test-browser",
-	}
-	db.Create(&session)
+	// Set up in-memory database and test data for fallback
+	db := newInMemoryDB(t)
+	user, _ := createTestUserAndSession(t, db, 2, "invalid-format-token", time.Time{})
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
@@ -338,32 +333,9 @@ func TestValidateLoginToken_RedisZeroUserID(t *testing.T) {
 	// Set up mock expectations - Redis returns zero user ID
 	mock.ExpectGet("session:zero-uid-token").SetVal("0:1")
 
-	// Set up in-memory database for fallback
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
-
-	// Create test data
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "hashedpassword",
-		RoleID:   1,
-	}
-	db.Create(&user)
-
-	session := model.Session{
-		SessionToken: "zero-uid-token",
-		UserID:       user.ID,
-		ExpiresAt:    time.Now().Add(time.Hour),
-		ClientIP:     "127.0.0.1",
-		Browser:      "test-browser",
-	}
-	db.Create(&session)
+	// Set up in-memory database and test data for fallback
+	db := newInMemoryDB(t)
+	user, _ := createTestUserAndSession(t, db, 1, "zero-uid-token", time.Time{})
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
@@ -412,7 +384,9 @@ func TestValidateLoginToken_RedisRoleIDParseError(t *testing.T) {
 	}
 
 	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
+	if err := db.AutoMigrate(&model.User{}, &model.Session{}); err != nil {
+		t.Fatalf("failed to auto-migrate: %v", err)
+	}
 
 	// Create test data
 	user := model.User{
@@ -476,32 +450,9 @@ func TestValidateLoginToken_RedisNotAvailable_DBFallback(t *testing.T) {
 	config.ResetRedisClientForTest()
 	defer config.ResetRedisClientForTest()
 
-	// Set up in-memory database
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
-
-	// Create test data
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "hashedpassword",
-		RoleID:   1,
-	}
-	db.Create(&user)
-
-	session := model.Session{
-		SessionToken: "db-only-token",
-		UserID:       user.ID,
-		ExpiresAt:    time.Now().Add(time.Hour),
-		ClientIP:     "127.0.0.1",
-		Browser:      "test-browser",
-	}
-	db.Create(&session)
+	// Set up in-memory database and test data
+	db := newInMemoryDB(t)
+	user, _ := createTestUserAndSession(t, db, 1, "db-only-token", time.Time{})
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
@@ -543,32 +494,9 @@ func TestValidateLoginToken_DBFallback_ExpiredSession(t *testing.T) {
 	config.ResetRedisClientForTest()
 	defer config.ResetRedisClientForTest()
 
-	// Set up in-memory database
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
-
-	// Create test data with expired session
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "hashedpassword",
-		RoleID:   1,
-	}
-	db.Create(&user)
-
-	session := model.Session{
-		SessionToken: "expired-token",
-		UserID:       user.ID,
-		ExpiresAt:    time.Now().Add(-time.Hour), // Expired 1 hour ago
-		ClientIP:     "127.0.0.1",
-		Browser:      "test-browser",
-	}
-	db.Create(&session)
+	// Set up in-memory database and test data with expired session
+	db := newInMemoryDB(t)
+	_, _ = createTestUserAndSession(t, db, 1, "expired-token", time.Now().Add(-time.Hour))
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
@@ -599,32 +527,9 @@ func TestValidateLoginToken_RedisKeyNotFound_DBFallback(t *testing.T) {
 	// Set up mock expectations - Redis returns key not found error
 	mock.ExpectGet("session:notfound-token").RedisNil()
 
-	// Set up in-memory database for fallback
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to create test database: %v", err)
-	}
-
-	// Auto-migrate tables
-	db.AutoMigrate(&model.User{}, &model.Session{})
-
-	// Create test data
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@example.com",
-		Password: "hashedpassword",
-		RoleID:   1,
-	}
-	db.Create(&user)
-
-	session := model.Session{
-		SessionToken: "notfound-token",
-		UserID:       user.ID,
-		ExpiresAt:    time.Now().Add(time.Hour),
-		ClientIP:     "127.0.0.1",
-		Browser:      "test-browser",
-	}
-	db.Create(&session)
+	// Set up in-memory database and test data for fallback
+	db := newInMemoryDB(t)
+	user, _ := createTestUserAndSession(t, db, 1, "notfound-token", time.Time{})
 
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
