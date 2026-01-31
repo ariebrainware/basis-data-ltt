@@ -116,6 +116,91 @@ type createDiseaseRequest struct {
 	Description string `json:"description" example:"A metabolic disease"`
 }
 
+// normalizeUpdateRequest normalizes the fields in an update request
+func normalizeUpdateRequest(req *createDiseaseRequest) {
+	if req.Codename != "" {
+		req.Codename = strings.ToLower(strings.TrimSpace(req.Codename))
+	}
+	if req.Name != "" {
+		req.Name = strings.TrimSpace(req.Name)
+	}
+	if req.Description != "" {
+		req.Description = strings.TrimSpace(req.Description)
+	}
+}
+
+// applyDiseaseUpdate applies the update to the existing disease
+func applyDiseaseUpdate(db *gorm.DB, existing *model.Disease, updates createDiseaseRequest) error {
+	return db.Model(existing).Updates(updates).Error
+}
+
+// validateRequiredFields checks that name and codename are not empty
+func validateRequiredFields(c *gin.Context, name, codename string) bool {
+	if name == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body: name is required",
+			Err: fmt.Errorf("name is required"),
+		})
+		return false
+	}
+	if codename == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body: codename is required",
+			Err: fmt.Errorf("codename is required"),
+		})
+		return false
+	}
+	return true
+}
+
+// checkDuplicateDisease checks if a disease with the given name or codename already exists
+func checkDuplicateDisease(c *gin.Context, db *gorm.DB, name, codename string) bool {
+	exists, err := diseaseExists(db, "LOWER(name) = ?", strings.ToLower(name))
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to check existing diseases",
+			Err: err,
+		})
+		return false
+	}
+	if exists {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Disease with similar name already exists",
+			Err: fmt.Errorf("disease already exists"),
+		})
+		return false
+	}
+
+	exists, err = diseaseExists(db, "LOWER(codename) = ?", strings.ToLower(codename))
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to check existing codenames",
+			Err: err,
+		})
+		return false
+	}
+	if exists {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Disease with this codename already exists",
+			Err: fmt.Errorf("codename already exists"),
+		})
+		return false
+	}
+
+	return true
+}
+
+// createDiseaseRecord creates a new disease record in the database
+func createDiseaseRecord(db *gorm.DB, name, codename, description string) (model.Disease, error) {
+	disease := model.Disease{
+		Name:        name,
+		Codename:    codename,
+		Description: description,
+	}
+	err := db.Create(&disease).Error
+	return disease, err
+}
+
 // CreateDisease godoc
 // @Summary      Create a new disease
 // @Description  Add a new disease to the system
@@ -131,8 +216,7 @@ type createDiseaseRequest struct {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /disease [post]
 func CreateDisease(c *gin.Context) {
-	diseaseRequest := createDiseaseRequest{}
-
+	var diseaseRequest createDiseaseRequest
 	if err := c.ShouldBindJSON(&diseaseRequest); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
@@ -141,72 +225,23 @@ func CreateDisease(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := ensureDB(c)
+	if !ok {
 		return
 	}
 
 	name, codename, description := normalizeDiseaseInput(diseaseRequest)
-	if name == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request body: name is required",
-			Err: fmt.Errorf("name is required"),
-		})
-		return
-	}
-	if codename == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request body: codename is required",
-			Err: fmt.Errorf("codename is required"),
-		})
+
+	if !validateRequiredFields(c, name, codename) {
 		return
 	}
 
-	// Check for existing name
-	exists, err := diseaseExists(db, "LOWER(name) = ?", strings.ToLower(name))
+	if !checkDuplicateDisease(c, db, name, codename) {
+		return
+	}
+
+	disease, err := createDiseaseRecord(db, name, codename, description)
 	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to check existing diseases",
-			Err: err,
-		})
-		return
-	}
-	if exists {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Disease with similar name already exists",
-			Err: fmt.Errorf("disease already exists"),
-		})
-		return
-	}
-
-	// Check for existing codename
-	exists, err = diseaseExists(db, "LOWER(codename) = ?", strings.ToLower(codename))
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to check existing codenames",
-			Err: err,
-		})
-		return
-	}
-	if exists {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Disease with this codename already exists",
-			Err: fmt.Errorf("codename already exists"),
-		})
-		return
-	}
-
-	disease := model.Disease{
-		Name:        name,
-		Codename:    codename,
-		Description: description,
-	}
-
-	if err := db.Create(&disease).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create disease",
 			Err: err,
@@ -241,8 +276,7 @@ func UpdateDisease(c *gin.Context) {
 		return
 	}
 
-	diseaseRequest := createDiseaseRequest{}
-
+	var diseaseRequest createDiseaseRequest
 	if err := c.ShouldBindJSON(&diseaseRequest); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid request body",
@@ -265,17 +299,9 @@ func UpdateDisease(c *gin.Context) {
 		return
 	}
 
-	// Normalize codename if provided
-	if diseaseRequest.Codename != "" {
-		diseaseRequest.Codename = strings.ToLower(strings.TrimSpace(diseaseRequest.Codename))
-	}
+	normalizeUpdateRequest(&diseaseRequest)
 
-	// Normalize name if provided
-	if diseaseRequest.Name != "" {
-		diseaseRequest.Name = strings.TrimSpace(diseaseRequest.Name)
-	}
-
-	if err := db.Model(&existingDisease).Updates(diseaseRequest).Error; err != nil {
+	if err := applyDiseaseUpdate(db, &existingDisease, diseaseRequest); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update disease",
 			Err: err,
