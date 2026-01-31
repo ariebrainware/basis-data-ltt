@@ -133,3 +133,30 @@ func ParseDataToMap(t *testing.T, raw json.RawMessage) map[string]interface{} {
 	}
 	return data
 }
+
+// CreateAdminAndTestUsers creates an admin user (logged in) and several test users.
+// Returns admin session token and admin user id.
+func CreateAdminAndTestUsers(t *testing.T, r http.Handler) (string, uint) {
+	adminToken, adminID := CreateAndLoginUser(t, r, SignupCreds{Name: "Admin User", Email: "admin@example.com", Password: "adminpass"})
+
+	testUsers := []map[string]string{
+		{"name": "Alice Johnson", "email": "alice@example.com", "password": "pass1234"},
+		{"name": "Bob Smith", "email": "bob@example.com", "password": "pass1234"},
+		{"name": "Charlie Brown", "email": "charlie@example.com", "password": "pass1234"},
+		{"name": "David Wilson", "email": "david@example.com", "password": "pass1234"},
+		{"name": "Eve Davis", "email": "eve@example.com", "password": "pass1234"},
+	}
+
+	for _, u := range testUsers {
+		b, _ := json.Marshal(u)
+		rr, err := doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+		if err != nil {
+			t.Fatalf("signup %s failed: %v", u["email"], err)
+		}
+		if rr.Code != http.StatusOK {
+			t.Fatalf("signup %s returned non-200: %d %s", u["email"], rr.Code, rr.Body.String())
+		}
+	}
+
+	return adminToken, adminID
+}
