@@ -22,6 +22,24 @@ func validateUpdateRequest(req *UpdateUserRequest) bool {
 	return req.Name != "" || req.Email != "" || req.Password != ""
 }
 
+// validateAndUpdateEmail checks email uniqueness and updates the user model if valid.
+func validateAndUpdateEmail(c *gin.Context, db *gorm.DB, user *model.User, newEmail string) bool {
+	if newEmail == "" || newEmail == user.Email {
+		return true
+	}
+	exists, err := emailExists(db, newEmail, user.ID)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
+		return false
+	}
+	if exists {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
+		return false
+	}
+	user.Email = newEmail
+	return true
+}
+
 // hashUserPassword generates a salt and hashes the provided password, updating the user model.
 func hashUserPassword(c *gin.Context, user *model.User, plainPassword string) error {
 	salt, err := util.GenerateSalt()
@@ -44,16 +62,8 @@ func hashUserPassword(c *gin.Context, user *model.User, plainPassword string) er
 // updateUserFields applies the changes from an UpdateUserRequest to a user model,
 // handling email uniqueness checks, password hashing, and returning whether password changed.
 func updateUserFields(c *gin.Context, db *gorm.DB, user *model.User, req *UpdateUserRequest) (passwordChanged bool, err error) {
-	if req.Email != "" && req.Email != user.Email {
-		exists, err := emailExists(db, req.Email, user.ID)
-		if err != nil {
-			return false, err
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-			return false, fmt.Errorf("email already exists")
-		}
-		user.Email = req.Email
+	if !validateAndUpdateEmail(c, db, user, req.Email) {
+		return false, fmt.Errorf("email validation failed")
 	}
 
 	if req.Name != "" {
@@ -74,6 +84,27 @@ func updateUserFields(c *gin.Context, db *gorm.DB, user *model.User, req *Update
 func invalidateUserSessions(db *gorm.DB, userID uint) {
 	_ = db.Where("user_id = ?", userID).Delete(&model.Session{}).Error
 	_ = util.InvalidateUserSessions(userID)
+}
+
+// performUserUpdate updates a user and returns success, handling all error cases and session invalidation.
+func performUserUpdate(c *gin.Context, db *gorm.DB, user *model.User, req *UpdateUserRequest) bool {
+	passwordChanged, err := updateUserFields(c, db, user, req)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
+		return false
+	}
+
+	if err := db.Save(user).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
+		return false
+	}
+
+	if passwordChanged {
+		invalidateUserSessions(db, user.ID)
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
+	return true
 }
 
 // UpdateUser godoc
@@ -127,22 +158,7 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	passwordChanged, err := updateUserFields(c, db, &user, &req)
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
-		return
-	}
-
-	if err := db.Save(&user).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
-		return
-	}
-
-	if passwordChanged {
-		invalidateUserSessions(db, user.ID)
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
+	performUserUpdate(c, db, &user, &req)
 }
 
 // ListUsers godoc
@@ -269,18 +285,7 @@ func AdminUpdateUser(c *gin.Context) {
 		return
 	}
 
-	_, err = updateUserFields(c, db, &user, &req)
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user fields", Err: err})
-		return
-	}
-
-	if err := db.Save(&user).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
+	performUserUpdate(c, db, &user, &req)
 }
 
 // parseIDParam parses the "id" path parameter into a uint and returns an error if invalid.
@@ -412,14 +417,14 @@ func UpdateUserByID(c *gin.Context) {
 // deleteUserWithSessions deletes a user and all their sessions atomically.
 func deleteUserWithSessions(db *gorm.DB, userID uint) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		var user model.User
-		if err := tx.First(&user, userID).Error; err != nil {
+		user := &model.User{}
+		if err := tx.First(user, userID).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("user_id = ?", userID).Delete(&model.Session{}).Error; err != nil {
 			return err
 		}
-		return tx.Delete(&user).Error
+		return tx.Delete(user).Error
 	})
 }
 
