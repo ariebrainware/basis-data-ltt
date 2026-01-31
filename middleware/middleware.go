@@ -43,7 +43,13 @@ func setHSTSHeader(c *gin.Context) {
 
 // unauthorizedSession logs and returns a standardized unauthorized session response.
 func unauthorizedSession(c *gin.Context, msg, logMsg string, err error) {
-	util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, logMsg)
+	util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{
+		UserID:   "",
+		Email:    "",
+		IP:       c.ClientIP(),
+		Resource: c.Request.URL.Path,
+		Reason:   logMsg,
+	})
 	unauthorizedAbort(c, msg, err)
 }
 
@@ -58,7 +64,13 @@ func unauthorizedAbort(c *gin.Context, msg string, err error) {
 // found in RequireRole and other middleware helpers.
 func logUnauthorizedWithUser(c *gin.Context, logMsg string) {
 	userID, _ := GetUserID(c)
-	util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, logMsg)
+	util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{
+		UserID:   fmt.Sprintf("%d", userID),
+		Email:    "",
+		IP:       c.ClientIP(),
+		Resource: c.Request.URL.Path,
+		Reason:   logMsg,
+	})
 }
 
 func logAndAbortUnauthorized(c *gin.Context, logMsg, userMsg string, err error) {
@@ -282,7 +294,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 		}
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
-			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Session token not provided")
+			util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{UserID: "", Email: "", IP: c.ClientIP(), Resource: c.Request.URL.Path, Reason: "Session token not provided"})
 			unauthorizedAbort(c, "Session token not provided", fmt.Errorf("session token not provided"))
 			return
 		}

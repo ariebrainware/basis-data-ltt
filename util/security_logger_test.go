@@ -163,7 +163,7 @@ func TestLogLoginSuccess(t *testing.T) {
 	securityLogger = log.New(&buf, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 	defer func() { securityLogger = originalLogger }()
 
-	LogLoginSuccess(123, "user@example.com", "192.168.1.1", "Mozilla/5.0")
+	LogLoginSuccess(LoginParams{UserID: 123, Email: "user@example.com", IP: "192.168.1.1", UserAgent: "Mozilla/5.0"})
 	output := buf.String()
 
 	expectedStrings := []string{
@@ -188,7 +188,7 @@ func TestLogLoginFailure(t *testing.T) {
 	securityLogger = log.New(&buf, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 	defer func() { securityLogger = originalLogger }()
 
-	LogLoginFailure("user@example.com", "192.168.1.1", "Mozilla/5.0", "invalid password")
+	LogLoginFailure(LoginParams{Email: "user@example.com", IP: "192.168.1.1", UserAgent: "Mozilla/5.0", Reason: "invalid password"})
 	output := buf.String()
 
 	expectedStrings := []string{
@@ -211,7 +211,7 @@ func TestLogLogout(t *testing.T) {
 	securityLogger = log.New(&buf, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 	defer func() { securityLogger = originalLogger }()
 
-	LogLogout(456, "user@example.com", "192.168.1.2", "Chrome")
+	LogLogout(LoginParams{UserID: 456, Email: "user@example.com", IP: "192.168.1.2", UserAgent: "Chrome"})
 	output := buf.String()
 
 	expectedStrings := []string{
@@ -234,7 +234,7 @@ func TestLogAccountLocked(t *testing.T) {
 	securityLogger = log.New(&buf, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 	defer func() { securityLogger = originalLogger }()
 
-	LogAccountLocked(789, "locked@example.com", "192.168.1.3", "too many failed attempts")
+	LogAccountLocked(AccountLockParams{UserID: 789, Email: "locked@example.com", IP: "192.168.1.3", Reason: "too many failed attempts"})
 	output := buf.String()
 
 	expectedStrings := []string{
@@ -257,7 +257,13 @@ func TestLogUnauthorizedAccess(t *testing.T) {
 	securityLogger = log.New(&buf, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 	defer func() { securityLogger = originalLogger }()
 
-	LogUnauthorizedAccess("101", "user@example.com", "192.168.1.4", "/admin/users", "insufficient permissions")
+	LogUnauthorizedAccess(UnauthorizedAccessParams{
+		UserID:   "101",
+		Email:    "user@example.com",
+		IP:       "192.168.1.4",
+		Resource: "/admin/users",
+		Reason:   "insufficient permissions",
+	})
 	output := buf.String()
 
 	expectedStrings := []string{
@@ -279,7 +285,7 @@ func TestLogRateLimitExceeded(t *testing.T) {
 	securityLogger = log.New(&buf, "[SECURITY] ", log.LstdFlags|log.Lmsgprefix)
 	defer func() { securityLogger = originalLogger }()
 
-	LogRateLimitExceeded("user@example.com", "192.168.1.5", "/login")
+	LogRateLimitExceeded(RateLimitParams{Email: "user@example.com", IP: "192.168.1.5", Endpoint: "/login"})
 	output := buf.String()
 
 	expectedStrings := []string{
