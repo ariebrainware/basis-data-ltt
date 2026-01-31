@@ -190,6 +190,49 @@ func checkDuplicateDisease(c *gin.Context, db *gorm.DB, name, codename string) b
 	return true
 }
 
+// checkDuplicateDiseaseExcluding checks if a disease with the given name or codename already exists, excluding a specific disease ID
+func checkDuplicateDiseaseExcluding(c *gin.Context, db *gorm.DB, name, codename string, excludeID uint) bool {
+	if name != "" {
+		var existingDisease model.Disease
+		err := db.Where("LOWER(name) = ? AND id != ?", strings.ToLower(name), excludeID).First(&existingDisease).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to check existing diseases",
+				Err: err,
+			})
+			return false
+		}
+		if err == nil {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Disease with similar name already exists",
+				Err: fmt.Errorf("disease already exists"),
+			})
+			return false
+		}
+	}
+
+	if codename != "" {
+		var existingDisease model.Disease
+		err := db.Where("LOWER(codename) = ? AND id != ?", strings.ToLower(codename), excludeID).First(&existingDisease).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to check existing codenames",
+				Err: err,
+			})
+			return false
+		}
+		if err == nil {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Disease with this codename already exists",
+				Err: fmt.Errorf("codename already exists"),
+			})
+			return false
+		}
+	}
+
+	return true
+}
+
 // createDiseaseRecord creates a new disease record in the database
 func createDiseaseRecord(db *gorm.DB, name, codename, description string) (model.Disease, error) {
 	disease := model.Disease{
@@ -300,6 +343,11 @@ func UpdateDisease(c *gin.Context) {
 	}
 
 	normalizeUpdateRequest(&diseaseRequest)
+
+	// Check for duplicates, excluding the current disease
+	if !checkDuplicateDiseaseExcluding(c, db, diseaseRequest.Name, diseaseRequest.Codename, existingDisease.ID) {
+		return
+	}
 
 	if err := applyDiseaseUpdate(db, &existingDisease, diseaseRequest); err != nil {
 		util.CallServerError(c, util.APIErrorParams{

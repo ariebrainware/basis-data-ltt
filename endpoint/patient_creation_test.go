@@ -1,7 +1,6 @@
 package endpoint
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -15,27 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
-
-type requestParams struct {
-	method  string
-	path    string
-	body    []byte
-	headers map[string]string
-}
-
-func doRequest(r http.Handler, params requestParams) (*httptest.ResponseRecorder, error) {
-	req, err := http.NewRequest(params.method, params.path, bytes.NewBuffer(params.body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	for k, v := range params.headers {
-		req.Header.Set(k, v)
-	}
-	rr := httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
-	return rr, nil
-}
 
 type testSetupParams struct {
 	secret   string
