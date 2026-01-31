@@ -15,6 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestMain(m *testing.M) {
+	// Set Gin to test mode once for all tests
+	gin.SetMode(gin.TestMode)
+	code := m.Run()
+	os.Exit(code)
+}
+
 // newInMemoryDB creates an in-memory sqlite DB and runs required migrations for tests.
 func newInMemoryDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -91,10 +98,6 @@ var (
 	userIDContext = contextID{key: UserIDKey, label: "user_id"}
 	roleIDContext = contextID{key: RoleIDKey, label: "role_id"}
 )
-
-func setGinTestMode() {
-	gin.SetMode(gin.TestMode)
-}
 
 func setupRedisMock(t *testing.T) redismock.ClientMock {
 	rdb, mock := redismock.NewClientMock()
@@ -257,8 +260,6 @@ func TestDatabaseMiddlewareAndGetDB(t *testing.T) {
 
 func TestValidateLoginToken_MissingSessionToken(t *testing.T) {
 	// Test that missing session token returns 401
-	setGinTestMode()
-
 	db := &gorm.DB{}
 	w := runValidateLoginTokenRequest(db, "", func(c *gin.Context) {
 		c.Status(200)
@@ -271,8 +272,6 @@ func TestValidateLoginToken_MissingSessionToken(t *testing.T) {
 
 func TestValidateLoginToken_MissingDatabase(t *testing.T) {
 	// Test that missing database in context returns 500
-	setGinTestMode()
-
 	w := runValidateLoginTokenRequest(nil, "test-token", func(c *gin.Context) {
 		c.Status(200)
 	})
@@ -284,8 +283,6 @@ func TestValidateLoginToken_MissingDatabase(t *testing.T) {
 
 func TestValidateLoginToken_RedisSuccessfulParse(t *testing.T) {
 	// Test successful Redis parse with valid uint values
-	setGinTestMode()
-
 	// Create mock Redis client
 	mock := setupRedisMock(t)
 
@@ -309,8 +306,6 @@ func TestValidateLoginToken_RedisSuccessfulParse(t *testing.T) {
 }
 
 func TestValidateLoginToken_RedisFallbackCases(t *testing.T) {
-	setGinTestMode()
-
 	cases := []fallbackCase{
 		{
 			name:       "non_numeric_value",
@@ -375,8 +370,6 @@ func TestValidateLoginToken_RedisFallbackCases(t *testing.T) {
 
 func TestValidateLoginToken_RedisNotAvailable_DBFallback(t *testing.T) {
 	// Test fallback to DB when Redis is not available
-	setGinTestMode()
-
 	// Ensure Redis client is nil
 	config.ResetRedisClientForTest()
 	defer config.ResetRedisClientForTest()
@@ -396,8 +389,6 @@ func TestValidateLoginToken_RedisNotAvailable_DBFallback(t *testing.T) {
 
 func TestValidateLoginToken_DBFallback_ExpiredSession(t *testing.T) {
 	// Test DB fallback returns 401 for expired session
-	setGinTestMode()
-
 	// Ensure Redis client is nil
 	config.ResetRedisClientForTest()
 	defer config.ResetRedisClientForTest()
