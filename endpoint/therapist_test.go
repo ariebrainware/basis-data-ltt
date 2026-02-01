@@ -1,11 +1,9 @@
 package endpoint
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -108,74 +106,7 @@ func createTestTherapist(db *gorm.DB, t *testing.T, approved bool) model.Therapi
 	return therapist
 }
 
-// helper to perform GET requests and parse JSON response
-func performGetRequest(r *gin.Engine, url string) (*httptest.ResponseRecorder, map[string]interface{}, error) {
-	req := httptest.NewRequest(http.MethodGet, url, nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	var response map[string]interface{}
-	if w.Body.Len() > 0 {
-		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-			return w, nil, err
-		}
-	}
-	return w, response, nil
-}
-
-// helper to perform JSON requests (POST/PATCH/PUT) and parse JSON response
-func performJSONRequest(r *gin.Engine, method, url string, body interface{}) (*httptest.ResponseRecorder, map[string]interface{}, error) {
-	var reader *strings.Reader
-	if body != nil {
-		b, _ := json.Marshal(body)
-		reader = strings.NewReader(string(b))
-	} else {
-		reader = strings.NewReader("")
-	}
-	req := httptest.NewRequest(method, url, reader)
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	var response map[string]interface{}
-	if w.Body.Len() > 0 {
-		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-			return w, nil, err
-		}
-	}
-	return w, response, nil
-}
-
-// doGetWithHandler registers the GET handler at registerPath and performs a GET
-// request against requestPath, returning the recorder and parsed JSON response.
-func doGetWithHandler(r *gin.Engine, registerPath, requestPath string, handler gin.HandlerFunc) (*httptest.ResponseRecorder, map[string]interface{}, error) {
-	r.GET(registerPath, handler)
-	return performGetRequest(r, requestPath)
-}
-
-type jsonRequest struct {
-	method       string
-	registerPath string
-	requestPath  string
-	handler      gin.HandlerFunc
-	body         interface{}
-}
-
-// doJSONWithHandler registers the handler for the given method at registerPath
-// and performs a request against requestPath with the optional body.
-func doJSONWithHandler(r *gin.Engine, req jsonRequest) (*httptest.ResponseRecorder, map[string]interface{}, error) {
-	switch req.method {
-	case http.MethodPost:
-		r.POST(req.registerPath, req.handler)
-	case http.MethodPatch:
-		r.PATCH(req.registerPath, req.handler)
-	case http.MethodPut:
-		r.PUT(req.registerPath, req.handler)
-	case http.MethodDelete:
-		r.DELETE(req.registerPath, req.handler)
-	default:
-		r.Handle(req.method, req.registerPath, req.handler)
-	}
-	return performJSONRequest(r, req.method, req.requestPath, req.body)
-}
+// request helpers moved to test_request_helpers_test.go
 
 func TestListTherapist_Success(t *testing.T) {
 	r, db := setupTherapistTest(t)
@@ -184,7 +115,7 @@ func TestListTherapist_Success(t *testing.T) {
 	createTestTherapist(db, t, true)
 	createTestTherapist(db, t, false)
 
-	w, response, err := doGetWithHandler(r, "/therapist", "/therapist", ListTherapist)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist", requestPath: "/therapist", handler: ListTherapist})
 	assert.NoError(t, err)
 	assertSuccessResponse(t, w, response)
 }
@@ -197,7 +128,7 @@ func TestListTherapist_WithPagination(t *testing.T) {
 		createTestTherapist(db, t, true)
 	}
 
-	w, response, err := doGetWithHandler(r, "/therapist", "/therapist?limit=2&offset=1", ListTherapist)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist", requestPath: "/therapist?limit=2&offset=1", handler: ListTherapist})
 	assert.NoError(t, err)
 	assertSuccessResponse(t, w, response)
 }
@@ -214,7 +145,7 @@ func TestListTherapist_WithKeyword(t *testing.T) {
 	}
 	db.Create(&therapist)
 
-	w, response, err := doGetWithHandler(r, "/therapist", "/therapist?keyword=John", ListTherapist)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist", requestPath: "/therapist?keyword=John", handler: ListTherapist})
 	assert.NoError(t, err)
 	assertSuccessResponse(t, w, response)
 }
@@ -224,7 +155,7 @@ func TestListTherapist_WithGroupByDate(t *testing.T) {
 
 	createTestTherapist(db, t, true)
 
-	w, response, err := doGetWithHandler(r, "/therapist", "/therapist?group_by_date=last_2_days", ListTherapist)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist", requestPath: "/therapist?group_by_date=last_2_days", handler: ListTherapist})
 	assert.NoError(t, err)
 	assertSuccessResponse(t, w, response)
 }
@@ -234,7 +165,7 @@ func TestGetTherapistInfo_Success(t *testing.T) {
 
 	therapist := createTestTherapist(db, t, true)
 
-	w, response, err := doGetWithHandler(r, "/therapist/:id", fmt.Sprintf("/therapist/%d", therapist.ID), GetTherapistInfo)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: GetTherapistInfo})
 	assert.NoError(t, err)
 	assertSuccessResponse(t, w, response)
 }
@@ -242,14 +173,14 @@ func TestGetTherapistInfo_Success(t *testing.T) {
 func TestGetTherapistInfo_NotFound(t *testing.T) {
 	r, db := setupTherapistTest(t)
 	_ = db
-	w, _, _ := doGetWithHandler(r, "/therapist/:id", "/therapist/99999", GetTherapistInfo)
+	w, _, _ := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: GetTherapistInfo})
 	assertStatus(t, w, http.StatusNotFound)
 }
 
 func TestGetTherapistInfo_InvalidID(t *testing.T) {
 	r, db := setupTherapistTest(t)
 	_ = db
-	w, _, _ := doGetWithHandler(r, "/therapist/:id", "/therapist/invalid", GetTherapistInfo)
+	w, _, _ := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist/:id", requestPath: "/therapist/invalid", handler: GetTherapistInfo})
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -262,7 +193,7 @@ func TestCreateTherapist_Success(t *testing.T) {
 		"email":     fmt.Sprintf("new%d@test.com", time.Now().UnixNano()),
 	}
 
-	w, response, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPost, registerPath: "/therapist", requestPath: "/therapist", handler: CreateTherapist, body: reqBody})
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/therapist", requestPath: "/therapist", handler: CreateTherapist, body: reqBody})
 	assert.NoError(t, err)
 	assertSuccessResponse(t, w, response)
 }
@@ -273,7 +204,7 @@ func TestCreateTherapist_MissingFields(t *testing.T) {
 	reqBody := map[string]interface{}{
 		"full_name": "Test",
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPost, registerPath: "/therapist", requestPath: "/therapist", handler: CreateTherapist, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/therapist", requestPath: "/therapist", handler: CreateTherapist, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusBadRequest)
 }
@@ -294,7 +225,7 @@ func TestCreateTherapist_DuplicateNIK(t *testing.T) {
 		"nik":       "DUPLICATE123",
 		"email":     "new@test.com",
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPost, registerPath: "/therapist", requestPath: "/therapist", handler: CreateTherapist, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/therapist", requestPath: "/therapist", handler: CreateTherapist, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusBadRequest)
 }
@@ -307,7 +238,7 @@ func TestUpdateTherapist_Success(t *testing.T) {
 	reqBody := map[string]interface{}{
 		"full_name": "Updated Name",
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPatch, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: UpdateTherapist, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: UpdateTherapist, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusOK)
 
@@ -323,7 +254,7 @@ func TestUpdateTherapist_NotFound(t *testing.T) {
 	reqBody := map[string]interface{}{
 		"full_name": "Updated",
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPatch, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: UpdateTherapist, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: UpdateTherapist, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusNotFound)
 }
@@ -333,13 +264,8 @@ func TestUpdateTherapist_InvalidJSON(t *testing.T) {
 
 	therapist := createTestTherapist(db, t, true)
 
-	// Register handler and perform an invalid JSON request directly
-	r.PATCH("/therapist/:id", UpdateTherapist)
-	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/therapist/%d", therapist.ID), strings.NewReader("invalid json"))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: UpdateTherapist, body: "invalid json"})
+	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusBadRequest)
 }
 
@@ -351,7 +277,7 @@ func TestTherapistApproval_Approve(t *testing.T) {
 	reqBody := map[string]interface{}{
 		"is_approved": true,
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPut, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: TherapistApproval, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPut, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: TherapistApproval, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusOK)
 
@@ -369,7 +295,7 @@ func TestTherapistApproval_Reject(t *testing.T) {
 	reqBody := map[string]interface{}{
 		"is_approved": false,
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPut, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: TherapistApproval, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPut, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: TherapistApproval, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusOK)
 
@@ -385,7 +311,7 @@ func TestTherapistApproval_NotFound(t *testing.T) {
 	reqBody := map[string]interface{}{
 		"is_approved": true,
 	}
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodPut, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: TherapistApproval, body: reqBody})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPut, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: TherapistApproval, body: reqBody})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusNotFound)
 }
@@ -395,7 +321,7 @@ func TestDeleteTherapist_Success(t *testing.T) {
 
 	therapist := createTestTherapist(db, t, true)
 
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodDelete, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: DeleteTherapist, body: nil})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: DeleteTherapist, body: nil})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusOK)
 
@@ -408,7 +334,7 @@ func TestDeleteTherapist_Success(t *testing.T) {
 func TestDeleteTherapist_NotFound(t *testing.T) {
 	r, db := setupTherapistTest(t)
 	_ = db
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodDelete, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: DeleteTherapist, body: nil})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: DeleteTherapist, body: nil})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusNotFound)
 }
@@ -416,7 +342,7 @@ func TestDeleteTherapist_NotFound(t *testing.T) {
 func TestDeleteTherapist_InvalidID(t *testing.T) {
 	r, db := setupTherapistTest(t)
 	_ = db
-	w, _, err := doJSONWithHandler(r, jsonRequest{method: http.MethodDelete, registerPath: "/therapist/:id", requestPath: "/therapist/invalid", handler: DeleteTherapist, body: nil})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/therapist/:id", requestPath: "/therapist/invalid", handler: DeleteTherapist, body: nil})
 	assert.NoError(t, err)
 	assertStatus(t, w, http.StatusBadRequest)
 }

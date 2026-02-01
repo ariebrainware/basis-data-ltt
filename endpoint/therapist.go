@@ -318,10 +318,10 @@ func TherapistApproval(c *gin.Context) {
 		return
 	}
 
-	handleTherapistApproval(c, db, true)
+	handleTherapistApproval(c, db)
 }
 
-func handleTherapistApproval(c *gin.Context, db *gorm.DB, isApproval bool) {
+func handleTherapistApproval(c *gin.Context, db *gorm.DB) {
 	id, therapist, err := getTherapistAndBindJSON(c)
 	if err != nil {
 		return
