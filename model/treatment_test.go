@@ -357,4 +357,5 @@ func TestTreatementRequest_Structure(t *testing.T) {
 	assert.Equal(t, "P001", request.PatientCode)
 	assert.Equal(t, uint(1), request.TherapistID)
 	assert.Equal(t, 2, len(request.Treatment))
+	assert.Equal(t, "Shoulder pain", request.Issues)
 }

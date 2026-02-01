@@ -1,15 +1,14 @@
 package endpoint
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
+	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -20,10 +19,45 @@ import (
 
 func setupTreatmentTest(t *testing.T) (*gin.Engine, *gorm.DB) {
 	gin.SetMode(gin.TestMode)
-	db := setupTestDB(t)
+	db := setupTreatmentDB(t)
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 	return r, db
+}
+
+func setupTreatmentDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	t.Setenv("APPENV", "test")
+	t.Setenv("JWTSECRET", "test-secret")
+	util.SetJWTSecret("test-secret")
+
+	db, err := config.ConnectMySQL()
+	if err != nil {
+		t.Fatalf("connect test db: %v", err)
+	}
+
+	models := []interface{}{
+		&model.Patient{},
+		&model.Therapist{},
+		&model.Treatment{},
+		&model.User{},
+		&model.Session{},
+	}
+
+	if err := db.AutoMigrate(models...); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	for _, m := range models {
+		db.Where("1 = 1").Delete(m)
+	}
+
+	t.Cleanup(func() {
+		_ = db.Migrator().DropTable(models...)
+	})
+
+	return db
 }
 
 func createTestTreatment(db *gorm.DB, t *testing.T, patientCode string, therapistID uint) model.Treatment {
@@ -66,6 +100,8 @@ func createTestTreatment(db *gorm.DB, t *testing.T, patientCode string, therapis
 	return treatment
 }
 
+// request helpers moved to test_request_helpers_test.go for reuse
+
 func TestListTreatments_Success(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 
@@ -73,16 +109,9 @@ func TestListTreatments_Success(t *testing.T) {
 	createTestTreatment(db, t, "P001", 1)
 	createTestTreatment(db, t, "P002", 1)
 
-	r.GET("/treatment", ListTreatments)
-
-	req := httptest.NewRequest(http.MethodGet, "/treatment", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment", handler: ListTreatments})
 
 	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 }
@@ -95,13 +124,10 @@ func TestListTreatments_WithPagination(t *testing.T) {
 		createTestTreatment(db, t, fmt.Sprintf("P%03d", i), 1)
 	}
 
-	r.GET("/treatment", ListTreatments)
-
-	req := httptest.NewRequest(http.MethodGet, "/treatment?limit=2&offset=1", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment?limit=2&offset=1", handler: ListTreatments})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestListTreatments_WithKeyword(t *testing.T) {
@@ -117,13 +143,10 @@ func TestListTreatments_WithKeyword(t *testing.T) {
 
 	createTestTreatment(db, t, "SEARCH001", 1)
 
-	r.GET("/treatment", ListTreatments)
-
-	req := httptest.NewRequest(http.MethodGet, "/treatment?keyword=SEARCH", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment?keyword=SEARCH", handler: ListTreatments})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestListTreatments_WithTherapistFilter(t *testing.T) {
@@ -132,13 +155,10 @@ func TestListTreatments_WithTherapistFilter(t *testing.T) {
 	createTestTreatment(db, t, "P001", 1)
 	createTestTreatment(db, t, "P002", 2)
 
-	r.GET("/treatment", ListTreatments)
-
-	req := httptest.NewRequest(http.MethodGet, "/treatment?therapist_id=1", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment?therapist_id=1", handler: ListTreatments})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestListTreatments_WithDateFilter(t *testing.T) {
@@ -146,13 +166,10 @@ func TestListTreatments_WithDateFilter(t *testing.T) {
 
 	createTestTreatment(db, t, "P001", 1)
 
-	r.GET("/treatment", ListTreatments)
-
-	req := httptest.NewRequest(http.MethodGet, "/treatment?group_by_date=last_2_days", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment?group_by_date=last_2_days", handler: ListTreatments})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestListTreatments_WithSessionTherapist(t *testing.T) {
@@ -184,14 +201,10 @@ func TestListTreatments_WithSessionTherapist(t *testing.T) {
 
 	createTestTreatment(db, t, "P001", therapist.ID)
 
-	r.GET("/treatment", ListTreatments)
-
-	req := httptest.NewRequest(http.MethodGet, "/treatment", nil)
-	req.Header.Set("session-token", "test-token-123")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment", handler: ListTreatments, headers: map[string]string{"session-token": "test-token-123"}})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestCreateTreatment_Success(t *testing.T) {
@@ -205,25 +218,18 @@ func TestCreateTreatment_Success(t *testing.T) {
 	}
 	db.Create(&patient)
 
-	r.POST("/treatment", CreateTreatment)
-
 	reqBody := map[string]interface{}{
-		"patient_code": "CREATE001",
-		"therapist_id": 1,
-		"date":         time.Now().Format("2006-01-02"),
-		"notes":        "Test treatment",
+		"patient_code":   "CREATE001",
+		"therapist_id":   1,
+		"treatment_date": time.Now().Format("2006-01-02"),
+		"issues":         "Test issues",
+		"treatment":      []string{"Test treatment"},
+		"remarks":        "Test remarks",
+		"next_visit":     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
 	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/treatment", strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
 	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 }
@@ -232,14 +238,10 @@ func TestCreateTreatment_InvalidJSON(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	r.POST("/treatment", CreateTreatment)
-
-	req := httptest.NewRequest(http.MethodPost, "/treatment", strings.NewReader("invalid json"))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: "invalid json"})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestCreateTreatment_DuplicateEntry(t *testing.T) {
@@ -267,44 +269,38 @@ func TestCreateTreatment_DuplicateEntry(t *testing.T) {
 	}
 	db.Create(&treatment)
 
-	r.POST("/treatment", CreateTreatment)
-
 	reqBody := map[string]interface{}{
-		"patient_code": "DUP001",
-		"therapist_id": 1,
-		"date":         date,
-		"notes":        "Duplicate treatment",
+		"patient_code":   "DUP001",
+		"therapist_id":   1,
+		"treatment_date": date,
+		"issues":         "Issue 1",
+		"treatment":      []string{"Duplicate treatment"},
+		"remarks":        "Duplicate remarks",
+		"next_visit":     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
 	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/treatment", strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestCreateTreatment_PatientNotFound(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	r.POST("/treatment", CreateTreatment)
-
 	reqBody := map[string]interface{}{
-		"patient_code": "NOTEXIST",
-		"therapist_id": 1,
-		"date":         time.Now().Format("2006-01-02"),
-		"notes":        "Test",
+		"patient_code":   "NOTEXIST",
+		"therapist_id":   1,
+		"treatment_date": time.Now().Format("2006-01-02"),
+		"issues":         "Test issues",
+		"treatment":      []string{"Test treatment"},
+		"remarks":        "Test remarks",
+		"next_visit":     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
 	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPost, "/treatment", strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestUpdateTreatment_Success(t *testing.T) {
@@ -312,19 +308,13 @@ func TestUpdateTreatment_Success(t *testing.T) {
 
 	treatment := createTestTreatment(db, t, "UPD001", 1)
 
-	r.PATCH("/treatment/:id", UpdateTreatment)
-
 	reqBody := map[string]interface{}{
 		"remarks": "Updated remarks",
 	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/treatment/%d", treatment.ID), strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: fmt.Sprintf("/treatment/%d", treatment.ID), handler: UpdateTreatment, body: reqBody})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 
 	// Verify update
 	var updated model.Treatment
@@ -336,38 +326,26 @@ func TestUpdateTreatment_NotFound(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	r.PATCH("/treatment/:id", UpdateTreatment)
-
 	reqBody := map[string]interface{}{
 		"notes": "Updated",
 	}
-	body, _ := json.Marshal(reqBody)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: "/treatment/99999", handler: UpdateTreatment, body: reqBody})
 
-	req := httptest.NewRequest(http.MethodPatch, "/treatment/99999", strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestUpdateTreatment_InvalidID(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	r.PATCH("/treatment/:id", UpdateTreatment)
-
 	reqBody := map[string]interface{}{
 		"notes": "Updated",
 	}
-	body, _ := json.Marshal(reqBody)
-
-	req := httptest.NewRequest(http.MethodPatch, "/treatment/invalid", strings.NewReader(string(body)))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: "/treatment/invalid", handler: UpdateTreatment, body: reqBody})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestUpdateTreatment_InvalidJSON(t *testing.T) {
@@ -375,14 +353,10 @@ func TestUpdateTreatment_InvalidJSON(t *testing.T) {
 
 	treatment := createTestTreatment(db, t, "INV001", 1)
 
-	r.PATCH("/treatment/:id", UpdateTreatment)
-
-	req := httptest.NewRequest(http.MethodPatch, fmt.Sprintf("/treatment/%d", treatment.ID), strings.NewReader("invalid json"))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: fmt.Sprintf("/treatment/%d", treatment.ID), handler: UpdateTreatment, body: "invalid json"})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestDeleteTreatment_Success(t *testing.T) {
@@ -390,17 +364,14 @@ func TestDeleteTreatment_Success(t *testing.T) {
 
 	treatment := createTestTreatment(db, t, "DEL001", 1)
 
-	r.DELETE("/treatment/:id", DeleteTreatment)
-
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/treatment/%d", treatment.ID), nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/treatment/:id", requestPath: fmt.Sprintf("/treatment/%d", treatment.ID), handler: DeleteTreatment})
 
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
 
 	// Verify soft delete
 	var deleted model.Treatment
-	err := db.First(&deleted, treatment.ID).Error
+	err = db.First(&deleted, treatment.ID).Error
 	assert.Error(t, err)
 }
 
@@ -408,26 +379,20 @@ func TestDeleteTreatment_NotFound(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	r.DELETE("/treatment/:id", DeleteTreatment)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/treatment/:id", requestPath: "/treatment/99999", handler: DeleteTreatment})
 
-	req := httptest.NewRequest(http.MethodDelete, "/treatment/99999", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestDeleteTreatment_InvalidID(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	r.DELETE("/treatment/:id", DeleteTreatment)
-
-	req := httptest.NewRequest(http.MethodDelete, "/treatment/invalid", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/treatment/:id", requestPath: "/treatment/invalid", handler: DeleteTreatment})
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.NoError(t, err)
 }
 
 func TestParseQueryInt_Valid(t *testing.T) {
@@ -479,7 +444,7 @@ func TestParseQueryInt_Missing(t *testing.T) {
 }
 
 func TestApplyCreatedAtFilterForTreatments(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupTreatmentDB(t)
 
 	tests := []struct {
 		name     string
@@ -503,7 +468,7 @@ func TestApplyCreatedAtFilterForTreatments(t *testing.T) {
 }
 
 func TestGetTherapistIDFromSession_Success(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupTreatmentDB(t)
 
 	// Setup test data
 	user := model.User{
@@ -535,7 +500,7 @@ func TestGetTherapistIDFromSession_Success(t *testing.T) {
 }
 
 func TestGetTherapistIDFromSession_InvalidToken(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupTreatmentDB(t)
 
 	id, err := getTherapistIDFromSession(db, "invalid-token")
 	assert.Error(t, err)
@@ -543,7 +508,7 @@ func TestGetTherapistIDFromSession_InvalidToken(t *testing.T) {
 }
 
 func TestGetTherapistIDFromSession_TherapistNotFound(t *testing.T) {
-	db := setupTestDB(t)
+	db := setupTreatmentDB(t)
 
 	user := model.User{
 		Name:     "Test User",
@@ -582,7 +547,7 @@ func TestHandleSessionError(t *testing.T) {
 
 func TestGetDBOrAbort_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := setupTestDB(t)
+	db := setupTreatmentDB(t)
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 

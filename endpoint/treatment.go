@@ -301,6 +301,22 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
+	var patient model.Patient
+	if err := db.Where("patient_code = ?", createTreatmentRequest.PatientCode).First(&patient).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Patient not found",
+				Err: err,
+			})
+			return
+		}
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to verify patient",
+			Err: err,
+		})
+		return
+	}
+
 	if err := db.Create(&model.Treatment{
 		TreatmentDate: createTreatmentRequest.TreatmentDate,
 		PatientCode:   createTreatmentRequest.PatientCode,
