@@ -500,7 +500,7 @@ func bindUpdateUserRequest(c *gin.Context) (UpdateUserRequest, bool) {
 }
 
 func requireUpdateFields(c *gin.Context, req UpdateUserRequest) bool {
-	if req.Name != "" || req.Email != "" || req.Password != "" {
+	if validateUpdateRequest(&req) {
 		return true
 	}
 	util.CallUserError(c, util.APIErrorParams{
@@ -508,87 +508,6 @@ func requireUpdateFields(c *gin.Context, req UpdateUserRequest) bool {
 		Err: fmt.Errorf("no fields to update"),
 	})
 	return false
-}
-
-func updateUserWithRequest(c *gin.Context, userID uint, req UpdateUserRequest, invalidateSessions bool) {
-	db, ok := getDBOrRespond(c)
-	if !ok {
-		return
-	}
-
-	user, err := fetchUserByIDDB(db, userID)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
-			return
-		}
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
-		return
-	}
-
-	passwordChanged, ok := applyUserUpdates(c, db, user, req)
-	if !ok {
-		return
-	}
-
-	if err := db.Save(user).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
-		return
-	}
-
-	if invalidateSessions && passwordChanged {
-		_ = db.Where("user_id = ?", user.ID).Delete(&model.Session{}).Error
-		_ = util.InvalidateUserSessions(user.ID)
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
-}
-
-func fetchUserByIDDB(db *gorm.DB, uid uint) (*model.User, error) {
-	var user model.User
-	if err := db.First(&user, uid).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
-}
-
-func applyUserUpdates(c *gin.Context, db *gorm.DB, user *model.User, req UpdateUserRequest) (bool, bool) {
-	if req.Email != "" && req.Email != user.Email {
-		exists, err := emailExists(db, req.Email, user.ID)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
-			return false, false
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-			return false, false
-		}
-		user.Email = req.Email
-	}
-
-	if req.Name != "" {
-		user.Name = req.Name
-	}
-
-	if req.Password == "" {
-		return false, true
-	}
-
-	salt, err := util.GenerateSalt()
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
-		return false, false
-	}
-
-	hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
-		return false, false
-	}
-
-	user.Password = hashedPassword
-	user.PasswordSalt = salt
-	return true, true
 }
 
 // Helper functions for listing and pagination exist earlier in the file
