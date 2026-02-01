@@ -43,7 +43,13 @@ func setHSTSHeader(c *gin.Context) {
 
 // unauthorizedSession logs and returns a standardized unauthorized session response.
 func unauthorizedSession(c *gin.Context, msg, logMsg string, err error) {
-	util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, logMsg)
+	util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{
+		UserID:   "",
+		Email:    "",
+		IP:       c.ClientIP(),
+		Resource: c.Request.URL.Path,
+		Reason:   logMsg,
+	})
 	unauthorizedAbort(c, msg, err)
 }
 
@@ -58,7 +64,13 @@ func unauthorizedAbort(c *gin.Context, msg string, err error) {
 // found in RequireRole and other middleware helpers.
 func logUnauthorizedWithUser(c *gin.Context, logMsg string) {
 	userID, _ := GetUserID(c)
-	util.LogUnauthorizedAccess(fmt.Sprintf("%d", userID), "", c.ClientIP(), c.Request.URL.Path, logMsg)
+	util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{
+		UserID:   fmt.Sprintf("%d", userID),
+		Email:    "",
+		IP:       c.ClientIP(),
+		Resource: c.Request.URL.Path,
+		Reason:   logMsg,
+	})
 }
 
 func logAndAbortUnauthorized(c *gin.Context, logMsg, userMsg string, err error) {
@@ -175,36 +187,26 @@ func GetDB(c *gin.Context) *gorm.DB {
 
 // GetUserID retrieves the user ID from the Gin context
 func GetUserID(c *gin.Context) (uint, bool) {
-	return getUintFromContext(c, UserIDKey)
+	return getTypedValueFromContext[uint](c, UserIDKey)
 }
 
 // GetRoleID retrieves the role ID from the Gin context
 func GetRoleID(c *gin.Context) (uint32, bool) {
-	return getUint32FromContext(c, RoleIDKey)
+	return getTypedValueFromContext[uint32](c, RoleIDKey)
 }
 
-func getUintFromContext(c *gin.Context, key string) (uint, bool) {
+// getTypedValueFromContext is a generic helper to retrieve typed values from Gin context
+func getTypedValueFromContext[T any](c *gin.Context, key string) (T, bool) {
+	var zero T
 	val, exists := c.Get(key)
 	if !exists {
-		return 0, false
+		return zero, false
 	}
-	id, ok := val.(uint)
+	typedVal, ok := val.(T)
 	if !ok {
-		return 0, false
+		return zero, false
 	}
-	return id, true
-}
-
-func getUint32FromContext(c *gin.Context, key string) (uint32, bool) {
-	val, exists := c.Get(key)
-	if !exists {
-		return 0, false
-	}
-	id, ok := val.(uint32)
-	if !ok {
-		return 0, false
-	}
-	return id, true
+	return typedVal, true
 }
 
 // RequireRole creates a middleware that checks if the user has one of the specified roles
@@ -282,7 +284,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 		}
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
-			util.LogUnauthorizedAccess("", "", c.ClientIP(), c.Request.URL.Path, "Session token not provided")
+			util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{UserID: "", Email: "", IP: c.ClientIP(), Resource: c.Request.URL.Path, Reason: "Session token not provided"})
 			unauthorizedAbort(c, "Session token not provided", fmt.Errorf("session token not provided"))
 			return
 		}
