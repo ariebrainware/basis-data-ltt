@@ -435,7 +435,7 @@ func TestParseQueryInt_Valid(t *testing.T) {
 	r := gin.New()
 	var result int
 	r.GET("/test", func(c *gin.Context) {
-		result = parseQueryInt(c, "value", 10)
+		result = parseQueryIntTest(c, "value", 10)
 		c.Status(http.StatusOK)
 	})
 
@@ -451,7 +451,7 @@ func TestParseQueryInt_Invalid(t *testing.T) {
 	r := gin.New()
 	var result int
 	r.GET("/test", func(c *gin.Context) {
-		result = parseQueryInt(c, "value", 10)
+		result = parseQueryIntTest(c, "value", 10)
 		c.Status(http.StatusOK)
 	})
 
@@ -467,7 +467,7 @@ func TestParseQueryInt_Missing(t *testing.T) {
 	r := gin.New()
 	var result int
 	r.GET("/test", func(c *gin.Context) {
-		result = parseQueryInt(c, "value", 10)
+		result = parseQueryIntTest(c, "value", 10)
 		c.Status(http.StatusOK)
 	})
 
@@ -570,7 +570,7 @@ func TestHandleSessionError(t *testing.T) {
 	r := gin.New()
 
 	r.GET("/test", func(c *gin.Context) {
-		handleSessionError(c, gorm.ErrRecordNotFound)
+		handleSessionErrorTest(c, gorm.ErrRecordNotFound)
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
@@ -622,7 +622,7 @@ func TestGetDBOrAbort_NoDatabase(t *testing.T) {
 }
 
 // Test helper functions
-func parseQueryInt(c *gin.Context, key string, defaultValue int) int {
+func parseQueryIntTest(c *gin.Context, key string, defaultValue int) int {
 	value := c.Query(key)
 	if value == "" {
 		return defaultValue
@@ -634,7 +634,7 @@ func parseQueryInt(c *gin.Context, key string, defaultValue int) int {
 	return result
 }
 
-func handleSessionError(c *gin.Context, err error) {
+func handleSessionErrorTest(c *gin.Context, err error) {
 	if err == gorm.ErrRecordNotFound {
 		util.CallUserNotAuthorized(c, util.APIErrorParams{
 			Msg: "Invalid or expired session",
