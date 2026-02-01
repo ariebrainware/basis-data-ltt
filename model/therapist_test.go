@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,27 @@ func setupTherapistTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+func insertTherapist(t *testing.T, db *gorm.DB, therapist Therapist) Therapist {
+	t.Helper()
+	err := db.Create(&therapist).Error
+	assert.NoError(t, err)
+	return therapist
+}
+
+func findTherapistByField(t *testing.T, db *gorm.DB, field string, value interface{}) (Therapist, error) {
+	t.Helper()
+	var found Therapist
+	err := db.Where(fmt.Sprintf("%s = ?", field), value).First(&found).Error
+	return found, err
+}
+
+func findTherapistsByNameLike(t *testing.T, db *gorm.DB, pattern string) ([]Therapist, error) {
+	t.Helper()
+	var found []Therapist
+	err := db.Where("full_name LIKE ?", pattern).Find(&found).Error
+	return found, err
+}
+
 func TestTherapistModel_Create(t *testing.T) {
 	db := setupTherapistTestDB(t)
 
@@ -27,8 +49,7 @@ func TestTherapistModel_Create(t *testing.T) {
 		Email:    "dr.john@test.com",
 	}
 
-	err := db.Create(&therapist).Error
-	assert.NoError(t, err)
+	therapist = insertTherapist(t, db, therapist)
 	assert.NotZero(t, therapist.ID)
 }
 
@@ -40,7 +61,7 @@ func TestTherapistModel_Read(t *testing.T) {
 		NIK:      "0987654321",
 		Email:    "dr.jane@test.com",
 	}
-	db.Create(&therapist)
+	therapist = insertTherapist(t, db, therapist)
 
 	var found Therapist
 	err := db.First(&found, therapist.ID).Error
@@ -57,7 +78,7 @@ func TestTherapistModel_Update(t *testing.T) {
 		NIK:      "1111111111",
 		Email:    "original@test.com",
 	}
-	db.Create(&therapist)
+	therapist = insertTherapist(t, db, therapist)
 
 	therapist.FullName = "Updated Name"
 	therapist.IsApproved = true
@@ -78,7 +99,7 @@ func TestTherapistModel_Delete(t *testing.T) {
 		NIK:      "2222222222",
 		Email:    "delete@test.com",
 	}
-	db.Create(&therapist)
+	therapist = insertTherapist(t, db, therapist)
 
 	err := db.Delete(&therapist).Error
 	assert.NoError(t, err)
@@ -98,7 +119,7 @@ func TestTherapistModel_ApprovalStatus(t *testing.T) {
 		Email:      "pending@test.com",
 		IsApproved: false,
 	}
-	db.Create(&therapist)
+	therapist = insertTherapist(t, db, therapist)
 
 	assert.False(t, therapist.IsApproved)
 
@@ -122,7 +143,7 @@ func TestTherapistModel_ListApproved(t *testing.T) {
 			Email:      "approved" + string(rune(i)) + "@test.com",
 			IsApproved: true,
 		}
-		db.Create(&therapist)
+		insertTherapist(t, db, therapist)
 	}
 
 	for i := 0; i < 2; i++ {
@@ -132,7 +153,7 @@ func TestTherapistModel_ListApproved(t *testing.T) {
 			Email:      "unapproved" + string(rune(i)) + "@test.com",
 			IsApproved: false,
 		}
-		db.Create(&therapist)
+		insertTherapist(t, db, therapist)
 	}
 
 	var approved []Therapist
@@ -149,10 +170,9 @@ func TestTherapistModel_SearchByNIK(t *testing.T) {
 		NIK:      "SEARCH123",
 		Email:    "search@test.com",
 	}
-	db.Create(&therapist)
+	insertTherapist(t, db, therapist)
 
-	var found Therapist
-	err := db.Where("NIK = ?", "SEARCH123").First(&found).Error
+	found, err := findTherapistByField(t, db, "NIK", "SEARCH123")
 	assert.NoError(t, err)
 	assert.Equal(t, "Search Test", found.FullName)
 }
@@ -165,10 +185,9 @@ func TestTherapistModel_SearchByEmail(t *testing.T) {
 		NIK:      "EMAIL123",
 		Email:    "unique.email@test.com",
 	}
-	db.Create(&therapist)
+	insertTherapist(t, db, therapist)
 
-	var found Therapist
-	err := db.Where("email = ?", "unique.email@test.com").First(&found).Error
+	found, err := findTherapistByField(t, db, "email", "unique.email@test.com")
 	assert.NoError(t, err)
 	assert.Equal(t, "Email Search", found.FullName)
 }
@@ -181,7 +200,7 @@ func TestTherapistModel_Timestamps(t *testing.T) {
 		NIK:      "TIME123",
 		Email:    "timestamp@test.com",
 	}
-	db.Create(&therapist)
+	therapist = insertTherapist(t, db, therapist)
 
 	assert.NotZero(t, therapist.CreatedAt)
 	assert.NotZero(t, therapist.UpdatedAt)
@@ -198,7 +217,7 @@ func TestTherapistModel_CountByStatus(t *testing.T) {
 			Email:      "count" + string(rune(i)) + "@test.com",
 			IsApproved: true,
 		}
-		db.Create(&therapist)
+		insertTherapist(t, db, therapist)
 	}
 
 	var count int64
@@ -215,10 +234,9 @@ func TestTherapistModel_SearchByName(t *testing.T) {
 		NIK:      "NAME123",
 		Email:    "searchname@test.com",
 	}
-	db.Create(&therapist)
+	insertTherapist(t, db, therapist)
 
-	var found []Therapist
-	err := db.Where("full_name LIKE ?", "%Searchable%").Find(&found).Error
+	found, err := findTherapistsByNameLike(t, db, "%Searchable%")
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(found), 1)
 }

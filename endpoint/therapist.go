@@ -326,20 +326,18 @@ func handleTherapistApproval(c *gin.Context, db *gorm.DB, isApproval bool) {
 	if err != nil {
 		return
 	}
-
-	if isApproval && !therapist.IsApproved {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Changes allowed only for approval and it must be true",
-			Err: fmt.Errorf("misinterpretation of request"),
-		})
-		return
-	}
-
 	handleTherapistUpdate(c, db, id, therapist)
 }
 
 func handleTherapistUpdate(c *gin.Context, db *gorm.DB, id string, therapist model.Therapist) {
 	if err := updateTherapistInDB(db, id, therapist); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallErrorNotFound(c, util.APIErrorParams{
+				Msg: "Therapist not found",
+				Err: err,
+			})
+			return
+		}
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update therapist",
 			Err: err,
@@ -359,8 +357,19 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 		return err
 	}
 
+	// GORM's Updates with a struct will ignore zero-values (e.g., false for booleans).
+	// That means attempting to set IsApproved=false via Updates(struct) will be skipped.
+	// First perform a general struct update (non-zero fields), then explicitly
+	// update the `is_approved` column if the caller provided a differing boolean value.
 	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
 		return err
+	}
+
+	// If the requested IsApproved differs from the stored value, ensure we persist it.
+	if existingTherapist.IsApproved != therapist.IsApproved {
+		if err := db.Model(&existingTherapist).Update("is_approved", therapist.IsApproved).Error; err != nil {
+			return err
+		}
 	}
 
 	return nil
