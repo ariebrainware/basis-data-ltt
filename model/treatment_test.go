@@ -21,8 +21,8 @@ func setupTreatmentTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// TreatmentSpec describes the fields for creating a test Treatment.
-type TreatmentSpec struct {
+// CreateTreatmentParams groups parameters for creating test treatments
+type CreateTreatmentParams struct {
 	PatientCode   string
 	TherapistID   uint
 	TreatmentDate string
@@ -32,47 +32,22 @@ type TreatmentSpec struct {
 	NextVisit     string
 }
 
-// newTreatment returns a Treatment populated from a TreatmentSpec.
-func newTreatment(spec TreatmentSpec) Treatment {
-	return Treatment{
-		PatientCode:   spec.PatientCode,
-		TherapistID:   spec.TherapistID,
-		TreatmentDate: spec.TreatmentDate,
-		Issues:        spec.Issues,
-		Treatment:     spec.Treatment,
-		Remarks:       spec.Remarks,
-		NextVisit:     spec.NextVisit,
+// createTreatment creates a Treatment from params and inserts it into the DB
+func createTreatment(db *gorm.DB, p CreateTreatmentParams) Treatment {
+	treatment := Treatment{
+		PatientCode:   p.PatientCode,
+		TherapistID:   p.TherapistID,
+		TreatmentDate: p.TreatmentDate,
+		Issues:        p.Issues,
+		Treatment:     p.Treatment,
+		Remarks:       p.Remarks,
+		NextVisit:     p.NextVisit,
 	}
+	db.Create(&treatment)
+	return treatment
 }
 
-// createAndInsertTreatment creates a Treatment from spec, inserts it into the DB, and returns it.
-func createAndInsertTreatment(db *gorm.DB, spec TreatmentSpec) (Treatment, error) {
-	t := newTreatment(spec)
-	err := db.Create(&t).Error
-	return t, err
-}
-
-// SpecOption configures a TreatmentSpec
-type SpecOption func(*TreatmentSpec)
-
-// mkSpec builds a TreatmentSpec using functional options to keep
-// the callsite argument count small.
-func mkSpec(patientCode string, therapistID uint, opts ...SpecOption) TreatmentSpec {
-	spec := TreatmentSpec{PatientCode: patientCode, TherapistID: therapistID}
-	for _, o := range opts {
-		o(&spec)
-	}
-	return spec
-}
-
-// Option helpers
-func WithTreatmentDate(d string) SpecOption { return func(s *TreatmentSpec) { s.TreatmentDate = d } }
-func WithIssues(i string) SpecOption        { return func(s *TreatmentSpec) { s.Issues = i } }
-func WithTreatment(t string) SpecOption     { return func(s *TreatmentSpec) { s.Treatment = t } }
-func WithRemarks(r string) SpecOption       { return func(s *TreatmentSpec) { s.Remarks = r } }
-func WithNextVisit(n string) SpecOption     { return func(s *TreatmentSpec) { s.NextVisit = n } }
-
-// Date formatting helpers to reduce duplication
+// Date formatting helpers
 func todayStr() string {
 	return time.Now().Format("2006-01-02")
 }
@@ -83,30 +58,32 @@ func daysFromNowStr(days int) string {
 
 func TestTreatmentModel_Create(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment, err := createAndInsertTreatment(db, mkSpec("P001", uint(1),
-		WithTreatmentDate(todayStr()),
-		WithIssues("Back pain"),
-		WithTreatment("Massage therapy"),
-		WithRemarks("Initial treatment session"),
-		WithNextVisit(daysFromNowStr(7)),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P001",
+		TherapistID:   1,
+		TreatmentDate: todayStr(),
+		Issues:        "Back pain",
+		Treatment:     "Massage therapy",
+		Remarks:       "Initial treatment session",
+		NextVisit:     daysFromNowStr(7),
+	})
 	assert.NotZero(t, treatment.ID)
 }
 
 func TestTreatmentModel_Read(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment, err := createAndInsertTreatment(db, mkSpec("P002", uint(1),
-		WithTreatmentDate("2024-01-15"),
-		WithIssues("Neck pain"),
-		WithTreatment("Physical therapy"),
-		WithRemarks("Follow-up treatment"),
-		WithNextVisit("2024-01-22"),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P002",
+		TherapistID:   1,
+		TreatmentDate: "2024-01-15",
+		Issues:        "Neck pain",
+		Treatment:     "Physical therapy",
+		Remarks:       "Follow-up treatment",
+		NextVisit:     "2024-01-22",
+	})
 
 	var found Treatment
-	err = db.First(&found, treatment.ID).Error
+	err := db.First(&found, treatment.ID).Error
 	assert.NoError(t, err)
 	assert.Equal(t, "P002", found.PatientCode)
 	assert.Equal(t, "Follow-up treatment", found.Remarks)
@@ -114,17 +91,18 @@ func TestTreatmentModel_Read(t *testing.T) {
 
 func TestTreatmentModel_Update(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment, err := createAndInsertTreatment(db, mkSpec("P003", uint(1),
-		WithTreatmentDate("2024-01-20"),
-		WithIssues("Shoulder pain"),
-		WithTreatment("Exercise"),
-		WithRemarks("Original remarks"),
-		WithNextVisit("2024-01-27"),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P003",
+		TherapistID:   1,
+		TreatmentDate: "2024-01-20",
+		Issues:        "Shoulder pain",
+		Treatment:     "Exercise",
+		Remarks:       "Original remarks",
+		NextVisit:     "2024-01-27",
+	})
 
 	treatment.Remarks = "Updated remarks"
-	err = db.Save(&treatment).Error
+	err := db.Save(&treatment).Error
 	assert.NoError(t, err)
 
 	var updated Treatment
@@ -134,16 +112,17 @@ func TestTreatmentModel_Update(t *testing.T) {
 
 func TestTreatmentModel_Delete(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment, err := createAndInsertTreatment(db, mkSpec("P004", uint(1),
-		WithTreatmentDate("2024-01-25"),
-		WithIssues("Knee pain"),
-		WithTreatment("Rest"),
-		WithRemarks("Delete test"),
-		WithNextVisit("2024-02-01"),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P004",
+		TherapistID:   1,
+		TreatmentDate: "2024-01-25",
+		Issues:        "Knee pain",
+		Treatment:     "Rest",
+		Remarks:       "Delete test",
+		NextVisit:     "2024-02-01",
+	})
 
-	err = db.Delete(&treatment).Error
+	err := db.Delete(&treatment).Error
 	assert.NoError(t, err)
 
 	var found Treatment
@@ -158,14 +137,15 @@ func TestTreatmentModel_ListByPatient(t *testing.T) {
 
 	// Create multiple treatments for same patient
 	for i := 0; i < 3; i++ {
-		_, err := createAndInsertTreatment(db, mkSpec(patientCode, uint(1),
-			WithTreatmentDate(daysFromNowStr(-i)),
-			WithIssues("Pain type "+string(rune('A'+i))),
-			WithTreatment("Treatment "+string(rune('A'+i))),
-			WithRemarks("Session "+string(rune('1'+i))),
-			WithNextVisit(daysFromNowStr(7-i)),
-		))
-		assert.NoError(t, err)
+		createTreatment(db, CreateTreatmentParams{
+			PatientCode:   patientCode,
+			TherapistID:   1,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        "Pain type " + string(rune('A'+i)),
+			Treatment:     "Treatment " + string(rune('A'+i)),
+			Remarks:       "Session " + string(rune('1'+i)),
+			NextVisit:     daysFromNowStr(7 - i),
+		})
 	}
 
 	var treatments []Treatment
@@ -181,14 +161,15 @@ func TestTreatmentModel_ListByTherapist(t *testing.T) {
 
 	// Create multiple treatments for same therapist
 	for i := 0; i < 4; i++ {
-		_, err := createAndInsertTreatment(db, mkSpec("P00"+string(rune('6'+i)), therapistID,
-			WithTreatmentDate(daysFromNowStr(-i)),
-			WithIssues("Issue "+string(rune('A'+i))),
-			WithTreatment("Treatment "+string(rune('A'+i))),
-			WithRemarks("Remarks "+string(rune('A'+i))),
-			WithNextVisit(daysFromNowStr(7-i)),
-		))
-		assert.NoError(t, err)
+		createTreatment(db, CreateTreatmentParams{
+			PatientCode:   "P00" + string(rune('6'+i)),
+			TherapistID:   therapistID,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        "Issue " + string(rune('A'+i)),
+			Treatment:     "Treatment " + string(rune('A'+i)),
+			Remarks:       "Remarks " + string(rune('A'+i)),
+			NextVisit:     daysFromNowStr(7 - i),
+		})
 	}
 
 	var treatments []Treatment
@@ -204,14 +185,15 @@ func TestTreatmentModel_ListByDate(t *testing.T) {
 
 	// Create treatments on specific date
 	for i := 0; i < 2; i++ {
-		_, err := createAndInsertTreatment(db, mkSpec("P10"+string(rune('0'+i)), uint(1),
-			WithTreatmentDate(targetDate),
-			WithIssues("Special day treatment"),
-			WithTreatment("Valentine's Day therapy"),
-			WithRemarks("Scheduled session"),
-			WithNextVisit("2024-02-21"),
-		))
-		assert.NoError(t, err)
+		createTreatment(db, CreateTreatmentParams{
+			PatientCode:   "P10" + string(rune('0'+i)),
+			TherapistID:   1,
+			TreatmentDate: targetDate,
+			Issues:        "Special day treatment",
+			Treatment:     "Valentine's Day therapy",
+			Remarks:       "Scheduled session",
+			NextVisit:     "2024-02-21",
+		})
 	}
 
 	var treatments []Treatment
@@ -223,14 +205,15 @@ func TestTreatmentModel_ListByDate(t *testing.T) {
 func TestTreatmentModel_AllFields(t *testing.T) {
 	db := setupTreatmentTestDB(t)
 
-	treatment, err := createAndInsertTreatment(db, mkSpec("P999", uint(10),
-		WithTreatmentDate("2024-03-01"),
-		WithIssues("Multiple issues"),
-		WithTreatment("Comprehensive treatment with all fields filled"),
-		WithRemarks("Patient responded well"),
-		WithNextVisit("2024-03-08"),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P999",
+		TherapistID:   10,
+		TreatmentDate: "2024-03-01",
+		Issues:        "Multiple issues",
+		Treatment:     "Comprehensive treatment with all fields filled",
+		Remarks:       "Patient responded well",
+		NextVisit:     "2024-03-08",
+	})
 
 	var found Treatment
 	db.First(&found, treatment.ID)
@@ -242,14 +225,15 @@ func TestTreatmentModel_AllFields(t *testing.T) {
 
 func TestTreatmentModel_Timestamps(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment, err := createAndInsertTreatment(db, mkSpec("P100", uint(1),
-		WithTreatmentDate(todayStr()),
-		WithIssues("Timestamp test issue"),
-		WithTreatment("Timestamp test treatment"),
-		WithRemarks("Testing timestamps"),
-		WithNextVisit(daysFromNowStr(7)),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P100",
+		TherapistID:   1,
+		TreatmentDate: todayStr(),
+		Issues:        "Timestamp test issue",
+		Treatment:     "Timestamp test treatment",
+		Remarks:       "Testing timestamps",
+		NextVisit:     daysFromNowStr(7),
+	})
 
 	assert.NotZero(t, treatment.CreatedAt)
 	assert.NotZero(t, treatment.UpdatedAt)
@@ -261,14 +245,15 @@ func TestTreatmentModel_OrderByDate(t *testing.T) {
 	// Create treatments on different dates
 	dates := []string{"2024-01-01", "2024-01-15", "2024-01-10"}
 	for i, date := range dates {
-		_, err := createAndInsertTreatment(db, mkSpec("PORD"+string(rune('0'+i)), uint(1),
-			WithTreatmentDate(date),
-			WithIssues("Order test issue "+string(rune('A'+i))),
-			WithTreatment("Order test "+string(rune('A'+i))),
-			WithRemarks("Testing order"),
-			WithNextVisit("2024-02-01"),
-		))
-		assert.NoError(t, err)
+		createTreatment(db, CreateTreatmentParams{
+			PatientCode:   "PORD" + string(rune('0'+i)),
+			TherapistID:   1,
+			TreatmentDate: date,
+			Issues:        "Order test issue " + string(rune('A'+i)),
+			Treatment:     "Order test " + string(rune('A'+i)),
+			Remarks:       "Testing order",
+			NextVisit:     "2024-02-01",
+		})
 	}
 
 	var treatments []Treatment
@@ -284,14 +269,15 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 
 	// Create multiple treatments
 	for i := 0; i < 6; i++ {
-		_, err := createAndInsertTreatment(db, mkSpec(patientCode, uint(1),
-			WithTreatmentDate(daysFromNowStr(-i)),
-			WithIssues("Count test issue"),
-			WithTreatment("Count test treatment"),
-			WithRemarks("Testing count"),
-			WithNextVisit(daysFromNowStr(7-i)),
-		))
-		assert.NoError(t, err)
+		createTreatment(db, CreateTreatmentParams{
+			PatientCode:   patientCode,
+			TherapistID:   1,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        "Count test issue",
+			Treatment:     "Count test treatment",
+			Remarks:       "Testing count",
+			NextVisit:     daysFromNowStr(7 - i),
+		})
 	}
 
 	var count int64
@@ -302,14 +288,15 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 
 func TestTreatmentModel_EmptyRemarks(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment, err := createAndInsertTreatment(db, mkSpec("P200", uint(1),
-		WithTreatmentDate(todayStr()),
-		WithIssues("Empty remarks test"),
-		WithTreatment("Treatment with no remarks"),
-		WithRemarks(""),
-		WithNextVisit(daysFromNowStr(7)),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P200",
+		TherapistID:   1,
+		TreatmentDate: todayStr(),
+		Issues:        "Empty remarks test",
+		Treatment:     "Treatment with no remarks",
+		Remarks:       "",
+		NextVisit:     daysFromNowStr(7),
+	})
 
 	var found Treatment
 	db.First(&found, treatment.ID)
@@ -323,14 +310,15 @@ func TestTreatmentModel_LongRemarks(t *testing.T) {
 		"It includes observations, progress notes, recommendations for future treatments, and any concerns " +
 		"that need to be addressed. The remark may span multiple paragraphs and contain specific medical terminology."
 
-	treatment, err := createAndInsertTreatment(db, mkSpec("P300", uint(1),
-		WithTreatmentDate(todayStr()),
-		WithIssues("Complex case"),
-		WithTreatment("Comprehensive therapy"),
-		WithRemarks(longRemarks),
-		WithNextVisit(daysFromNowStr(7)),
-	))
-	assert.NoError(t, err)
+	treatment := createTreatment(db, CreateTreatmentParams{
+		PatientCode:   "P300",
+		TherapistID:   1,
+		TreatmentDate: todayStr(),
+		Issues:        "Complex case",
+		Treatment:     "Comprehensive therapy",
+		Remarks:       longRemarks,
+		NextVisit:     daysFromNowStr(7),
+	})
 
 	var found Treatment
 	db.First(&found, treatment.ID)
