@@ -21,6 +21,16 @@ const (
 	RoleIDKey = "role_id"
 )
 
+// HeaderSpec groups header configuration to avoid passing many primitive strings
+type HeaderSpec struct {
+	Name    string
+	EnvKey  string
+	Default string
+}
+
+// APIToken is a small type alias to avoid primitive obsession when passing tokens
+type APIToken string
+
 // getenvOrDefault returns the environment value for key or the provided default.
 func getenvOrDefault(key, def string) string {
 	v := os.Getenv(key)
@@ -39,6 +49,12 @@ func setHSTSHeader(c *gin.Context) {
 		hstsValue += "; includeSubDomains"
 	}
 	c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
+}
+
+// setHeaderFromSpec sets a response header from an environment variable or default
+// using a structured spec to avoid passing many primitive string arguments.
+func setHeaderFromSpec(c *gin.Context, spec HeaderSpec) {
+	c.Writer.Header().Set(spec.Name, getenvOrDefault(spec.EnvKey, spec.Default))
 }
 
 // unauthorizedSession logs and returns a standardized unauthorized session response.
@@ -115,12 +131,13 @@ func tryParseRedisSession(val string) (uint, uint32, bool) {
 	return uint(uid64), uint32(rid64), true
 }
 
-func tokenValidator(c *gin.Context, expectedToken string) bool {
+// tokenValidatorTyped accepts an APIToken to reduce primitive string usage
+func tokenValidatorTyped(c *gin.Context, expected APIToken) bool {
 	if c.Request.Method == http.MethodOptions {
 		return true
 	}
 	token := strings.TrimSpace(c.GetHeader("Authorization"))
-	if token != expectedToken {
+	if token != string(expected) {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid API token"})
 		return false
 	}
@@ -128,12 +145,18 @@ func tokenValidator(c *gin.Context, expectedToken string) bool {
 }
 
 func setCorsHeaders(c *gin.Context) {
-	c.Writer.Header().Set("Access-Control-Allow-Origin", getenvOrDefault("CORSALLOWORIGIN", "http://localhost:3000"))
-	c.Writer.Header().Set("Access-Control-Allow-Methods", getenvOrDefault("CORSALLOWMETHODS", "POST, PUT, GET, OPTIONS, DELETE, PATCH"))
-	c.Writer.Header().Set("Access-Control-Allow-Headers", getenvOrDefault("CORSALLOWHEADERS", "X-Requested-With, Content-Type, Authorization, session-token"))
-	c.Writer.Header().Set("Access-Control-Max-Age", getenvOrDefault("CORSMAXAGE", "86400"))
-	c.Writer.Header().Set("Access-Control-Allow-Credentials", getenvOrDefault("CORSALLOWCREDENTIALS", "true"))
-	c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
+	configs := []HeaderSpec{
+		{Name: "Access-Control-Allow-Origin", EnvKey: "CORSALLOWORIGIN", Default: "http://localhost:3000"},
+		{Name: "Access-Control-Allow-Methods", EnvKey: "CORSALLOWMETHODS", Default: "POST, PUT, GET, OPTIONS, DELETE, PATCH"},
+		{Name: "Access-Control-Allow-Headers", EnvKey: "CORSALLOWHEADERS", Default: "X-Requested-With, Content-Type, Authorization, session-token"},
+		{Name: "Access-Control-Max-Age", EnvKey: "CORSMAXAGE", Default: "86400"},
+		{Name: "Access-Control-Allow-Credentials", EnvKey: "CORSALLOWCREDENTIALS", Default: "true"},
+		{Name: "Content-Type", EnvKey: "CORSCONTENTTYPE", Default: "application/json"},
+	}
+
+	for _, cfg := range configs {
+		setHeaderFromSpec(c, cfg)
+	}
 
 	// Add HSTS header for HTTPS security. Only set when TLS is present or explicitly enabled
 	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {
@@ -160,7 +183,7 @@ func CORSMiddleware() gin.HandlerFunc {
 		}
 
 		// Call tokenValidator after handling preflight.
-		if !tokenValidator(c, fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN"))) {
+		if !tokenValidatorTyped(c, APIToken(fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN")))) {
 			return
 		}
 
@@ -284,8 +307,7 @@ func ValidateLoginToken() gin.HandlerFunc {
 		}
 		sessionToken := c.GetHeader("session-token")
 		if sessionToken == "" {
-			util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{UserID: "", Email: "", IP: c.ClientIP(), Resource: c.Request.URL.Path, Reason: "Session token not provided"})
-			unauthorizedAbort(c, "Session token not provided", fmt.Errorf("session token not provided"))
+			unauthorizedSession(c, "Session token not provided", "Session token not provided", fmt.Errorf("session token not provided"))
 			return
 		}
 		// First try Redis for fast session validation: key session:<token> -> "userID:roleID"
