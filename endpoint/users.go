@@ -17,6 +17,13 @@ type UpdateUserRequest struct {
 	Password string `json:"password" example:"newpassword123"`
 }
 
+type listUsersParams struct {
+	limit   int
+	cursor  uint
+	offset  int
+	keyword string
+}
+
 // UpdateUser godoc
 // @Summary      Update current user profile
 // @Description  Update authenticated user's name, email, and/or password
@@ -32,31 +39,11 @@ type UpdateUserRequest struct {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /user [patch]
 func UpdateUser(c *gin.Context) {
-	var req UpdateUserRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid request payload",
-			Err: err,
-		})
+	req, ok := bindUpdateUserRequest(c)
+	if !ok {
 		return
 	}
-
-	// Validate that at least one field is being updated
-	if req.Name == "" && req.Email == "" && req.Password == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "At least one field (name, email, or password) must be provided",
-			Err: fmt.Errorf("no fields to update"),
-		})
-		return
-	}
-
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	if !requireUpdateFields(c, req) {
 		return
 	}
 
@@ -69,68 +56,7 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
-	var user model.User
-	if err := db.First(&user, userID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
-			return
-		}
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
-		return
-	}
-
-	// If email provided and different, ensure uniqueness
-	if req.Email != "" && req.Email != user.Email {
-		exists, err := emailExists(db, req.Email, user.ID)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
-			return
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-			return
-		}
-		user.Email = req.Email
-	}
-
-	if req.Name != "" {
-		user.Name = req.Name
-	}
-
-	if req.Password != "" {
-		salt, err := util.GenerateSalt()
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
-			return
-		}
-
-		hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
-			return
-		}
-
-		user.Password = hashedPassword
-		user.PasswordSalt = salt
-	}
-
-	if err := db.Save(&user).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
-		return
-	}
-
-	// If password changed, invalidate all sessions for this user (DB + Redis)
-	if req.Password != "" {
-		// delete sessions in DB
-		_ = db.Where("user_id = ?", user.ID).Delete(&model.Session{}).Error
-		// delete sessions in Redis (best-effort)
-		_ = util.InvalidateUserSessions(user.ID)
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{
-		Msg:  "User updated successfully",
-		Data: user,
-	})
+	updateUserWithRequest(c, userID, req, true)
 }
 
 // ListUsers godoc
@@ -149,91 +75,40 @@ func UpdateUser(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /user [get]
 func ListUsers(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.Query("limit"))
-	cursorStr := c.Query("cursor")
-	offsetStr := c.Query("offset")
-	keyword := c.Query("keyword")
-
-	// Set default and max limits
-	if limit <= 0 {
-		limit = 10
-	}
-	if limit > 100 {
-		limit = 100
-	}
-
-	// Parse and validate cursor
-	var cursor uint
-	if cursorStr != "" {
-		cursorVal, err := strconv.ParseUint(cursorStr, 10, strconv.IntSize)
-		if err != nil {
-			util.CallUserError(c, util.APIErrorParams{
-				Msg: "Invalid cursor parameter",
-				Err: fmt.Errorf("cursor must be a valid positive integer"),
-			})
-			return
-		}
-		cursor = uint(cursorVal)
-	}
-
-	// Parse offset (optional). Negative offsets are ignored.
-	var offset int
-	if offsetStr != "" {
-		offVal, err := strconv.Atoi(offsetStr)
-		if err == nil && offVal > 0 {
-			offset = offVal
-		}
-	}
-
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
+	params, err := parseListUsersParams(c)
+	if err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid cursor parameter",
+			Err: err,
 		})
 		return
 	}
 
-	var users []model.User
-	// GORM automatically excludes soft-deleted records (where deleted_at IS NOT NULL)
-	// when querying models with gorm.Model. No explicit filter is needed here.
-	query := db.Model(&model.User{})
-
-	// Apply keyword filter if provided
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		query = query.Where("name LIKE ? OR email LIKE ?", kw, kw)
+	db, ok := getDBOrRespond(c)
+	if !ok {
+		return
 	}
 
-	// Compute total number of matching users (without pagination)
-	var total int64
-	countQuery := db.Model(&model.User{})
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		countQuery = countQuery.Where("name LIKE ? OR email LIKE ?", kw, kw)
-	}
-	if err := countQuery.Count(&total).Error; err != nil {
+	query := buildUsersQuery(db, params.keyword)
+
+	total, err := countUsers(query)
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to count users", Err: err})
 		return
 	}
 
-	// Apply cursor-based pagination if provided, otherwise apply offset if provided
-	if cursor > 0 {
-		query = query.Where("id > ?", cursor)
-	} else if offset > 0 {
-		query = query.Offset(offset)
-	}
+	query = applyUsersPagination(query, params.cursor, params.offset)
 
-	// Fetch one extra record to determine if there are more pages
-	if err := query.Order("id ASC").Limit(limit + 1).Find(&users).Error; err != nil {
+	users, err := fetchUsers(query, params.limit)
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve users", Err: err})
 		return
 	}
 
 	// Determine if there are more pages
-	hasMore := len(users) > limit
+	hasMore := len(users) > params.limit
 	if hasMore {
-		users = users[:limit]
+		users = users[:params.limit]
 	}
 
 	// Get the next cursor (only if there are more pages)
@@ -276,79 +151,15 @@ func AdminUpdateUser(c *gin.Context) {
 		util.CallUserError(c, util.APIErrorParams{Msg: err.Error(), Err: err})
 		return
 	}
-
-	var req UpdateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request payload", Err: err})
+	req, ok := bindUpdateUserRequest(c)
+	if !ok {
+		return
+	}
+	if !requireUpdateFields(c, req) {
 		return
 	}
 
-	// Validate that at least one field is being updated
-	if req.Name == "" && req.Email == "" && req.Password == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "At least one field (name, email, or password) must be provided",
-			Err: fmt.Errorf("no fields to update"),
-		})
-		return
-	}
-
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Database connection not available", Err: fmt.Errorf("db is nil")})
-		return
-	}
-
-	var user model.User
-	if err := db.First(&user, uid).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
-			return
-		}
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
-		return
-	}
-
-	// If email provided and different, ensure uniqueness
-	if req.Email != "" && req.Email != user.Email {
-		exists, err := emailExists(db, req.Email, user.ID)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
-			return
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
-			return
-		}
-		user.Email = req.Email
-	}
-
-	if req.Name != "" {
-		user.Name = req.Name
-	}
-
-	if req.Password != "" {
-		salt, err := util.GenerateSalt()
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
-			return
-		}
-
-		hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
-			return
-		}
-
-		user.Password = hashedPassword
-		user.PasswordSalt = salt
-	}
-
-	if err := db.Save(&user).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
-		return
-	}
-
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
+	updateUserWithRequest(c, uid, req, false)
 }
 
 // parseIDParam parses the "id" path parameter into a uint and returns an error if invalid.
@@ -478,4 +289,174 @@ func DeleteUser(c *gin.Context) {
 	_ = util.InvalidateUserSessions(uid)
 
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User deleted"})
+}
+
+func bindUpdateUserRequest(c *gin.Context) (UpdateUserRequest, bool) {
+	var req UpdateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request payload", Err: err})
+		return UpdateUserRequest{}, false
+	}
+	return req, true
+}
+
+func requireUpdateFields(c *gin.Context, req UpdateUserRequest) bool {
+	if req.Name != "" || req.Email != "" || req.Password != "" {
+		return true
+	}
+	util.CallUserError(c, util.APIErrorParams{
+		Msg: "At least one field (name, email, or password) must be provided",
+		Err: fmt.Errorf("no fields to update"),
+	})
+	return false
+}
+
+func updateUserWithRequest(c *gin.Context, userID uint, req UpdateUserRequest, invalidateSessions bool) {
+	db, ok := getDBOrRespond(c)
+	if !ok {
+		return
+	}
+
+	user, err := fetchUserByID(db, userID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
+			return
+		}
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve user", Err: err})
+		return
+	}
+
+	passwordChanged, ok := applyUserUpdates(c, db, user, req)
+	if !ok {
+		return
+	}
+
+	if err := db.Save(user).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update user", Err: err})
+		return
+	}
+
+	if invalidateSessions && passwordChanged {
+		_ = db.Where("user_id = ?", user.ID).Delete(&model.Session{}).Error
+		_ = util.InvalidateUserSessions(user.ID)
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User updated successfully", Data: user})
+}
+
+func fetchUserByID(db *gorm.DB, uid uint) (*model.User, error) {
+	var user model.User
+	if err := db.First(&user, uid).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func applyUserUpdates(c *gin.Context, db *gorm.DB, user *model.User, req UpdateUserRequest) (bool, bool) {
+	if req.Email != "" && req.Email != user.Email {
+		exists, err := emailExists(db, req.Email, user.ID)
+		if err != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to validate email uniqueness", Err: err})
+			return false, false
+		}
+		if exists {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Email already exists", Err: fmt.Errorf("email already exists")})
+			return false, false
+		}
+		user.Email = req.Email
+	}
+
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+
+	if req.Password == "" {
+		return false, true
+	}
+
+	salt, err := util.GenerateSalt()
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to generate password salt", Err: err})
+		return false, false
+	}
+
+	hashedPassword, err := util.HashPasswordArgon2(req.Password, salt)
+	if err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to hash password", Err: err})
+		return false, false
+	}
+
+	user.Password = hashedPassword
+	user.PasswordSalt = salt
+	return true, true
+}
+
+func parseListUsersParams(c *gin.Context) (listUsersParams, error) {
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var cursor uint
+	if cursorStr := c.Query("cursor"); cursorStr != "" {
+		cursorVal, err := strconv.ParseUint(cursorStr, 10, strconv.IntSize)
+		if err != nil {
+			return listUsersParams{}, fmt.Errorf("cursor must be a valid positive integer")
+		}
+		cursor = uint(cursorVal)
+	}
+
+	var offset int
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		offVal, err := strconv.Atoi(offsetStr)
+		if err == nil && offVal > 0 {
+			offset = offVal
+		}
+	}
+
+	return listUsersParams{
+		limit:   limit,
+		cursor:  cursor,
+		offset:  offset,
+		keyword: c.Query("keyword"),
+	}, nil
+}
+
+func buildUsersQuery(db *gorm.DB, keyword string) *gorm.DB {
+	query := db.Model(&model.User{})
+	if keyword != "" {
+		kw := "%" + keyword + "%"
+		query = query.Where("name LIKE ? OR email LIKE ?", kw, kw)
+	}
+	return query
+}
+
+func countUsers(query *gorm.DB) (int64, error) {
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+func applyUsersPagination(query *gorm.DB, cursor uint, offset int) *gorm.DB {
+	if cursor > 0 {
+		return query.Where("id > ?", cursor)
+	}
+	if offset > 0 {
+		return query.Offset(offset)
+	}
+	return query
+}
+
+func fetchUsers(query *gorm.DB, limit int) ([]model.User, error) {
+	var users []model.User
+	if err := query.Order("id ASC").Limit(limit + 1).Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
 }
