@@ -74,7 +74,7 @@ func ListTherapist(c *gin.Context) {
 }
 
 func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, error) {
-	id, ok := validateTherapistID(c)
+	id, ok := validateTherapistIDParam(c)
 	if !ok {
 		return "", model.Therapist{}, fmt.Errorf("therapist id missing")
 	}
@@ -93,7 +93,9 @@ func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, err
 
 // validateTherapistID ensures the `id` path param is present and returns it.
 // It responds with a user error when missing and returns ("", false).
-func validateTherapistID(c *gin.Context) (string, bool) {
+// validateTherapistIDParam ensures the `id` path param is present and returns it.
+// It responds with a user error when missing and returns ("", false).
+func validateTherapistIDParam(c *gin.Context) (string, bool) {
 	id := c.Param("id")
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{
@@ -365,7 +367,7 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 }
 
 func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
-	id, ok := validateTherapistID(c)
+	id, ok := validateTherapistIDParam(c)
 	if !ok {
 		return "", model.Therapist{}, fmt.Errorf("therapist ID is required")
 	}
@@ -397,7 +399,7 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist/{id} [delete]
 func DeleteTherapist(c *gin.Context) {
-	id, ok := validateTherapistID(c)
+	id, ok := validateTherapistIDParam(c)
 	if !ok {
 		return
 	}
