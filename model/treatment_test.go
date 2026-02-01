@@ -43,7 +43,9 @@ func createTreatment(db *gorm.DB, p CreateTreatmentParams) Treatment {
 		Remarks:       p.Remarks,
 		NextVisit:     p.NextVisit,
 	}
-	db.Create(&treatment)
+	if err := db.Create(&treatment).Error; err != nil {
+		panic(fmt.Sprintf("failed to create treatment in test: %v", err))
+	}
 	return treatment
 }
 
