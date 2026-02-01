@@ -1,14 +1,17 @@
 package model
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func TestSeedRolesCreatesRoles(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:testdb_role_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open sqlite in-memory DB: %v", err)
 	}

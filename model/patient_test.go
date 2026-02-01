@@ -1,7 +1,9 @@
 package model
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
@@ -9,7 +11,8 @@ import (
 )
 
 func setupPatientTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	dsn := fmt.Sprintf("file:testdb_patient_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	assert.NoError(t, err)
 
 	err = db.AutoMigrate(&Patient{})

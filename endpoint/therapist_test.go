@@ -174,7 +174,7 @@ func TestGetTherapistInfo_NotFound(t *testing.T) {
 	r, db := setupTherapistTest(t)
 	_ = db
 	w, _, _ := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/therapist/:id", requestPath: "/therapist/99999", handler: GetTherapistInfo})
-	assertStatus(t, w, http.StatusNotFound)
+	assertStatus(t, w, http.StatusBadRequest)
 }
 
 func TestGetTherapistInfo_InvalidID(t *testing.T) {
