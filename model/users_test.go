@@ -1,7 +1,9 @@
 package model
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
@@ -9,7 +11,9 @@ import (
 )
 
 func setupUserTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	// Use a unique in-memory database name to avoid cross-test contamination
+	dsn := fmt.Sprintf("file:testdb_%d?mode=memory&cache=shared", time.Now().UnixNano())
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	assert.NoError(t, err)
 
 	err = db.AutoMigrate(&User{}, &Role{})
@@ -18,38 +22,43 @@ func setupUserTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+// Test helpers to reduce duplication across tests
+func createRole(db *gorm.DB, name string) Role {
+	role := Role{Name: name}
+	db.Create(&role)
+	return role
+}
+
+// CreateUserParams groups parameters for createUser to avoid many arguments.
+type CreateUserParams struct {
+	Role     Role
+	Name     string
+	Email    string
+	Password string
+}
+
+func createUser(db *gorm.DB, p CreateUserParams) User {
+	user := User{
+		Name:     p.Name,
+		Email:    p.Email,
+		Password: p.Password,
+		RoleID:   uint32(p.Role.ID),
+	}
+	db.Create(&user)
+	return user
+}
+
 func TestUserModel_Create(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	// Create role first
-	role := Role{Name: "Admin"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Test User",
-		Email:    "test@test.com",
-		Password: "hashed_password",
-		RoleID:   uint32(role.ID),
-	}
-
-	err := db.Create(&user).Error
-	assert.NoError(t, err)
-	assert.NotZero(t, user.ID)
+	role := createRole(db, "Admin")
+	created := createUser(db, CreateUserParams{Role: role, Name: "Test User", Email: "test@test.com", Password: "hashed_password"})
+	assert.NotZero(t, created.ID)
 }
 
 func TestUserModel_Read(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Read Test",
-		Email:    "read@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	user := createUser(db, CreateUserParams{Role: role, Name: "Read Test", Email: "read@test.com", Password: "hash"})
 
 	var found User
 	err := db.First(&found, user.ID).Error
@@ -60,17 +69,8 @@ func TestUserModel_Read(t *testing.T) {
 
 func TestUserModel_Update(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Original Name",
-		Email:    "original@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	user := createUser(db, CreateUserParams{Role: role, Name: "Original Name", Email: "original@test.com", Password: "hash"})
 
 	user.Name = "Updated Name"
 	err := db.Save(&user).Error
@@ -83,17 +83,8 @@ func TestUserModel_Update(t *testing.T) {
 
 func TestUserModel_Delete(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Delete Test",
-		Email:    "delete@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	user := createUser(db, CreateUserParams{Role: role, Name: "Delete Test", Email: "delete@test.com", Password: "hash"})
 
 	err := db.Delete(&user).Error
 	assert.NoError(t, err)
@@ -105,18 +96,9 @@ func TestUserModel_Delete(t *testing.T) {
 
 func TestUserModel_UniqueEmail(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user1 := User{
-		Name:     "User 1",
-		Email:    "unique@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	err := db.Create(&user1).Error
-	assert.NoError(t, err)
+	role := createRole(db, "User")
+	user1 := createUser(db, CreateUserParams{Role: role, Name: "User 1", Email: "unique@test.com", Password: "hash"})
+	assert.NotZero(t, user1.ID)
 
 	// SQLite may not enforce unique in memory mode
 	// This validates the model structure
@@ -126,23 +108,14 @@ func TestUserModel_UniqueEmail(t *testing.T) {
 		Password: "hash",
 		RoleID:   uint32(role.ID),
 	}
-	err = db.Create(&user2).Error
-	// In production MySQL with unique constraint, this would fail
+	err := db.Create(&user2).Error
+	_ = err // In production MySQL with unique constraint, this would fail
 }
 
 func TestUserModel_SearchByEmail(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Search Test",
-		Email:    "searchable@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	createUser(db, CreateUserParams{Role: role, Name: "Search Test", Email: "searchable@test.com", Password: "hash"})
 
 	var found User
 	err := db.Where("email = ?", "searchable@test.com").First(&found).Error
@@ -152,20 +125,11 @@ func TestUserModel_SearchByEmail(t *testing.T) {
 
 func TestUserModel_WithPasswordSalt(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:         "Salt Test",
-		Email:        "salt@test.com",
-		Password:     "argon2id$salt$hash",
-		PasswordSalt: "random_salt_value",
-		RoleID:       uint32(role.ID),
-	}
-
-	err := db.Create(&user).Error
-	assert.NoError(t, err)
+	role := createRole(db, "User")
+	user := createUser(db, CreateUserParams{Role: role, Name: "Salt Test", Email: "salt@test.com", Password: "argon2id$salt$hash"})
+	// manually set salt for this test
+	user.PasswordSalt = "random_salt_value"
+	db.Save(&user)
 
 	var found User
 	db.First(&found, user.ID)
@@ -174,18 +138,8 @@ func TestUserModel_WithPasswordSalt(t *testing.T) {
 
 func TestUserModel_FailedAttempts(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:           "Attempts Test",
-		Email:          "attempts@test.com",
-		Password:       "hash",
-		RoleID:         uint32(role.ID),
-		FailedAttempts: 0,
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	user := createUser(db, CreateUserParams{Role: role, Name: "Attempts Test", Email: "attempts@test.com", Password: "hash"})
 
 	// Increment failed attempts
 	user.FailedAttempts++
@@ -193,26 +147,16 @@ func TestUserModel_FailedAttempts(t *testing.T) {
 
 	var updated User
 	db.First(&updated, user.ID)
-	assert.Equal(t, 1, updated.FailedAttempts)
+	assert.Equal(t, uint(1), updated.FailedAttempts)
 }
 
 func TestUserModel_AccountLock(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
+	role := createRole(db, "User")
 	lockUntil := int64(1234567890)
-	user := User{
-		Name:        "Lock Test",
-		Email:       "lock@test.com",
-		Password:    "hash",
-		RoleID:      uint32(role.ID),
-		LockedUntil: &lockUntil,
-	}
-
-	err := db.Create(&user).Error
-	assert.NoError(t, err)
+	user := createUser(db, CreateUserParams{Role: role, Name: "Lock Test", Email: "lock@test.com", Password: "hash"})
+	user.LockedUntil = &lockUntil
+	db.Save(&user)
 
 	var found User
 	db.First(&found, user.ID)
@@ -222,33 +166,17 @@ func TestUserModel_AccountLock(t *testing.T) {
 
 func TestUserModel_ListByRole(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	adminRole := Role{Name: "Admin"}
-	db.Create(&adminRole)
-
-	userRole := Role{Name: "User"}
-	db.Create(&userRole)
+	adminRole := createRole(db, "Admin")
+	userRole := createRole(db, "User")
 
 	// Create admin users
 	for i := 0; i < 3; i++ {
-		user := User{
-			Name:     "Admin " + string(rune(i)),
-			Email:    "admin" + string(rune(i)) + "@test.com",
-			Password: "hash",
-			RoleID:   uint32(adminRole.ID),
-		}
-		db.Create(&user)
+		createUser(db, CreateUserParams{Role: adminRole, Name: "Admin " + string(rune(i)), Email: "admin" + string(rune(i)) + "@test.com", Password: "hash"})
 	}
 
 	// Create regular users
 	for i := 0; i < 2; i++ {
-		user := User{
-			Name:     "User " + string(rune(i)),
-			Email:    "user" + string(rune(i)) + "@test.com",
-			Password: "hash",
-			RoleID:   uint32(userRole.ID),
-		}
-		db.Create(&user)
+		createUser(db, CreateUserParams{Role: userRole, Name: "User " + string(rune(i)), Email: "user" + string(rune(i)) + "@test.com", Password: "hash"})
 	}
 
 	var admins []User
@@ -259,17 +187,8 @@ func TestUserModel_ListByRole(t *testing.T) {
 
 func TestUserModel_Timestamps(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Timestamp Test",
-		Email:    "timestamp@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	user := createUser(db, CreateUserParams{Role: role, Name: "Timestamp Test", Email: "timestamp@test.com", Password: "hash"})
 
 	assert.NotZero(t, user.CreatedAt)
 	assert.NotZero(t, user.UpdatedAt)
@@ -277,20 +196,12 @@ func TestUserModel_Timestamps(t *testing.T) {
 
 func TestUserModel_ResetFailedAttempts(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
+	role := createRole(db, "User")
 	lockUntil := int64(1234567890)
-	user := User{
-		Name:           "Reset Test",
-		Email:          "reset@test.com",
-		Password:       "hash",
-		RoleID:         uint32(role.ID),
-		FailedAttempts: 5,
-		LockedUntil:    &lockUntil,
-	}
-	db.Create(&user)
+	user := createUser(db, CreateUserParams{Role: role, Name: "Reset Test", Email: "reset@test.com", Password: "hash"})
+	user.FailedAttempts = 5
+	user.LockedUntil = &lockUntil
+	db.Save(&user)
 
 	// Reset
 	user.FailedAttempts = 0
@@ -299,25 +210,17 @@ func TestUserModel_ResetFailedAttempts(t *testing.T) {
 
 	var updated User
 	db.First(&updated, user.ID)
-	assert.Equal(t, 0, updated.FailedAttempts)
+	assert.Equal(t, uint(0), updated.FailedAttempts)
 	assert.Nil(t, updated.LockedUntil)
 }
 
 func TestUserModel_CountByRole(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "Therapist"}
-	db.Create(&role)
+	role := createRole(db, "Therapist")
 
 	// Create therapists
 	for i := 0; i < 4; i++ {
-		user := User{
-			Name:     "Therapist " + string(rune(i)),
-			Email:    "therapist" + string(rune(i)) + "@test.com",
-			Password: "hash",
-			RoleID:   uint32(role.ID),
-		}
-		db.Create(&user)
+		createUser(db, CreateUserParams{Role: role, Name: "Therapist " + string(rune(i)), Email: "therapist" + string(rune(i)) + "@test.com", Password: "hash"})
 	}
 
 	var count int64
@@ -328,17 +231,8 @@ func TestUserModel_CountByRole(t *testing.T) {
 
 func TestUserModel_SearchByName(t *testing.T) {
 	db := setupUserTestDB(t)
-
-	role := Role{Name: "User"}
-	db.Create(&role)
-
-	user := User{
-		Name:     "Searchable Username",
-		Email:    "searchname@test.com",
-		Password: "hash",
-		RoleID:   uint32(role.ID),
-	}
-	db.Create(&user)
+	role := createRole(db, "User")
+	createUser(db, CreateUserParams{Role: role, Name: "Searchable Username", Email: "searchname@test.com", Password: "hash"})
 
 	var found []User
 	err := db.Where("name LIKE ?", "%Searchable%").Find(&found).Error
