@@ -80,7 +80,7 @@ type SignupCreds struct {
 func CreateAndLoginUser(t *testing.T, r http.Handler, creds SignupCreds) (string, uint) {
 	signupBody := map[string]string{"name": creds.Name, "email": creds.Email, "password": creds.Password}
 	b, _ := json.Marshal(signupBody)
-	rr, err := doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr, err := doRequest(r, requestParams{method: "POST", path: "/signup", body: b, headers: map[string]string{"Authorization": "Bearer test-api-token"}})
 	if err != nil {
 		t.Fatalf("signup %s failed: %v", creds.Email, err)
 	}
@@ -91,7 +91,7 @@ func CreateAndLoginUser(t *testing.T, r http.Handler, creds SignupCreds) (string
 	// Login
 	loginBody := map[string]string{"email": creds.Email, "password": creds.Password}
 	b, _ = json.Marshal(loginBody)
-	rr, err = doRequest(r, "POST", "/login", b, map[string]string{"Authorization": "Bearer test-api-token"})
+	rr, err = doRequest(r, requestParams{method: "POST", path: "/login", body: b, headers: map[string]string{"Authorization": "Bearer test-api-token"}})
 	if err != nil {
 		t.Fatalf("login %s failed: %v", creds.Email, err)
 	}
@@ -175,7 +175,7 @@ func CreateAdminAndTestUsers(t *testing.T, r http.Handler) (string, uint) {
 
 	for _, u := range testUsers {
 		b, _ := json.Marshal(u)
-		rr, err := doRequest(r, "POST", "/signup", b, map[string]string{"Authorization": "Bearer test-api-token"})
+		rr, err := doRequest(r, requestParams{method: "POST", path: "/signup", body: b, headers: map[string]string{"Authorization": "Bearer test-api-token"}})
 		if err != nil {
 			t.Fatalf("signup %s failed: %v", u["email"], err)
 		}
@@ -194,7 +194,7 @@ func ListUsersData(t *testing.T, r http.Handler, adminToken string, query string
 	if query != "" {
 		path += "?" + query
 	}
-	rr, err := doRequest(r, "GET", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	rr, err := doRequest(r, requestParams{method: "GET", path: path, body: nil, headers: map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken}})
 	if err != nil {
 		t.Fatalf("list users request failed: %v", err)
 	}
@@ -236,7 +236,7 @@ func PatchUserEmail(t *testing.T, r http.Handler, req EmailUpdateRequest) *httpt
 	}
 	updateBody := map[string]string{"email": req.Email}
 	b, _ := json.Marshal(updateBody)
-	rr, err := doRequest(r, "PATCH", path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": req.Token})
+	rr, err := doRequest(r, requestParams{method: "PATCH", path: path, body: b, headers: map[string]string{"Authorization": "Bearer test-api-token", "session-token": req.Token}})
 	if err != nil {
 		t.Fatalf("email update failed: %v", err)
 	}
