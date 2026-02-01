@@ -200,22 +200,22 @@ func TestTokenValidator(t *testing.T) {
 
 	// OPTIONS should bypass token validation
 	c.Request = httptest.NewRequest("OPTIONS", "/", nil)
-	if !tokenValidator(c, "anything") {
-		t.Fatalf("expected tokenValidator to allow OPTIONS method")
+	if !tokenValidatorTyped(c, "anything") {
+		t.Fatalf("expected tokenValidatorTyped to allow OPTIONS method")
 	}
 
 	// Non-OPTIONS must match expected token
-	expected := "Bearer secret-token"
+	expected := APIToken("Bearer secret-token")
 	if err := os.Setenv("APITOKEN", "secret-token"); err != nil {
 		t.Fatalf("failed to set APITOKEN: %v", err)
 	}
 	defer func() { _ = os.Unsetenv("APITOKEN") }()
 
 	c.Request = httptest.NewRequest("GET", "/", nil)
-	c.Request.Header.Set("Authorization", expected)
-	ok := tokenValidator(c, expected)
+	c.Request.Header.Set("Authorization", string(expected))
+	ok := tokenValidatorTyped(c, expected)
 	if !ok {
-		t.Fatalf("expected tokenValidator to accept matching token")
+		t.Fatalf("expected tokenValidatorTyped to accept matching token")
 	}
 
 	// mismatch should abort and return false
@@ -223,9 +223,9 @@ func TestTokenValidator(t *testing.T) {
 	c2, _ := gin.CreateTestContext(c2w)
 	c2.Request = httptest.NewRequest("GET", "/", nil)
 	c2.Request.Header.Set("Authorization", "Bearer bad")
-	ok2 := tokenValidator(c2, expected)
+	ok2 := tokenValidatorTyped(c2, expected)
 	if ok2 {
-		t.Fatalf("expected tokenValidator to reject bad token")
+		t.Fatalf("expected tokenValidatorTyped to reject bad token")
 	}
 	if c2w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 on bad token, got %d", c2w.Code)

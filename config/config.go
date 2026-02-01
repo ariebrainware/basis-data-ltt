@@ -94,7 +94,10 @@ func ConnectMySQL() (*gorm.DB, error) {
 	cfg := LoadConfig()
 	// For tests, use an in-memory SQLite DB to avoid needing an external MySQL instance.
 	if cfg.AppEnv == "test" {
-		dsn := "file::memory:?cache=shared"
+		// Use a unique in-memory database name per process/call to avoid
+		// cross-test contamination when tests run in the same process.
+		// Example: file:testdb_123456789?mode=memory&cache=shared
+		dsn := fmt.Sprintf("file:testdb_%d?mode=memory&cache=shared", time.Now().UnixNano())
 		gormConfig := &gorm.Config{
 			Logger: logger.New(
 				log.New(os.Stdout, "\r\n", log.LstdFlags),
