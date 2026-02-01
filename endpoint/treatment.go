@@ -6,12 +6,45 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+// treatmentQueryParams encapsulates all query parameters for treatment listing
+type treatmentQueryParams struct {
+	limit       int
+	offset      int
+	therapistID int
+	keyword     string
+	groupByDate string
+	jakartaLoc  *time.Location
+}
+
+func validateTreatmentID(c *gin.Context) (string, bool) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing treatment ID",
+			Err: fmt.Errorf("treatment ID is required"),
+		})
+		return "", false
+	}
+	return id, true
+}
+
+func findTreatmentOrAbort(c *gin.Context, db *gorm.DB, treatmentID string) (*model.Treatment, bool) {
+	var treatment model.Treatment
+	if err := db.First(&treatment, treatmentID).Error; err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Treatment not found",
+			Err: err,
+		})
+		return nil, false
+	}
+	return &treatment, true
+}
 
 // applyCreatedAtFilterForTreatments applies a created_at filter for supported ranges on treatment_date.
 // Supported values: "last_2_days", "last_3_months", "last_6_months".
@@ -52,91 +85,147 @@ func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
 	return therapistID, nil
 }
 
-func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, groupByDate string) ([]model.ListTreatementResponse, int64, error) {
-	var treatments []model.ListTreatementResponse
-	var totalTreatments int64
-
-	// Load Jakarta timezone once for date parsing
-	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to load timezone: %v", err)
-	}
-
-	query := db.Table("treatments").
+func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
+	return db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
 		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age").
 		Where("patients.deleted_at IS NULL")
+}
+
+func buildCountQuery(db *gorm.DB) *gorm.DB {
+	return db.Table("treatments").
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
+		Where("patients.deleted_at IS NULL")
+}
+
+func applyPagination(query *gorm.DB, limit, offset int) *gorm.DB {
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
 	if offset > 0 {
 		query = query.Offset(offset)
 	}
+	return query
+}
+
+func applyKeywordFilter(query *gorm.DB, keyword string) *gorm.DB {
 	if keyword != "" {
 		kw := "%" + keyword + "%"
-		query = query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
+		return query.Order("treatments.treatment_date DESC").Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
+	}
+	return query.Order("treatments.created_at DESC")
+}
 
-	} else {
-		query = query.Order("treatments.created_at DESC")
-	}
+func applyTherapistFilter(query *gorm.DB, therapistID int) *gorm.DB {
 	if therapistID != 0 {
-		query = query.Where("treatments.therapist_id = ?", therapistID)
+		return query.Where("treatments.therapist_id = ?", therapistID)
 	}
-	if groupByDate != "" {
-		// Support either an explicit date (YYYY-MM-DD) or predefined ranges
-		if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
-			// Filter treatments that fall within the specified date (inclusive start, exclusive next day)
-			end := start.Add(24 * time.Hour)
-			query = query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
-		} else {
-			// Validate groupByDate against whitelist to prevent SQL injection for range values
-			validDates := map[string]bool{
-				"last_2_days":   true,
-				"last_3_months": true,
-				"last_6_months": true,
-			}
-			if validDates[groupByDate] {
-				query = applyCreatedAtFilterForTreatments(query, groupByDate)
-			}
-		}
+	return query
+}
+
+func applyDateFilter(query *gorm.DB, groupByDate string, jakartaLoc *time.Location) *gorm.DB {
+	if groupByDate == "" {
+		return query
 	}
+
+	// Try parsing as explicit date first
+	if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
+		end := start.Add(24 * time.Hour)
+		return query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
+	}
+
+	// Otherwise check predefined ranges
+	validDates := map[string]bool{
+		"last_2_days":   true,
+		"last_3_months": true,
+		"last_6_months": true,
+	}
+	if validDates[groupByDate] {
+		return applyCreatedAtFilterForTreatments(query, groupByDate)
+	}
+	return query
+}
+
+func fetchTreatments(db *gorm.DB, params treatmentQueryParams) ([]model.ListTreatementResponse, int64, error) {
+	var treatments []model.ListTreatementResponse
+	var totalTreatments int64
+
+	// Build and execute main query
+	query := buildTreatmentBaseQuery(db)
+	query = applyPagination(query, params.limit, params.offset)
+	query = applyKeywordFilter(query, params.keyword)
+	query = applyTherapistFilter(query, params.therapistID)
+	query = applyDateFilter(query, params.groupByDate, params.jakartaLoc)
 
 	if err := query.Find(&treatments).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// Count total with the same filters (without limit/offset)
-	countQuery := db.Table("treatments").
-		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
-		Where("patients.deleted_at IS NULL")
-	if keyword != "" {
-		kw := "%" + keyword + "%"
-		countQuery = countQuery.Where("patients.full_name LIKE ? OR treatments.patient_code = ?", kw, keyword)
-	}
-	if therapistID != 0 {
-		countQuery = countQuery.Where("treatments.therapist_id = ?", therapistID)
-	}
-	if groupByDate != "" {
-		if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
-			end := start.Add(24 * time.Hour)
-			countQuery = countQuery.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
-		} else {
-			validDates := map[string]bool{
-				"last_2_days":   true,
-				"last_3_months": true,
-				"last_6_months": true,
-			}
-			if validDates[groupByDate] {
-				countQuery = applyCreatedAtFilterForTreatments(countQuery, groupByDate)
-			}
-		}
-	}
+	// Build and execute count query (same filters, no pagination)
+	countQuery := buildCountQuery(db)
+	countQuery = applyKeywordFilter(countQuery, params.keyword)
+	countQuery = applyTherapistFilter(countQuery, params.therapistID)
+	countQuery = applyDateFilter(countQuery, params.groupByDate, params.jakartaLoc)
+
 	if err := countQuery.Count(&totalTreatments).Error; err != nil {
 		return nil, 0, err
 	}
 
 	return treatments, totalTreatments, nil
+}
+
+func parseQueryInt(c *gin.Context, key string, defaultVal int) int {
+	if s := c.Query(key); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 0 {
+			return v
+		}
+	}
+	return defaultVal
+}
+
+func resolveTherapistIDFromSession(c *gin.Context, db *gorm.DB) (int, error) {
+	sessionToken := c.GetHeader("session-token")
+	therapistID, err := getTherapistIDFromSession(db, sessionToken)
+	if err != nil {
+		return 0, err
+	}
+
+	maxUint := ^uint(0) >> 1
+	if therapistID > maxUint {
+		return 0, fmt.Errorf("therapist id overflow: %d", therapistID)
+	}
+	return int(therapistID), nil
+}
+
+func handleSessionError(c *gin.Context, err error) {
+	switch {
+	case strings.Contains(err.Error(), "session token is empty"):
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Session token is missing in 'session-token' header",
+			Err: err,
+		})
+	case strings.Contains(err.Error(), "session not found"):
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Session not found or has expired",
+			Err: err,
+		})
+	case strings.Contains(err.Error(), "user not found"):
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "User associated with the session was not found",
+			Err: err,
+		})
+	case strings.Contains(err.Error(), "therapist not found"):
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Therapist associated with the user was not found",
+			Err: err,
+		})
+	default:
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to get therapist ID from session",
+			Err: err,
+		})
+	}
 }
 
 // ListTreatments godoc
@@ -159,92 +248,39 @@ func fetchTreatments(db *gorm.DB, limit, offset, therapistID int, keyword, group
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /treatment [get]
 func ListTreatments(c *gin.Context) {
-	// Parse query params manually to avoid depending on parseQueryParams signature.
-	limit := 0
-	offset := 0
-	therapistID := 0
-	keyword := c.Query("keyword")
-	groupByDate := c.Query("group_by_date")
-
-	if l := c.Query("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
-			limit = v
-		}
-	}
-	if o := c.Query("offset"); o != "" {
-		if v, err := strconv.Atoi(o); err == nil && v > 0 {
-			offset = v
-		}
-	}
-	if t := c.Query("therapist_id"); t != "" {
-		if v, err := strconv.Atoi(t); err == nil && v >= 0 {
-			therapistID = v
-		}
+	db, ok := getDBOrAbort(c)
+	if !ok {
+		return
 	}
 
-	filterByTherapist := c.Query("filter_by_therapist") == "true"
-
-	db := middleware.GetDB(c)
-	if db == nil {
+	jakartaLoc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
+			Msg: "Failed to load timezone",
+			Err: err,
 		})
 		return
 	}
 
-	// If filter_by_therapist is true, get therapist ID from session
-	if filterByTherapist {
-		sessionToken := c.GetHeader("session-token")
-		sessionTherapistID, err := getTherapistIDFromSession(db, sessionToken)
-		if err != nil {
-			// Provide more specific error messages based on the root cause
-			switch {
-			case strings.Contains(err.Error(), "session token is empty"):
-				util.CallUserError(c, util.APIErrorParams{
-					Msg: "Session token is missing in 'session-token' header",
-					Err: err,
-				})
-			case strings.Contains(err.Error(), "session not found"):
-				util.CallUserError(c, util.APIErrorParams{
-					Msg: "Session not found or has expired",
-					Err: err,
-				})
-			case strings.Contains(err.Error(), "user not found"):
-				util.CallUserError(c, util.APIErrorParams{
-					Msg: "User associated with the session was not found",
-					Err: err,
-				})
-			case strings.Contains(err.Error(), "therapist not found"):
-				util.CallUserError(c, util.APIErrorParams{
-					Msg: "Therapist associated with the user was not found",
-					Err: err,
-				})
-			default:
-				util.CallServerError(c, util.APIErrorParams{
-					Msg: "Failed to get therapist ID from session",
-					Err: err,
-				})
-			}
-			return
-		}
-		// Safely convert `uint` to `int` after checking platform-dependent
-		// max int to avoid accidental overflows flagged by static analysis.
-		// Compute the platform max int as an unsigned value to avoid
-		// converting a potentially negative int to uint (which static
-		// analyzers flag). Compare against that unsigned max instead.
-		maxUint := ^uint(0) >> 1
-		if sessionTherapistID > maxUint {
-			util.CallServerError(c, util.APIErrorParams{
-				Msg: "Therapist ID value out of range",
-				Err: fmt.Errorf("therapist id overflow: %d", sessionTherapistID),
-			})
-			return
-		}
-		therapistID = int(sessionTherapistID)
+	params := treatmentQueryParams{
+		limit:       parseQueryInt(c, "limit", 0),
+		offset:      parseQueryInt(c, "offset", 0),
+		therapistID: parseQueryInt(c, "therapist_id", 0),
+		keyword:     c.Query("keyword"),
+		groupByDate: c.Query("group_by_date"),
+		jakartaLoc:  jakartaLoc,
 	}
 
-	treatments, totalTreatments, err := fetchTreatments(db, limit, offset, therapistID, keyword, groupByDate)
+	if c.Query("filter_by_therapist") == "true" {
+		therapistID, err := resolveTherapistIDFromSession(c, db)
+		if err != nil {
+			handleSessionError(c, err)
+			return
+		}
+		params.therapistID = therapistID
+	}
+
+	treatments, totalTreatments, err := fetchTreatments(db, params)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to fetch treatments",
@@ -257,6 +293,30 @@ func ListTreatments(c *gin.Context) {
 		Msg:  "Treatments fetched successfully",
 		Data: map[string]interface{}{"total": totalTreatments, "total_fetched": len(treatments), "treatments": treatments},
 	})
+}
+
+func checkDuplicateTreatment(c *gin.Context, db *gorm.DB, date string, patientCode string) bool {
+	var existingTreatment model.Treatment
+	if err := db.Where("treatment_date = ? AND patient_code = ?", date, patientCode).First(&existingTreatment).Error; err == nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Treatment with this date already exists for this patient",
+			Err: fmt.Errorf("duplicate treatment date"),
+		})
+		return false
+	}
+	return true
+}
+
+func createTreatmentRecord(db *gorm.DB, req model.TreatementRequest) error {
+	return db.Create(&model.Treatment{
+		TreatmentDate: req.TreatmentDate,
+		PatientCode:   req.PatientCode,
+		TherapistID:   req.TherapistID,
+		Issues:        req.Issues,
+		Treatment:     strings.Join(req.Treatment, ","),
+		Remarks:       req.Remarks,
+		NextVisit:     req.NextVisit,
+	}).Error
 }
 
 // CreateTreatment godoc
@@ -274,8 +334,8 @@ func ListTreatments(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /treatment [post]
 func CreateTreatment(c *gin.Context) {
-	createTreatmentRequest := model.TreatementRequest{}
-	if err := c.ShouldBindJSON(&createTreatmentRequest); err != nil {
+	var req model.TreatementRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid input data",
 			Err: err,
@@ -283,33 +343,16 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
-	var existingTreatment model.Treatment
-	if err := db.Where("treatment_date = ? AND patient_code = ?", createTreatmentRequest.TreatmentDate, createTreatmentRequest.PatientCode).First(&existingTreatment).Error; err == nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Treatment with this date already exists for this patient",
-			Err: fmt.Errorf("duplicate treatment date"),
-		})
+	if !checkDuplicateTreatment(c, db, req.TreatmentDate, req.PatientCode) {
 		return
 	}
 
-	if err := db.Create(&model.Treatment{
-		TreatmentDate: createTreatmentRequest.TreatmentDate,
-		PatientCode:   createTreatmentRequest.PatientCode,
-		TherapistID:   createTreatmentRequest.TherapistID,
-		Issues:        createTreatmentRequest.Issues,
-		Treatment:     strings.Join(createTreatmentRequest.Treatment, ","),
-		Remarks:       createTreatmentRequest.Remarks,
-		NextVisit:     createTreatmentRequest.NextVisit,
-	}).Error; err != nil {
+	if err := createTreatmentRecord(db, req); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create treatment",
 			Err: err,
@@ -339,17 +382,13 @@ func CreateTreatment(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /treatment/{id} [patch]
 func UpdateTreatment(c *gin.Context) {
-	treatmentID := c.Param("id")
-	if treatmentID == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing treatment ID",
-			Err: fmt.Errorf("treatment ID is required"),
-		})
+	treatmentID, ok := validateTreatmentID(c)
+	if !ok {
 		return
 	}
 
-	treatment := model.Treatment{}
-	if err := c.ShouldBindJSON(&treatment); err != nil {
+	var updates model.Treatment
+	if err := c.ShouldBindJSON(&updates); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid input data",
 			Err: err,
@@ -357,25 +396,17 @@ func UpdateTreatment(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
-	var existingTreatment model.Treatment
-	if err := db.First(&existingTreatment, treatmentID).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Treatment not found",
-			Err: err,
-		})
+	existingTreatment, ok := findTreatmentOrAbort(c, db, treatmentID)
+	if !ok {
 		return
 	}
 
-	if err := db.Model(&existingTreatment).Updates(treatment).Error; err != nil {
+	if err := db.Model(existingTreatment).Updates(updates).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update treatment",
 			Err: err,
@@ -404,34 +435,22 @@ func UpdateTreatment(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /treatment/{id} [delete]
 func DeleteTreatment(c *gin.Context) {
-	treatmentID := c.Param("id")
-	if treatmentID == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing treatment ID",
-			Err: fmt.Errorf("treatment ID is required"),
-		})
+	treatmentID, ok := validateTreatmentID(c)
+	if !ok {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	if db == nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Database connection not available",
-			Err: fmt.Errorf("db is nil"),
-		})
+	db, ok := getDBOrAbort(c)
+	if !ok {
 		return
 	}
 
-	var existingTreatment model.Treatment
-	if err := db.First(&existingTreatment, treatmentID).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Treatment not found",
-			Err: err,
-		})
+	existingTreatment, ok := findTreatmentOrAbort(c, db, treatmentID)
+	if !ok {
 		return
 	}
 
-	if err := db.Delete(&existingTreatment).Error; err != nil {
+	if err := db.Delete(existingTreatment).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to delete treatment",
 			Err: err,

@@ -55,7 +55,7 @@ func RateLimiter(config RateLimitConfig) gin.HandlerFunc {
 
 		if !allowed {
 			// Log rate limit exceeded
-			util.LogRateLimitExceeded("", clientIP, endpoint)
+			util.LogRateLimitExceeded(util.RateLimitParams{Email: "", IP: clientIP, Endpoint: endpoint})
 
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Too many requests. Please try again later.",

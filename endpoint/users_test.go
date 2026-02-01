@@ -18,7 +18,7 @@ func TestAdminUpdateTargetPassword(t *testing.T) {
 	path := "/user/" + strconv.Itoa(int(targetID))
 	updateBody := map[string]string{"password": "newtargetpass", "name": "Target Updated"}
 	b, _ := json.Marshal(updateBody)
-	rr, err := doRequest(r, "PATCH", path, b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	rr, err := doRequest(r, requestParams{method: "PATCH", path: path, body: b, headers: map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken}})
 	if err != nil {
 		t.Fatalf("admin update failed: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestAdminDeleteTarget(t *testing.T) {
 	_, targetID := CreateAndLoginUser(t, r, SignupCreds{Name: "Target User", Email: "target@example.com", Password: "targetpass"})
 
 	path := "/user/" + strconv.Itoa(int(targetID))
-	rr, err := doRequest(r, "DELETE", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	rr, err := doRequest(r, requestParams{method: "DELETE", path: path, body: nil, headers: map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken}})
 	if err != nil {
 		t.Fatalf("delete user failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestAdminDeleteTarget(t *testing.T) {
 		t.Fatalf("delete user non-200: %d %s", rr.Code, rr.Body.String())
 	}
 
-	rr, err = doRequest(r, "GET", path, nil, map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken})
+	rr, err = doRequest(r, requestParams{method: "GET", path: path, body: nil, headers: map[string]string{"Authorization": "Bearer test-api-token", "session-token": adminToken}})
 	if err != nil {
 		t.Fatalf("get user after delete failed: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestSelfPasswordUpdate(t *testing.T) {
 	// Self update using userToken (use endpoint /user)
 	selfUpdate := map[string]string{"name": "Self Updated", "password": "finalpass"}
 	b, _ := json.Marshal(selfUpdate)
-	rr, err := doRequest(r, "PATCH", "/user", b, map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken})
+	rr, err := doRequest(r, requestParams{method: "PATCH", path: "/user", body: b, headers: map[string]string{"Authorization": "Bearer test-api-token", "session-token": userToken}})
 	if err != nil {
 		t.Fatalf("self update failed: %v", err)
 	}

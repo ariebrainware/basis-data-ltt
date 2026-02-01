@@ -13,7 +13,7 @@ func fetchTherapist(db *gorm.DB, q listQuery) ([]model.Therapist, int64, error) 
 	var therapist []model.Therapist
 	var totalTherapist int64
 
-	query := db.Order("created_at ASC")
+	query := db.Offset(q.Offset).Order("created_at ASC")
 	if q.Limit > 0 {
 		query = query.Limit(q.Limit)
 	}
@@ -73,10 +73,23 @@ func ListTherapist(c *gin.Context) {
 	})
 }
 
+// validateTherapistID extracts and validates the therapist ID from the URL parameter
+func validateTherapistID(c *gin.Context) (string, error) {
+	id := c.Param("id")
+	if id == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Missing therapist ID",
+			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return "", fmt.Errorf("therapist ID is required")
+	}
+	return id, nil
+}
+
 func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, error) {
-	id, ok := validateTherapistID(c)
-	if !ok {
-		return "", model.Therapist{}, fmt.Errorf("therapist id missing")
+	id, err := validateTherapistID(c)
+	if err != nil {
+		return "", model.Therapist{}, err
 	}
 
 	var therapist model.Therapist
@@ -365,9 +378,9 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 }
 
 func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
-	id, ok := validateTherapistID(c)
-	if !ok {
-		return "", model.Therapist{}, fmt.Errorf("therapist ID is required")
+	id, err := validateTherapistID(c)
+	if err != nil {
+		return "", model.Therapist{}, err
 	}
 
 	therapist := model.Therapist{}
@@ -397,8 +410,8 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /therapist/{id} [delete]
 func DeleteTherapist(c *gin.Context) {
-	id, ok := validateTherapistID(c)
-	if !ok {
+	id, err := validateTherapistID(c)
+	if err != nil {
 		return
 	}
 

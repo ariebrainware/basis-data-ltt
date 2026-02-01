@@ -116,12 +116,12 @@ func getDBOrRespond(c *gin.Context) (*gorm.DB, bool) {
 func loadUserForLogin(ctx loginContext) (model.User, bool) {
 	user, err := loadUserByEmail(ctx.DB, ctx.Email)
 	if err == gorm.ErrRecordNotFound {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "user not found")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "user not found"})
 		util.CallUserError(ctx.C, util.APIErrorParams{Msg: "Invalid email or password", Err: fmt.Errorf("user not found")})
 		return model.User{}, false
 	}
 	if err != nil {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "database error")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "database error"})
 		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Database error", Err: err})
 		return model.User{}, false
 	}
@@ -130,7 +130,7 @@ func loadUserForLogin(ctx loginContext) (model.User, bool) {
 
 func ensureAccountNotLocked(ctx loginContext, user *model.User) bool {
 	if locked, expiry := isAccountLocked(user); locked {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "account locked")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "account locked"})
 		util.CallUserError(ctx.C, util.APIErrorParams{Msg: fmt.Sprintf("Account is locked until %s due to multiple failed login attempts", expiry.Format(time.RFC3339)), Err: fmt.Errorf("account locked")})
 		return false
 	}
@@ -140,13 +140,13 @@ func ensureAccountNotLocked(ctx loginContext, user *model.User) bool {
 func verifyPasswordOrRespond(ctx loginContext, user *model.User, plain string) bool {
 	match, err := util.VerifyPassword(plain, user.Password, user.PasswordSalt)
 	if err != nil {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "password verification error")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "password verification error"})
 		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Password verification failed", Err: err})
 		return false
 	}
 	if !match {
 		incrementFailedAttempts(ctx.DB, user, ctx.CI)
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "invalid password")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "invalid password"})
 		util.CallUserError(ctx.C, util.APIErrorParams{Msg: "Invalid email or password", Err: fmt.Errorf("invalid password")})
 		return false
 	}
@@ -156,7 +156,7 @@ func verifyPasswordOrRespond(ctx loginContext, user *model.User, plain string) b
 func fetchRoleOrRespond(ctx loginContext, roleID uint32) (model.Role, bool) {
 	role, err := fetchRole(ctx.DB, roleID)
 	if err == gorm.ErrRecordNotFound {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "role not found")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "role not found"})
 		util.CallUserError(ctx.C, util.APIErrorParams{Msg: "Role not found", Err: fmt.Errorf("role not found")})
 		return model.Role{}, false
 	}
@@ -170,7 +170,7 @@ func fetchRoleOrRespond(ctx loginContext, roleID uint32) (model.Role, bool) {
 func createTokenOrRespond(ctx loginContext, user model.User) (string, bool) {
 	tokenString, err := createJWTToken(user)
 	if err != nil {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "token generation failed")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "token generation failed"})
 		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Could not generate token", Err: err})
 		return "", false
 	}
@@ -180,7 +180,7 @@ func createTokenOrRespond(ctx loginContext, user model.User) (string, bool) {
 func recordSessionOrRespond(ctx loginContext, info SessionInfo) (model.Session, bool) {
 	session, err := recordSession(ctx.DB, info)
 	if err != nil {
-		util.LogLoginFailure(ctx.Email, ctx.CI.IP, ctx.CI.Agent, "session creation failed")
+		util.LogLoginFailure(util.LoginParams{Email: ctx.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent, Reason: "session creation failed"})
 		util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Failed to record session", Err: err})
 		return model.Session{}, false
 	}
@@ -223,7 +223,7 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 		_ = util.AddSessionToUserSet(session.UserID, tokenString, exp)
 	}
 
-	util.LogLoginSuccess(user.ID, user.Email, ctx.CI.IP, ctx.CI.Agent)
+	util.LogLoginSuccess(util.LoginParams{UserID: user.ID, Email: user.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent})
 	util.CallSuccessOK(ctx.C, util.APISuccessParams{Msg: "Login successful", Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: user.ID}})
 	return true
 }
@@ -297,10 +297,10 @@ func incrementFailedAttempts(db *gorm.DB, user *model.User, ci clientInfo) {
 	if user.FailedAttempts >= 5 {
 		lockUntil := time.Now().Add(15 * time.Minute).Unix()
 		user.LockedUntil = &lockUntil
-		util.LogAccountLocked(user.ID, user.Email, ci.IP, "too many failed login attempts")
+		util.LogAccountLocked(util.AccountLockParams{UserID: user.ID, Email: user.Email, IP: ci.IP, Reason: "too many failed login attempts"})
 	}
 	if err := db.Save(user).Error; err != nil {
-		util.LogLoginFailure(user.Email, ci.IP, ci.Agent, "failed to update failed attempts")
+		util.LogLoginFailure(util.LoginParams{Email: user.Email, IP: ci.IP, UserAgent: ci.Agent, Reason: "failed to update failed attempts"})
 	}
 }
 
@@ -407,7 +407,7 @@ func Logout(c *gin.Context) {
 	// Get user info for logging
 	var user model.User
 	if err := db.First(&user, session.UserID).Error; err == nil {
-		util.LogLogout(user.ID, user.Email, c.ClientIP(), c.Request.UserAgent())
+		util.LogLogout(util.LoginParams{UserID: user.ID, Email: user.Email, IP: c.ClientIP(), UserAgent: c.Request.UserAgent()})
 	}
 
 	// Delete the session record from the database
