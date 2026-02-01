@@ -1,9 +1,7 @@
 package endpoint
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -87,21 +85,11 @@ func TestValidateToken_ValidToken(t *testing.T) {
 	}
 	db.Create(&session)
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	req.Header.Set("session-token", "valid-token-123")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken, headers: map[string]string{"session-token": "valid-token-123"}})
 	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
 	assert.True(t, response["success"].(bool))
 
-	// Verify role is returned in data
 	if data, ok := response["data"].(map[string]interface{}); ok {
 		assert.Equal(t, "Admin", data["role"])
 	}
@@ -113,17 +101,9 @@ func TestValidateToken_MissingToken(t *testing.T) {
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken})
 	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, response["error"].(string), "Invalid session token")
 }
 
@@ -133,18 +113,9 @@ func TestValidateToken_InvalidToken(t *testing.T) {
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	req.Header.Set("session-token", "invalid-token")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusUnauthorized, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken, headers: map[string]string{"session-token": "invalid-token"}})
 	assert.NoError(t, err)
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
 	assert.Contains(t, response["error"].(string), "Session not found")
 }
 
@@ -173,13 +144,8 @@ func TestValidateToken_ExpiredToken(t *testing.T) {
 	}
 	db.Create(&session)
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	req.Header.Set("session-token", "expired-token-123")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken, headers: map[string]string{"session-token": "expired-token-123"}})
+	assert.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -209,13 +175,8 @@ func TestValidateToken_SoftDeletedSession(t *testing.T) {
 	db.Create(&session)
 	db.Delete(&session) // Soft delete
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	req.Header.Set("session-token", "deleted-token-123")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken, headers: map[string]string{"session-token": "deleted-token-123"}})
+	assert.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -247,13 +208,8 @@ func TestValidateToken_SoftDeletedUser(t *testing.T) {
 	// Soft delete user
 	db.Delete(&user)
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	req.Header.Set("session-token", "user-deleted-token-123")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken, headers: map[string]string{"session-token": "user-deleted-token-123"}})
+	assert.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
@@ -262,17 +218,8 @@ func TestValidateToken_NoDatabaseConnection(t *testing.T) {
 	r := gin.New()
 	// Don't add database middleware
 
-	r.GET("/token/validate", ValidateToken)
-
-	req := httptest.NewRequest(http.MethodGet, "/token/validate", nil)
-	req.Header.Set("session-token", "any-token")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
-
-	var response map[string]interface{}
-	err := json.Unmarshal(w.Body.Bytes(), &response)
+	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/token/validate", requestPath: "/token/validate", handler: ValidateToken, headers: map[string]string{"session-token": "any-token"}})
 	assert.NoError(t, err)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, response["error"].(string), "Database connection not available")
 }

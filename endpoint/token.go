@@ -46,7 +46,7 @@ func ValidateToken(c *gin.Context) {
 		Select("sessions.*, roles.name as role").
 		Joins("JOIN users ON sessions.user_id = users.id").
 		Joins("JOIN roles ON users.role_id = roles.id").
-		Where("session_token = ? AND expires_at > ? AND sessions.deleted_at IS NULL", sessionToken, time.Now()).
+		Where("session_token = ? AND expires_at > ? AND sessions.deleted_at IS NULL AND users.deleted_at IS NULL", sessionToken, time.Now()).
 		First(&result).Error
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Session not found"})
