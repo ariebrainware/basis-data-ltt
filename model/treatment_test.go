@@ -68,31 +68,69 @@ func seedTreatments(t *testing.T, db *gorm.DB, count int, builder func(i int) Cr
 	}
 }
 
+// defaultTreatmentParams returns a default CreateTreatmentParams with common test values.
+// Pass the returned params to createTreatment or override fields as needed.
+func defaultTreatmentParams(patientCode string, therapistID uint) CreateTreatmentParams {
+	return CreateTreatmentParams{
+		PatientCode:   patientCode,
+		TherapistID:   therapistID,
+		TreatmentDate: todayStr(),
+		Issues:        "Test issue",
+		Treatment:     "Test treatment",
+		Remarks:       "Test remark",
+		NextVisit:     daysFromNowStr(7),
+	}
+}
+
+// samePatientBuilder returns a builder function for seeding treatments for a single patient.
+func samePatientBuilder(patientCode string, therapistID uint) func(i int) CreateTreatmentParams {
+	return func(i int) CreateTreatmentParams {
+		return CreateTreatmentParams{
+			PatientCode:   patientCode,
+			TherapistID:   therapistID,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        fmt.Sprintf("Pain type %c", 'A'+i),
+			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
+			Remarks:       fmt.Sprintf("Session %d", 1+i),
+			NextVisit:     daysFromNowStr(7 - i),
+		}
+	}
+}
+
+// multiplePatientBuilder returns a builder function for seeding treatments for different patients.
+func multiplePatientBuilder(codePrefix string, therapistID uint) func(i int) CreateTreatmentParams {
+	return func(i int) CreateTreatmentParams {
+		return CreateTreatmentParams{
+			PatientCode:   fmt.Sprintf("%s%03d", codePrefix, i),
+			TherapistID:   therapistID,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        fmt.Sprintf("Issue %c", 'A'+i),
+			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
+			Remarks:       fmt.Sprintf("Remarks %c", 'A'+i),
+			NextVisit:     daysFromNowStr(7 - i),
+		}
+	}
+}
+
 func TestTreatmentModel_Create(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P001",
-		TherapistID:   1,
-		TreatmentDate: todayStr(),
-		Issues:        "Back pain",
-		Treatment:     "Massage therapy",
-		Remarks:       "Initial treatment session",
-		NextVisit:     daysFromNowStr(7),
-	})
+	p := defaultTreatmentParams("P001", 1)
+	p.Issues = "Back pain"
+	p.Treatment = "Massage therapy"
+	p.Remarks = "Initial treatment session"
+	treatment := createTreatment(t, db, p)
 	assert.NotZero(t, treatment.ID)
 }
 
 func TestTreatmentModel_Read(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P002",
-		TherapistID:   1,
-		TreatmentDate: "2024-01-15",
-		Issues:        "Neck pain",
-		Treatment:     "Physical therapy",
-		Remarks:       "Follow-up treatment",
-		NextVisit:     "2024-01-22",
-	})
+	p := defaultTreatmentParams("P002", 1)
+	p.TreatmentDate = "2024-01-15"
+	p.Issues = "Neck pain"
+	p.Treatment = "Physical therapy"
+	p.Remarks = "Follow-up treatment"
+	p.NextVisit = "2024-01-22"
+	treatment := createTreatment(t, db, p)
 
 	var found Treatment
 	err := db.First(&found, treatment.ID).Error
@@ -103,15 +141,13 @@ func TestTreatmentModel_Read(t *testing.T) {
 
 func TestTreatmentModel_Update(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P003",
-		TherapistID:   1,
-		TreatmentDate: "2024-01-20",
-		Issues:        "Shoulder pain",
-		Treatment:     "Exercise",
-		Remarks:       "Original remarks",
-		NextVisit:     "2024-01-27",
-	})
+	p := defaultTreatmentParams("P003", 1)
+	p.TreatmentDate = "2024-01-20"
+	p.Issues = "Shoulder pain"
+	p.Treatment = "Exercise"
+	p.Remarks = "Original remarks"
+	p.NextVisit = "2024-01-27"
+	treatment := createTreatment(t, db, p)
 
 	treatment.Remarks = "Updated remarks"
 	err := db.Save(&treatment).Error
@@ -124,15 +160,13 @@ func TestTreatmentModel_Update(t *testing.T) {
 
 func TestTreatmentModel_Delete(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P004",
-		TherapistID:   1,
-		TreatmentDate: "2024-01-25",
-		Issues:        "Knee pain",
-		Treatment:     "Rest",
-		Remarks:       "Delete test",
-		NextVisit:     "2024-02-01",
-	})
+	p := defaultTreatmentParams("P004", 1)
+	p.TreatmentDate = "2024-01-25"
+	p.Issues = "Knee pain"
+	p.Treatment = "Rest"
+	p.Remarks = "Delete test"
+	p.NextVisit = "2024-02-01"
+	treatment := createTreatment(t, db, p)
 
 	err := db.Delete(&treatment).Error
 	assert.NoError(t, err)
@@ -145,17 +179,7 @@ func TestTreatmentModel_Delete(t *testing.T) {
 func TestTreatmentModel_ListByPatient(t *testing.T) {
 	db := setupTreatmentTestDB(t)
 	patientCode := "P005"
-	seedTreatments(t, db, 3, func(i int) CreateTreatmentParams {
-		return CreateTreatmentParams{
-			PatientCode:   patientCode,
-			TherapistID:   1,
-			TreatmentDate: daysFromNowStr(-i),
-			Issues:        fmt.Sprintf("Pain type %c", 'A'+i),
-			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
-			Remarks:       fmt.Sprintf("Session %d", 1+i),
-			NextVisit:     daysFromNowStr(7 - i),
-		}
-	})
+	seedTreatments(t, db, 3, samePatientBuilder(patientCode, 1))
 
 	var treatments []Treatment
 	err := db.Where("patient_code = ?", patientCode).Find(&treatments).Error
@@ -168,17 +192,7 @@ func TestTreatmentModel_ListByTherapist(t *testing.T) {
 
 	therapistID := uint(5)
 	// Create multiple treatments for same therapist
-	seedTreatments(t, db, 4, func(i int) CreateTreatmentParams {
-		return CreateTreatmentParams{
-			PatientCode:   fmt.Sprintf("%s%03d", "P006", i),
-			TherapistID:   therapistID,
-			TreatmentDate: daysFromNowStr(-i),
-			Issues:        fmt.Sprintf("Issue %c", 'A'+i),
-			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
-			Remarks:       fmt.Sprintf("Remarks %c", 'A'+i),
-			NextVisit:     daysFromNowStr(7 - i),
-		}
-	})
+	seedTreatments(t, db, 4, multiplePatientBuilder("P006", therapistID))
 
 	var treatments []Treatment
 	err := db.Where("therapist_id = ?", therapistID).Find(&treatments).Error
@@ -213,15 +227,13 @@ func TestTreatmentModel_ListByDate(t *testing.T) {
 func TestTreatmentModel_AllFields(t *testing.T) {
 	db := setupTreatmentTestDB(t)
 
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P999",
-		TherapistID:   10,
-		TreatmentDate: "2024-03-01",
-		Issues:        "Multiple issues",
-		Treatment:     "Comprehensive treatment with all fields filled",
-		Remarks:       "Patient responded well",
-		NextVisit:     "2024-03-08",
-	})
+	p := defaultTreatmentParams("P999", 10)
+	p.TreatmentDate = "2024-03-01"
+	p.Issues = "Multiple issues"
+	p.Treatment = "Comprehensive treatment with all fields filled"
+	p.Remarks = "Patient responded well"
+	p.NextVisit = "2024-03-08"
+	treatment := createTreatment(t, db, p)
 
 	var found Treatment
 	db.First(&found, treatment.ID)
@@ -233,15 +245,11 @@ func TestTreatmentModel_AllFields(t *testing.T) {
 
 func TestTreatmentModel_Timestamps(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P100",
-		TherapistID:   1,
-		TreatmentDate: todayStr(),
-		Issues:        "Timestamp test issue",
-		Treatment:     "Timestamp test treatment",
-		Remarks:       "Testing timestamps",
-		NextVisit:     daysFromNowStr(7),
-	})
+	p := defaultTreatmentParams("P100", 1)
+	p.Issues = "Timestamp test issue"
+	p.Treatment = "Timestamp test treatment"
+	p.Remarks = "Testing timestamps"
+	treatment := createTreatment(t, db, p)
 
 	assert.NotZero(t, treatment.CreatedAt)
 	assert.NotZero(t, treatment.UpdatedAt)
@@ -252,17 +260,17 @@ func TestTreatmentModel_OrderByDate(t *testing.T) {
 
 	// Create treatments on different dates
 	dates := []string{"2024-01-01", "2024-01-15", "2024-01-10"}
-	for i, date := range dates {
-		createTreatment(t, db, CreateTreatmentParams{
+	seedTreatments(t, db, len(dates), func(i int) CreateTreatmentParams {
+		return CreateTreatmentParams{
 			PatientCode:   "PORD" + string(rune('0'+i)),
 			TherapistID:   1,
-			TreatmentDate: date,
+			TreatmentDate: dates[i],
 			Issues:        "Order test issue " + string(rune('A'+i)),
 			Treatment:     "Order test " + string(rune('A'+i)),
 			Remarks:       "Testing order",
 			NextVisit:     "2024-02-01",
-		})
-	}
+		}
+	})
 
 	var treatments []Treatment
 	err := db.Order("treatment_date DESC").Find(&treatments).Error
@@ -276,17 +284,7 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 	patientCode := "PCOUNT"
 
 	// Create multiple treatments
-	seedTreatments(t, db, 6, func(i int) CreateTreatmentParams {
-		return CreateTreatmentParams{
-			PatientCode:   patientCode,
-			TherapistID:   1,
-			TreatmentDate: daysFromNowStr(-i),
-			Issues:        fmt.Sprintf("Pain type %c", 'A'+i),
-			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
-			Remarks:       fmt.Sprintf("Session %d", 1+i),
-			NextVisit:     daysFromNowStr(7 - i),
-		}
-	})
+	seedTreatments(t, db, 6, samePatientBuilder(patientCode, 1))
 
 	var count int64
 	err := db.Model(&Treatment{}).Where("patient_code = ?", patientCode).Count(&count).Error
@@ -296,15 +294,11 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 
 func TestTreatmentModel_EmptyRemarks(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P200",
-		TherapistID:   1,
-		TreatmentDate: todayStr(),
-		Issues:        "Empty remarks test",
-		Treatment:     "Treatment with no remarks",
-		Remarks:       "",
-		NextVisit:     daysFromNowStr(7),
-	})
+	p := defaultTreatmentParams("P200", 1)
+	p.Issues = "Empty remarks test"
+	p.Treatment = "Treatment with no remarks"
+	p.Remarks = ""
+	treatment := createTreatment(t, db, p)
 
 	var found Treatment
 	db.First(&found, treatment.ID)
@@ -318,15 +312,11 @@ func TestTreatmentModel_LongRemarks(t *testing.T) {
 		"It includes observations, progress notes, recommendations for future treatments, and any concerns " +
 		"that need to be addressed. The remark may span multiple paragraphs and contain specific medical terminology."
 
-	treatment := createTreatment(t, db, CreateTreatmentParams{
-		PatientCode:   "P300",
-		TherapistID:   1,
-		TreatmentDate: todayStr(),
-		Issues:        "Complex case",
-		Treatment:     "Comprehensive therapy",
-		Remarks:       longRemarks,
-		NextVisit:     daysFromNowStr(7),
-	})
+	p := defaultTreatmentParams("P300", 1)
+	p.Issues = "Complex case"
+	p.Treatment = "Comprehensive therapy"
+	p.Remarks = longRemarks
+	treatment := createTreatment(t, db, p)
 
 	var found Treatment
 	db.First(&found, treatment.ID)
