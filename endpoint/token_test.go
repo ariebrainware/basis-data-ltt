@@ -5,59 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
-	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 )
 
-// setupTokenTestDB sets up a database with all necessary migrations for token tests
 func setupTokenTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-
-	// Set test environment
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret-123")
-	util.SetJWTSecret("test-secret-123")
-
-	// Connect to test database
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("failed to connect test DB: %v", err)
-	}
-
-	// Migrate all necessary tables
-	testModels := []interface{}{
-		&model.Patient{},
-		&model.Disease{},
-		&model.User{},
-		&model.Session{},
-		&model.Therapist{},
-		&model.Role{},
-		&model.Treatment{},
-		&model.PatientCode{},
-	}
-
-	if err := db.AutoMigrate(testModels...); err != nil {
-		t.Fatalf("auto migrate failed: %v", err)
-	}
-
-	// Clean up all tables
-	for _, model := range testModels {
-		db.Where("1 = 1").Delete(model)
-	}
-
-	// Register cleanup
-	t.Cleanup(func() {
-		for _, model := range testModels {
-			_ = db.Migrator().DropTable(model)
-		}
-	})
-
-	return db
+	return setupEndpointTestDB(t)
 }
 
 func TestValidateToken_ValidToken(t *testing.T) {

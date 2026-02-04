@@ -1,24 +1,23 @@
 package model
 
 import (
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupPatientTestDB(t *testing.T) *gorm.DB {
-	dsn := fmt.Sprintf("file:testdb_patient_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	assert.NoError(t, err)
+	return setupTestDB(t, "patient", &Patient{})
+}
 
-	err = db.AutoMigrate(&Patient{})
-	assert.NoError(t, err)
-
-	return db
+// createPatientHelper creates a Patient record and fails the test on error.
+func createPatientHelper(t *testing.T, db *gorm.DB, p Patient) Patient {
+	t.Helper()
+	if err := db.Create(&p).Error; err != nil {
+		t.Fatalf("failed to create patient %q: %v", p.FullName, err)
+	}
+	return p
 }
 
 func TestPatientModel_Create(t *testing.T) {
@@ -32,20 +31,19 @@ func TestPatientModel_Create(t *testing.T) {
 		Email:       "john@test.com",
 	}
 
-	err := db.Create(&patient).Error
-	assert.NoError(t, err)
+	patient = createPatientHelper(t, db, patient)
+
 	assert.NotZero(t, patient.ID)
 }
 
 func TestPatientModel_Read(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	patient := createPatientHelper(t, db, Patient{
 		FullName:    "Jane Doe",
 		PatientCode: "P002",
 		Email:       "jane@test.com",
-	}
-	db.Create(&patient)
+	})
 
 	var found Patient
 	err := db.First(&found, patient.ID).Error
@@ -57,12 +55,11 @@ func TestPatientModel_Read(t *testing.T) {
 func TestPatientModel_Update(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	patient := createPatientHelper(t, db, Patient{
 		FullName:    "Original Name",
 		PatientCode: "P003",
 		Email:       "original@test.com",
-	}
-	db.Create(&patient)
+	})
 
 	patient.FullName = "Updated Name"
 	patient.Age = 35
@@ -78,12 +75,11 @@ func TestPatientModel_Update(t *testing.T) {
 func TestPatientModel_Delete(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	patient := createPatientHelper(t, db, Patient{
 		FullName:    "Delete Test",
 		PatientCode: "P004",
 		Email:       "delete@test.com",
-	}
-	db.Create(&patient)
+	})
 
 	err := db.Delete(&patient).Error
 	assert.NoError(t, err)
@@ -96,7 +92,7 @@ func TestPatientModel_Delete(t *testing.T) {
 func TestPatientModel_AllFields(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	patient := createPatientHelper(t, db, Patient{
 		FullName:       "Complete Patient",
 		Password:       "hashed_password",
 		Gender:         "Female",
@@ -108,10 +104,7 @@ func TestPatientModel_AllFields(t *testing.T) {
 		HealthHistory:  "Diabetes",
 		SurgeryHistory: "Appendectomy 2020",
 		PatientCode:    "P005",
-	}
-
-	err := db.Create(&patient).Error
-	assert.NoError(t, err)
+	})
 
 	var found Patient
 	db.First(&found, patient.ID)
@@ -125,13 +118,11 @@ func TestPatientModel_AllFields(t *testing.T) {
 func TestPatientModel_UniquePatientCode(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient1 := Patient{
+	createPatientHelper(t, db, Patient{
 		FullName:    "Patient 1",
 		PatientCode: "UNIQUE001",
 		Email:       "patient1@test.com",
-	}
-	err := db.Create(&patient1).Error
-	assert.NoError(t, err)
+	})
 
 	// SQLite may not enforce unique in memory mode
 	// This test validates the model structure
@@ -140,19 +131,18 @@ func TestPatientModel_UniquePatientCode(t *testing.T) {
 		PatientCode: "UNIQUE001",
 		Email:       "patient2@test.com",
 	}
-	err = db.Create(&patient2).Error
+	_ = db.Create(&patient2).Error
 	// In production MySQL, this would fail with unique constraint violation
 }
 
 func TestPatientModel_SearchByCode(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	createPatientHelper(t, db, Patient{
 		FullName:    "Search Test",
 		PatientCode: "SEARCH123",
 		Email:       "search@test.com",
-	}
-	db.Create(&patient)
+	})
 
 	var found Patient
 	err := db.Where("patient_code = ?", "SEARCH123").First(&found).Error
@@ -163,12 +153,11 @@ func TestPatientModel_SearchByCode(t *testing.T) {
 func TestPatientModel_SearchByEmail(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	createPatientHelper(t, db, Patient{
 		FullName:    "Email Search",
 		PatientCode: "P006",
 		Email:       "unique@test.com",
-	}
-	db.Create(&patient)
+	})
 
 	var found Patient
 	err := db.Where("email = ?", "unique@test.com").First(&found).Error
@@ -180,13 +169,12 @@ func TestPatientModel_MultiplePhoneNumbers(t *testing.T) {
 	db := setupPatientTestDB(t)
 
 	// Phone numbers stored as single string field
-	patient := Patient{
+	patient := createPatientHelper(t, db, Patient{
 		FullName:    "Multi Phone",
 		PatientCode: "P007",
 		Email:       "multiphone@test.com",
 		PhoneNumber: "081234567890",
-	}
-	db.Create(&patient)
+	})
 
 	var found Patient
 	db.First(&found, patient.ID)
@@ -196,12 +184,11 @@ func TestPatientModel_MultiplePhoneNumbers(t *testing.T) {
 func TestPatientModel_Timestamps(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	patient := createPatientHelper(t, db, Patient{
 		FullName:    "Timestamp Test",
 		PatientCode: "P008",
 		Email:       "timestamp@test.com",
-	}
-	db.Create(&patient)
+	})
 
 	assert.NotZero(t, patient.CreatedAt)
 	assert.NotZero(t, patient.UpdatedAt)
@@ -212,12 +199,11 @@ func TestPatientModel_ListWithPagination(t *testing.T) {
 
 	// Create multiple patients
 	for i := 1; i <= 10; i++ {
-		patient := Patient{
+		createPatientHelper(t, db, Patient{
 			FullName:    "Patient " + string(rune(i)),
 			PatientCode: "P" + string(rune(100+i)),
 			Email:       "patient" + string(rune(i)) + "@test.com",
-		}
-		db.Create(&patient)
+		})
 	}
 
 	var patients []Patient
@@ -229,21 +215,19 @@ func TestPatientModel_ListWithPagination(t *testing.T) {
 func TestPatientModel_FilterByAge(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient1 := Patient{
+	createPatientHelper(t, db, Patient{
 		FullName:    "Young Patient",
 		PatientCode: "P009",
 		Email:       "young@test.com",
 		Age:         20,
-	}
-	db.Create(&patient1)
+	})
 
-	patient2 := Patient{
+	createPatientHelper(t, db, Patient{
 		FullName:    "Old Patient",
 		PatientCode: "P010",
 		Email:       "old@test.com",
 		Age:         60,
-	}
-	db.Create(&patient2)
+	})
 
 	var youngPatients []Patient
 	err := db.Where("age < ?", 30).Find(&youngPatients).Error
@@ -254,13 +238,12 @@ func TestPatientModel_FilterByAge(t *testing.T) {
 func TestPatientModel_FilterByGender(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := Patient{
+	createPatientHelper(t, db, Patient{
 		FullName:    "Gender Test",
 		PatientCode: "P011",
 		Email:       "gender@test.com",
 		Gender:      "Male",
-	}
-	db.Create(&patient)
+	})
 
 	var malePatients []Patient
 	err := db.Where("gender = ?", "Male").Find(&malePatients).Error

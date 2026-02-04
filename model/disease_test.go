@@ -1,24 +1,24 @@
 package model
 
 import (
-	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupModelTestDB(t *testing.T) *gorm.DB {
-	dsn := fmt.Sprintf("file:testdb_disease_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	assert.NoError(t, err)
+	return setupTestDB(t, "disease", &Disease{})
+}
 
-	err = db.AutoMigrate(&Disease{})
-	assert.NoError(t, err)
-
-	return db
+// createDiseaseHelper creates a Disease record and fails the test on error.
+func createDiseaseHelper(t *testing.T, db *gorm.DB, name, codename string) Disease {
+	t.Helper()
+	d := Disease{Name: name, Codename: codename}
+	if err := db.Create(&d).Error; err != nil {
+		t.Fatalf("failed to create disease %q/%q: %v", name, codename, err)
+	}
+	return d
 }
 
 func TestDiseaseModel_Create(t *testing.T) {
@@ -162,12 +162,7 @@ func TestDiseaseModel_ListAll(t *testing.T) {
 
 func TestDiseaseModel_SearchByName(t *testing.T) {
 	db := setupModelTestDB(t)
-
-	disease := Disease{
-		Name:     "Searchable Disease",
-		Codename: "SEARCH001",
-	}
-	db.Create(&disease)
+	createDiseaseHelper(t, db, "Searchable Disease", "SEARCH001")
 
 	var found []Disease
 	err := db.Where("name LIKE ?", "%Searchable%").Find(&found).Error
@@ -178,12 +173,7 @@ func TestDiseaseModel_SearchByName(t *testing.T) {
 
 func TestDiseaseModel_SearchByCodename(t *testing.T) {
 	db := setupModelTestDB(t)
-
-	disease := Disease{
-		Name:     "Test Disease",
-		Codename: "TESTCODE",
-	}
-	db.Create(&disease)
+	createDiseaseHelper(t, db, "Test Disease", "TESTCODE")
 
 	var found Disease
 	err := db.Where("codename = ?", "TESTCODE").First(&found).Error

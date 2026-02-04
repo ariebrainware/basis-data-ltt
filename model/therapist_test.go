@@ -3,22 +3,13 @@ package model
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func setupTherapistTestDB(t *testing.T) *gorm.DB {
-	dsn := fmt.Sprintf("file:testdb_therapist_%d?mode=memory&cache=shared", time.Now().UnixNano())
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
-	assert.NoError(t, err)
-
-	err = db.AutoMigrate(&Therapist{})
-	assert.NoError(t, err)
-
-	return db
+	return setupTestDB(t, "therapist", &Therapist{})
 }
 
 func insertTherapist(t *testing.T, db *gorm.DB, therapist Therapist) Therapist {

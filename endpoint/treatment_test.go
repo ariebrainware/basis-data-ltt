@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
 	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -18,80 +17,51 @@ import (
 )
 
 func setupTreatmentTest(t *testing.T) (*gin.Engine, *gorm.DB) {
-	gin.SetMode(gin.TestMode)
-	db := setupTreatmentDB(t)
-	r := gin.New()
-	r.Use(middleware.DatabaseMiddleware(db))
+	t.Helper()
+	r, db := setupEndpointTest(t)
 	return r, db
 }
 
-// newTestRouter returns a new Gin engine configured for tests.
-// Use this for tests that don't need a DB injected.
-func newTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	return gin.New()
+// ensurePatientExists creates a patient with the given code if it doesn't exist
+func ensurePatientExists(db *gorm.DB, patientCode string) model.Patient {
+	var patient model.Patient
+	if err := db.Where("patient_code = ?", patientCode).First(&patient).Error; err == nil {
+		return patient
+	}
+
+	patient = model.Patient{
+		FullName:    "Test Patient",
+		PatientCode: patientCode,
+		Email:       fmt.Sprintf("patient%d@test.com", time.Now().UnixNano()),
+	}
+	db.Create(&patient)
+	return patient
 }
 
-func setupTreatmentDB(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret")
-	util.SetJWTSecret("test-secret")
-
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		t.Fatalf("connect test db: %v", err)
+// ensureTherapistExists retrieves a therapist by ID, or creates one if it doesn't exist
+func ensureTherapistExists(db *gorm.DB, therapistID uint) model.Therapist {
+	if therapistID == 0 {
+		return model.Therapist{}
 	}
 
-	models := []interface{}{
-		&model.Patient{},
-		&model.Therapist{},
-		&model.Treatment{},
-		&model.User{},
-		&model.Session{},
+	var therapist model.Therapist
+	if err := db.First(&therapist, therapistID).Error; err == nil {
+		return therapist
 	}
 
-	if err := db.AutoMigrate(models...); err != nil {
-		t.Fatalf("auto migrate: %v", err)
+	therapist = model.Therapist{
+		FullName: "Test Therapist",
+		NIK:      fmt.Sprintf("NIK%d", time.Now().UnixNano()),
+		Email:    fmt.Sprintf("therapist%d@test.com", time.Now().UnixNano()),
 	}
-
-	for _, m := range models {
-		db.Where("1 = 1").Delete(m)
-	}
-
-	t.Cleanup(func() {
-		_ = db.Migrator().DropTable(models...)
-	})
-
-	return db
+	therapist.ID = therapistID
+	db.Create(&therapist)
+	return therapist
 }
 
 func createTestTreatment(db *gorm.DB, t *testing.T, patientCode string, therapistID uint) model.Treatment {
-	// Create patient if not exists
-	var patient model.Patient
-	if err := db.Where("patient_code = ?", patientCode).First(&patient).Error; err != nil {
-		patient = model.Patient{
-			FullName:    "Test Patient",
-			PatientCode: patientCode,
-			Email:       fmt.Sprintf("patient%d@test.com", time.Now().UnixNano()),
-		}
-		db.Create(&patient)
-	}
-
-	// Create therapist if not exists
-	var therapist model.Therapist
-	if therapistID > 0 {
-		if err := db.First(&therapist, therapistID).Error; err != nil {
-			therapist = model.Therapist{
-				FullName: "Test Therapist",
-				NIK:      fmt.Sprintf("NIK%d", time.Now().UnixNano()),
-				Email:    fmt.Sprintf("therapist%d@test.com", time.Now().UnixNano()),
-			}
-			therapist.ID = therapistID
-			db.Create(&therapist)
-		}
-	}
+	_ = ensurePatientExists(db, patientCode)
+	_ = ensureTherapistExists(db, therapistID)
 
 	treatment := model.Treatment{
 		PatientCode:   patientCode,
@@ -519,7 +489,7 @@ func TestParseQueryInt_Missing(t *testing.T) {
 }
 
 func TestApplyCreatedAtFilterForTreatments(t *testing.T) {
-	db := setupTreatmentDB(t)
+	db := setupEndpointTestDB(t)
 
 	tests := []struct {
 		name     string
@@ -543,7 +513,7 @@ func TestApplyCreatedAtFilterForTreatments(t *testing.T) {
 }
 
 func TestGetTherapistIDFromSession_Success(t *testing.T) {
-	db := setupTreatmentDB(t)
+	db := setupEndpointTestDB(t)
 
 	// Setup test data
 	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 2, Email: "test@test.com", Token: "test-token", CreateTherapist: true})
@@ -555,7 +525,7 @@ func TestGetTherapistIDFromSession_Success(t *testing.T) {
 }
 
 func TestGetTherapistIDFromSession_InvalidToken(t *testing.T) {
-	db := setupTreatmentDB(t)
+	db := setupEndpointTestDB(t)
 
 	id, err := getTherapistIDFromSession(db, "invalid-token")
 	assert.Error(t, err)
@@ -563,7 +533,7 @@ func TestGetTherapistIDFromSession_InvalidToken(t *testing.T) {
 }
 
 func TestGetTherapistIDFromSession_TherapistNotFound(t *testing.T) {
-	db := setupTreatmentDB(t)
+	db := setupEndpointTestDB(t)
 
 	// Create user and session but no therapist record
 	_, _, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 2, Email: "test@test.com", Token: "test-token", CreateTherapist: false})
@@ -585,7 +555,7 @@ func TestHandleSessionError(t *testing.T) {
 }
 
 func TestGetDBOrAbort_Success(t *testing.T) {
-	db := setupTreatmentDB(t)
+	db := setupEndpointTestDB(t)
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 

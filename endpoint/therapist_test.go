@@ -3,95 +3,19 @@ package endpoint
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/ariebrainware/basis-data-ltt/config"
-	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
-	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 )
 
-// setupTestDBFull initializes database and migrates all required tables for therapist tests
-func setupTestDBFull(t *testing.T) (*gorm.DB, error) {
-	t.Helper()
-
-	// Set test environment
-	t.Setenv("APPENV", "test")
-	t.Setenv("JWTSECRET", "test-secret-123")
-	util.SetJWTSecret("test-secret-123")
-
-	// Connect to test database
-	db, err := config.ConnectMySQL()
-	if err != nil {
-		return nil, err
-	}
-
-	// Migrate all necessary tables for therapist tests
-	testModels := []interface{}{
-		&model.Patient{},
-		&model.Disease{},
-		&model.User{},
-		&model.Session{},
-		&model.Therapist{},
-		&model.Role{},
-		&model.Treatment{},
-		&model.PatientCode{},
-	}
-
-	if err := db.AutoMigrate(testModels...); err != nil {
-		return nil, err
-	}
-
-	// Clean up all tables
-	for _, model := range testModels {
-		db.Where("1 = 1").Delete(model)
-	}
-
-	// Register cleanup
-	t.Cleanup(func() {
-		// Drop tables after test completes
-		for _, model := range testModels {
-			_ = db.Migrator().DropTable(model)
-		}
-	})
-
-	return db, nil
-}
-
 func setupTherapistTest(t *testing.T) (*gin.Engine, *gorm.DB) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
-
-	// Connect to test DB with full migration
-	db, err := setupTestDBFull(t)
-	if err != nil {
-		t.Fatalf("setup test db failed: %v", err)
-	}
-
-	r := gin.New()
-	r.Use(middleware.DatabaseMiddleware(db))
+	r, db := setupEndpointTest(t)
 	return r, db
-}
-
-func assertStatus(t *testing.T, w *httptest.ResponseRecorder, expected int) {
-	t.Helper()
-	assert.Equal(t, expected, w.Code)
-}
-
-func assertSuccessResponse(t *testing.T, w *httptest.ResponseRecorder, response map[string]interface{}) {
-	t.Helper()
-	assert.Equal(t, http.StatusOK, w.Code)
-	if response == nil {
-		return
-	}
-	if success, ok := response["success"].(bool); ok {
-		assert.True(t, success)
-	}
 }
 
 func createTestTherapist(db *gorm.DB, t *testing.T, approved bool) model.Therapist {
