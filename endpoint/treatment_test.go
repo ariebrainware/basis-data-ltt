@@ -106,6 +106,57 @@ func createTestTreatment(db *gorm.DB, t *testing.T, patientCode string, therapis
 	return treatment
 }
 
+// CreateUserSessionOpts groups creation options for createUserWithSession to
+// avoid excess function arguments and improve readability in tests.
+type CreateUserSessionOpts struct {
+	RoleID          uint32
+	Email           string
+	Token           string
+	CreateTherapist bool
+}
+
+// createUserWithSession creates a user according to opts, optionally a therapist
+// record that references the user's email, and a session with the provided token.
+// Returns the created user, therapist (may be zero value), and session (may be zero value).
+func createUserWithSession(db *gorm.DB, t *testing.T, opts CreateUserSessionOpts) (model.User, model.Therapist, model.Session) {
+	t.Helper()
+	user := model.User{
+		Name:     "Therapist User",
+		Email:    opts.Email,
+		Password: "hash",
+		RoleID:   opts.RoleID,
+	}
+	if err := db.Create(&user).Error; err != nil {
+		t.Fatalf("failed to create user: %v", err)
+	}
+
+	var therapist model.Therapist
+	if opts.CreateTherapist {
+		therapist = model.Therapist{
+			FullName: "Session Therapist",
+			NIK:      fmt.Sprintf("NIK%d", time.Now().UnixNano()),
+			Email:    user.Email,
+		}
+		if err := db.Create(&therapist).Error; err != nil {
+			t.Fatalf("failed to create therapist: %v", err)
+		}
+	}
+
+	var session model.Session
+	if opts.Token != "" {
+		session = model.Session{
+			UserID:       user.ID,
+			SessionToken: opts.Token,
+			ExpiresAt:    time.Now().Add(time.Hour),
+		}
+		if err := db.Create(&session).Error; err != nil {
+			t.Fatalf("failed to create session: %v", err)
+		}
+	}
+
+	return user, therapist, session
+}
+
 // request helpers moved to test_request_helpers_test.go for reuse
 
 func TestListTreatments_Success(t *testing.T) {
@@ -180,34 +231,12 @@ func TestListTreatments_WithDateFilter(t *testing.T) {
 
 func TestListTreatments_WithSessionTherapist(t *testing.T) {
 	r, db := setupTreatmentTest(t)
-
-	// Create user and session
-	user := model.User{
-		Name:     "Therapist User",
-		Email:    "therapist@test.com",
-		Password: "hash",
-		RoleID:   2, // Therapist role
-	}
-	db.Create(&user)
-
-	// Create therapist
-	therapist := model.Therapist{
-		FullName: "Session Therapist",
-		NIK:      "SESS123",
-		Email:    user.Email,
-	}
-	db.Create(&therapist)
-
-	session := model.Session{
-		UserID:       user.ID,
-		SessionToken: "test-token-123",
-		ExpiresAt:    time.Now().Add(time.Hour),
-	}
-	db.Create(&session)
+	// Create user, therapist and session
+	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 2, Email: "therapist@test.com", Token: "test-token-123", CreateTherapist: true})
 
 	createTestTreatment(db, t, "P001", therapist.ID)
 
-	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment", handler: ListTreatments, headers: map[string]string{"session-token": "test-token-123"}})
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/treatment", requestPath: "/treatment", handler: ListTreatments, headers: map[string]string{"session-token": session.SessionToken}})
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NoError(t, err)
@@ -468,30 +497,10 @@ func TestGetTherapistIDFromSession_Success(t *testing.T) {
 	db := setupTreatmentDB(t)
 
 	// Setup test data
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@test.com",
-		Password: "hash",
-		RoleID:   2,
-	}
-	db.Create(&user)
-
-	therapist := model.Therapist{
-		FullName: "Test Therapist",
-		NIK:      "TEST123",
-		Email:    user.Email,
-	}
-	db.Create(&therapist)
-
-	session := model.Session{
-		UserID:       user.ID,
-		SessionToken: "test-token",
-		ExpiresAt:    time.Now().Add(time.Hour),
-	}
-	db.Create(&session)
+	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 2, Email: "test@test.com", Token: "test-token", CreateTherapist: true})
 
 	// Test
-	id, err := getTherapistIDFromSession(db, "test-token")
+	id, err := getTherapistIDFromSession(db, session.SessionToken)
 	assert.NoError(t, err)
 	assert.Equal(t, therapist.ID, id)
 }
@@ -507,22 +516,10 @@ func TestGetTherapistIDFromSession_InvalidToken(t *testing.T) {
 func TestGetTherapistIDFromSession_TherapistNotFound(t *testing.T) {
 	db := setupTreatmentDB(t)
 
-	user := model.User{
-		Name:     "Test User",
-		Email:    "test@test.com",
-		Password: "hash",
-		RoleID:   2,
-	}
-	db.Create(&user)
+	// Create user and session but no therapist record
+	_, _, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 2, Email: "test@test.com", Token: "test-token", CreateTherapist: false})
 
-	session := model.Session{
-		UserID:       user.ID,
-		SessionToken: "test-token",
-		ExpiresAt:    time.Now().Add(time.Hour),
-	}
-	db.Create(&session)
-
-	id, err := getTherapistIDFromSession(db, "test-token")
+	id, err := getTherapistIDFromSession(db, session.SessionToken)
 	assert.Error(t, err)
 	assert.Equal(t, uint(0), id)
 }

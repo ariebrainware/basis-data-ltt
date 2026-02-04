@@ -113,28 +113,7 @@ func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, err
 	return id, therapist, nil
 }
 
-// validateTherapistID ensures the `id` path param is present and returns it.
-// It responds with a user error when missing and returns ("", false).
-// validateTherapistIDParam ensures the `id` path param is present and returns it.
-// It responds with a user error when missing and returns ("", false).
-func validateTherapistIDParam(c *gin.Context) (string, bool) {
-	id := c.Param("id")
-	if id == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Missing therapist ID",
-			Err: fmt.Errorf("therapist ID is required"),
-		})
-		return "", false
-	}
-	if _, err := strconv.ParseUint(id, 10, 0); err != nil {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Invalid therapist ID",
-			Err: err,
-		})
-		return "", false
-	}
-	return id, true
-}
+// helper: use `validateTherapistID` which returns an error and sends responses
 
 // GetTherapistInfo godoc
 // @Summary      Get therapist information
@@ -276,7 +255,7 @@ func CreateTherapist(c *gin.Context) {
 
 	if err := createTherapistInDB(db, therapistRequest); err != nil {
 		// Duplicate therapist (email or NIK) is a user error (400). Other errors are server errors.
-		if err != nil && err.Error() == "therapist already registered" {
+		if err.Error() == "therapist already registered" {
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Therapist already registered",
 				Err: err,
