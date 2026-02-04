@@ -20,6 +20,11 @@ func createPatientHelper(t *testing.T, db *gorm.DB, p Patient) Patient {
 	return p
 }
 
+// newPatient is a small constructor to reduce test duplication for common fields.
+func newPatient(name, code, email string) Patient {
+	return Patient{FullName: name, PatientCode: code, Email: email}
+}
+
 func TestPatientModel_Create(t *testing.T) {
 	db := setupPatientTestDB(t)
 
@@ -39,11 +44,7 @@ func TestPatientModel_Create(t *testing.T) {
 func TestPatientModel_Read(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := createPatientHelper(t, db, Patient{
-		FullName:    "Jane Doe",
-		PatientCode: "P002",
-		Email:       "jane@test.com",
-	})
+	patient := createPatientHelper(t, db, newPatient("Jane Doe", "P002", "jane@test.com"))
 
 	var found Patient
 	err := db.First(&found, patient.ID).Error
@@ -55,11 +56,7 @@ func TestPatientModel_Read(t *testing.T) {
 func TestPatientModel_Update(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := createPatientHelper(t, db, Patient{
-		FullName:    "Original Name",
-		PatientCode: "P003",
-		Email:       "original@test.com",
-	})
+	patient := createPatientHelper(t, db, newPatient("Original Name", "P003", "original@test.com"))
 
 	patient.FullName = "Updated Name"
 	patient.Age = 35
@@ -75,11 +72,7 @@ func TestPatientModel_Update(t *testing.T) {
 func TestPatientModel_Delete(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := createPatientHelper(t, db, Patient{
-		FullName:    "Delete Test",
-		PatientCode: "P004",
-		Email:       "delete@test.com",
-	})
+	patient := createPatientHelper(t, db, newPatient("Delete Test", "P004", "delete@test.com"))
 
 	err := db.Delete(&patient).Error
 	assert.NoError(t, err)
@@ -126,11 +119,7 @@ func TestPatientModel_UniquePatientCode(t *testing.T) {
 
 	// SQLite may not enforce unique in memory mode
 	// This test validates the model structure
-	patient2 := Patient{
-		FullName:    "Patient 2",
-		PatientCode: "UNIQUE001",
-		Email:       "patient2@test.com",
-	}
+	patient2 := newPatient("Patient 2", "UNIQUE001", "patient2@test.com")
 	_ = db.Create(&patient2).Error
 	// In production MySQL, this would fail with unique constraint violation
 }
@@ -138,11 +127,7 @@ func TestPatientModel_UniquePatientCode(t *testing.T) {
 func TestPatientModel_SearchByCode(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	createPatientHelper(t, db, Patient{
-		FullName:    "Search Test",
-		PatientCode: "SEARCH123",
-		Email:       "search@test.com",
-	})
+	createPatientHelper(t, db, newPatient("Search Test", "SEARCH123", "search@test.com"))
 
 	var found Patient
 	err := db.Where("patient_code = ?", "SEARCH123").First(&found).Error
@@ -153,11 +138,7 @@ func TestPatientModel_SearchByCode(t *testing.T) {
 func TestPatientModel_SearchByEmail(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	createPatientHelper(t, db, Patient{
-		FullName:    "Email Search",
-		PatientCode: "P006",
-		Email:       "unique@test.com",
-	})
+	createPatientHelper(t, db, newPatient("Email Search", "P006", "unique@test.com"))
 
 	var found Patient
 	err := db.Where("email = ?", "unique@test.com").First(&found).Error
@@ -184,11 +165,7 @@ func TestPatientModel_MultiplePhoneNumbers(t *testing.T) {
 func TestPatientModel_Timestamps(t *testing.T) {
 	db := setupPatientTestDB(t)
 
-	patient := createPatientHelper(t, db, Patient{
-		FullName:    "Timestamp Test",
-		PatientCode: "P008",
-		Email:       "timestamp@test.com",
-	})
+	patient := createPatientHelper(t, db, newPatient("Timestamp Test", "P008", "timestamp@test.com"))
 
 	assert.NotZero(t, patient.CreatedAt)
 	assert.NotZero(t, patient.UpdatedAt)
@@ -199,11 +176,7 @@ func TestPatientModel_ListWithPagination(t *testing.T) {
 
 	// Create multiple patients
 	for i := 1; i <= 10; i++ {
-		createPatientHelper(t, db, Patient{
-			FullName:    "Patient " + string(rune(i)),
-			PatientCode: "P" + string(rune(100+i)),
-			Email:       "patient" + string(rune(i)) + "@test.com",
-		})
+		createPatientHelper(t, db, newPatient("Patient "+string(rune(i)), "P"+string(rune(100+i)), "patient"+string(rune(i))+"@test.com"))
 	}
 
 	var patients []Patient
