@@ -3,7 +3,6 @@ package endpoint
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
@@ -23,6 +22,13 @@ func setupTreatmentTest(t *testing.T) (*gin.Engine, *gorm.DB) {
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 	return r, db
+}
+
+// newTestRouter returns a new Gin engine configured for tests.
+// Use this for tests that don't need a DB injected.
+func newTestRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	return gin.New()
 }
 
 func setupTreatmentDB(t *testing.T) *gorm.DB {
@@ -396,50 +402,41 @@ func TestDeleteTreatment_InvalidID(t *testing.T) {
 }
 
 func TestParseQueryInt_Valid(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := newTestRouter()
 	var result int
-	r.GET("/test", func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		result = parseQueryIntTest(c, "value", 10)
 		c.Status(http.StatusOK)
-	})
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/test?value=25", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	_, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/test", requestPath: "/test?value=25", handler: handler})
+	assert.NoError(t, err)
 	assert.Equal(t, 25, result)
 }
 
 func TestParseQueryInt_Invalid(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := newTestRouter()
 	var result int
-	r.GET("/test", func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		result = parseQueryIntTest(c, "value", 10)
 		c.Status(http.StatusOK)
-	})
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/test?value=invalid", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	_, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/test", requestPath: "/test?value=invalid", handler: handler})
+	assert.NoError(t, err)
 	assert.Equal(t, 10, result) // Should return default
 }
 
 func TestParseQueryInt_Missing(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := newTestRouter()
 	var result int
-	r.GET("/test", func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		result = parseQueryIntTest(c, "value", 10)
 		c.Status(http.StatusOK)
-	})
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	_, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/test", requestPath: "/test", handler: handler})
+	assert.NoError(t, err)
 	assert.Equal(t, 10, result) // Should return default
 }
 
@@ -531,57 +528,48 @@ func TestGetTherapistIDFromSession_TherapistNotFound(t *testing.T) {
 }
 
 func TestHandleSessionError(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-
-	r.GET("/test", func(c *gin.Context) {
+	r := newTestRouter()
+	handler := func(c *gin.Context) {
 		handleSessionErrorTest(c, gorm.ErrRecordNotFound)
-	})
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/test", requestPath: "/test", handler: handler})
+	assert.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
 func TestGetDBOrAbort_Success(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	db := setupTreatmentDB(t)
 	r := gin.New()
 	r.Use(middleware.DatabaseMiddleware(db))
 
 	var resultDB *gorm.DB
 	var resultOK bool
-	r.GET("/test", func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		resultDB, resultOK = getDBOrAbort(c)
 		if resultOK {
 			c.Status(http.StatusOK)
 		}
-	})
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/test", requestPath: "/test", handler: handler})
+	assert.NoError(t, err)
 	assert.True(t, resultOK)
 	assert.NotNil(t, resultDB)
 	assert.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestGetDBOrAbort_NoDatabase(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
+	r := newTestRouter()
 
 	var resultOK bool
-	r.GET("/test", func(c *gin.Context) {
+	handler := func(c *gin.Context) {
 		_, resultOK = getDBOrAbort(c)
-	})
+	}
 
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodGet, registerPath: "/test", requestPath: "/test", handler: handler})
+	_ = w
+	assert.NoError(t, err)
 	assert.False(t, resultOK)
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
