@@ -85,3 +85,14 @@ func GetRedisClient() *redis.Client {
 func SetRedisClientForTesting(client *redis.Client) {
 	redisClient = client
 }
+
+// ResetRedisClientForTesting clears and closes the singleton Redis client.
+// Intended for use in tests to avoid cross-test interference.
+func ResetRedisClientForTesting() {
+	redisMutex.Lock()
+	defer redisMutex.Unlock()
+	if redisClient != nil {
+		_ = redisClient.Close()
+	}
+	redisClient = nil
+}

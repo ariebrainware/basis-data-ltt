@@ -32,6 +32,15 @@ type Config struct {
 var config *Config
 var once sync.Once
 
+// ResetConfigForTesting resets the package-level config singleton and
+// initialization guard. Tests may call this to ensure a fresh config
+// is loaded when changing environment variables between runs.
+// NOTE: This is intended for test usage only.
+func ResetConfigForTesting() {
+	once = sync.Once{}
+	config = nil
+}
+
 // LoadConfig loads the environment variables from a .env file, and returns a singleton Config instance.
 func LoadConfig() *Config {
 	once.Do(func() {

@@ -154,3 +154,11 @@ func GetJWTSecretByte() []byte {
 	// Return a copy to prevent external modifications using idiomatic Go pattern
 	return append([]byte(nil), jwtSecretByte...)
 }
+
+// ResetJWTSecretForTesting clears the in-memory JWT secret.
+// Intended for use by tests to avoid cross-test interference.
+func ResetJWTSecretForTesting() {
+	jwtMutex.Lock()
+	defer jwtMutex.Unlock()
+	jwtSecretByte = nil
+}
