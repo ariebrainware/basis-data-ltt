@@ -3,6 +3,7 @@ package endpoint
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
@@ -157,6 +158,86 @@ func createUserWithSession(db *gorm.DB, t *testing.T, opts CreateUserSessionOpts
 	return user, therapist, session
 }
 
+// test helpers to reduce duplication
+func createPatientIfNotExists(db *gorm.DB, t *testing.T, patientCode, email string) model.Patient {
+	t.Helper()
+	var patient model.Patient
+	if err := db.Where("patient_code = ?", patientCode).First(&patient).Error; err != nil {
+		patient = model.Patient{
+			FullName:    "Test Patient",
+			PatientCode: patientCode,
+			Email:       email,
+		}
+		if err := db.Create(&patient).Error; err != nil {
+			t.Fatalf("failed to create patient: %v", err)
+		}
+	}
+	return patient
+}
+
+// TreatmentRequestOpts groups common treatment request parameters to avoid duplication.
+// Use zero values for defaults.
+type TreatmentRequestOpts struct {
+	PatientCode   string
+	TherapistID   uint
+	TreatmentDate string // defaults to today if empty
+	Issues        string
+	Treatment     []string
+	Remarks       string
+	NextVisit     string // defaults to 7 days from now if empty
+}
+
+// buildTreatmentRequest constructs a standard treatment request body from opts.
+// Applies sensible defaults for empty fields.
+func buildTreatmentRequest(opts TreatmentRequestOpts) map[string]interface{} {
+	if opts.TreatmentDate == "" {
+		opts.TreatmentDate = time.Now().Format("2006-01-02")
+	}
+	if opts.NextVisit == "" {
+		opts.NextVisit = time.Now().AddDate(0, 0, 7).Format("2006-01-02")
+	}
+	if len(opts.Treatment) == 0 {
+		opts.Treatment = []string{"Test treatment"}
+	}
+	if opts.Issues == "" {
+		opts.Issues = "Test issues"
+	}
+	if opts.Remarks == "" {
+		opts.Remarks = "Test remarks"
+	}
+
+	return map[string]interface{}{
+		"patient_code":   opts.PatientCode,
+		"therapist_id":   opts.TherapistID,
+		"treatment_date": opts.TreatmentDate,
+		"issues":         opts.Issues,
+		"treatment":      opts.Treatment,
+		"remarks":        opts.Remarks,
+		"next_visit":     opts.NextVisit,
+	}
+}
+
+// assertTreatmentSuccessResponse checks that response is successful and status is 200.
+func assertTreatmentSuccessResponse(t *testing.T, w *httptest.ResponseRecorder, response map[string]interface{}) {
+	t.Helper()
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+}
+
+// assertTreatmentErrorResponse checks that response is an error with the expected status code.
+func assertTreatmentErrorResponse(t *testing.T, w *httptest.ResponseRecorder, expectedStatus int) {
+	t.Helper()
+	assert.Equal(t, expectedStatus, w.Code)
+}
+
+// assertStatusWithError checks response status and that no error occurred during request.
+// Commonly used in update/delete error path tests.
+func assertStatusWithError(t *testing.T, w *httptest.ResponseRecorder, expectedStatus int, err error) {
+	t.Helper()
+	assert.Equal(t, expectedStatus, w.Code)
+	assert.NoError(t, err)
+}
+
 // request helpers moved to test_request_helpers_test.go for reuse
 
 func TestListTreatments_Success(t *testing.T) {
@@ -191,12 +272,7 @@ func TestListTreatments_WithKeyword(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 
 	// Create patient with specific code
-	patient := model.Patient{
-		FullName:    "Search Patient",
-		PatientCode: "SEARCH001",
-		Email:       "search@test.com",
-	}
-	db.Create(&patient)
+	_ = createPatientIfNotExists(db, t, "SEARCH001", "search@test.com")
 
 	createTestTreatment(db, t, "SEARCH001", 1)
 
@@ -246,27 +322,16 @@ func TestCreateTreatment_Success(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 
 	// Create patient
-	patient := model.Patient{
-		FullName:    "Test Patient",
-		PatientCode: "CREATE001",
-		Email:       "create@test.com",
-	}
-	db.Create(&patient)
+	_ = createPatientIfNotExists(db, t, "CREATE001", "create@test.com")
 
-	reqBody := map[string]interface{}{
-		"patient_code":   "CREATE001",
-		"therapist_id":   1,
-		"treatment_date": time.Now().Format("2006-01-02"),
-		"issues":         "Test issues",
-		"treatment":      []string{"Test treatment"},
-		"remarks":        "Test remarks",
-		"next_visit":     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
-	}
+	reqBody := buildTreatmentRequest(TreatmentRequestOpts{
+		PatientCode: "CREATE001",
+		TherapistID: 1,
+	})
 	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
-	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NoError(t, err)
-	assert.True(t, response["success"].(bool))
+	assertTreatmentSuccessResponse(t, w, response)
 }
 
 func TestCreateTreatment_InvalidJSON(t *testing.T) {
@@ -283,12 +348,7 @@ func TestCreateTreatment_DuplicateEntry(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 
 	// Create patient
-	patient := model.Patient{
-		FullName:    "Test Patient",
-		PatientCode: "DUP001",
-		Email:       "dup@test.com",
-	}
-	db.Create(&patient)
+	_ = createPatientIfNotExists(db, t, "DUP001", "dup@test.com")
 
 	date := time.Now().Format("2006-01-02")
 
@@ -304,18 +364,17 @@ func TestCreateTreatment_DuplicateEntry(t *testing.T) {
 	}
 	db.Create(&treatment)
 
-	reqBody := map[string]interface{}{
-		"patient_code":   "DUP001",
-		"therapist_id":   1,
-		"treatment_date": date,
-		"issues":         "Issue 1",
-		"treatment":      []string{"Duplicate treatment"},
-		"remarks":        "Duplicate remarks",
-		"next_visit":     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
-	}
+	reqBody := buildTreatmentRequest(TreatmentRequestOpts{
+		PatientCode:   "DUP001",
+		TherapistID:   1,
+		TreatmentDate: date,
+		Issues:        "Issue 1",
+		Treatment:     []string{"Duplicate treatment"},
+		Remarks:       "Duplicate remarks",
+	})
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assertTreatmentErrorResponse(t, w, http.StatusBadRequest)
 	assert.NoError(t, err)
 }
 
@@ -323,18 +382,13 @@ func TestCreateTreatment_PatientNotFound(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 	_ = db
 
-	reqBody := map[string]interface{}{
-		"patient_code":   "NOTEXIST",
-		"therapist_id":   1,
-		"treatment_date": time.Now().Format("2006-01-02"),
-		"issues":         "Test issues",
-		"treatment":      []string{"Test treatment"},
-		"remarks":        "Test remarks",
-		"next_visit":     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
-	}
+	reqBody := buildTreatmentRequest(TreatmentRequestOpts{
+		PatientCode: "NOTEXIST",
+		TherapistID: 1,
+	})
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assertTreatmentErrorResponse(t, w, http.StatusBadRequest)
 	assert.NoError(t, err)
 }
 
@@ -366,8 +420,7 @@ func TestUpdateTreatment_NotFound(t *testing.T) {
 	}
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: "/treatment/99999", handler: UpdateTreatment, body: reqBody})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.NoError(t, err)
+	assertStatusWithError(t, w, http.StatusBadRequest, err)
 }
 
 func TestUpdateTreatment_InvalidID(t *testing.T) {
@@ -379,8 +432,7 @@ func TestUpdateTreatment_InvalidID(t *testing.T) {
 	}
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: "/treatment/invalid", handler: UpdateTreatment, body: reqBody})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.NoError(t, err)
+	assertStatusWithError(t, w, http.StatusBadRequest, err)
 }
 
 func TestUpdateTreatment_InvalidJSON(t *testing.T) {
@@ -390,8 +442,7 @@ func TestUpdateTreatment_InvalidJSON(t *testing.T) {
 
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/treatment/:id", requestPath: fmt.Sprintf("/treatment/%d", treatment.ID), handler: UpdateTreatment, body: "invalid json"})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.NoError(t, err)
+	assertStatusWithError(t, w, http.StatusBadRequest, err)
 }
 
 func TestDeleteTreatment_Success(t *testing.T) {
@@ -416,8 +467,7 @@ func TestDeleteTreatment_NotFound(t *testing.T) {
 
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/treatment/:id", requestPath: "/treatment/99999", handler: DeleteTreatment})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.NoError(t, err)
+	assertStatusWithError(t, w, http.StatusBadRequest, err)
 }
 
 func TestDeleteTreatment_InvalidID(t *testing.T) {
@@ -426,8 +476,7 @@ func TestDeleteTreatment_InvalidID(t *testing.T) {
 
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/treatment/:id", requestPath: "/treatment/invalid", handler: DeleteTreatment})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.NoError(t, err)
+	assertStatusWithError(t, w, http.StatusBadRequest, err)
 }
 
 func TestParseQueryInt_Valid(t *testing.T) {
