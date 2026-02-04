@@ -21,16 +21,6 @@ func setupSessionTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// test helpers to reduce duplication in session tests
-func mustCreateRole(db *gorm.DB, t *testing.T, name string) Role {
-	t.Helper()
-	role := Role{Name: name}
-	if err := db.Create(&role).Error; err != nil {
-		t.Fatalf("failed to create role: %v", err)
-	}
-	return role
-}
-
 type UserCreateOpts struct {
 	Name   string
 	Email  string
@@ -98,6 +88,28 @@ func mustCreateSession(db *gorm.DB, t *testing.T, opts SessionCreateOpts) Sessio
 		t.Fatalf("failed to create session: %v", err)
 	}
 	return s
+}
+
+// mustCreateMultipleSessions creates `count` sessions for a given user using
+// a token prefix and an expiry offset (relative to now). Tokens will be
+// generated as prefix + index.
+type MultipleSessionsOpts struct {
+	UserID        uint
+	Count         int
+	Prefix        string
+	ExpiresOffset time.Duration
+}
+
+func mustCreateMultipleSessions(db *gorm.DB, t *testing.T, opts MultipleSessionsOpts) {
+	t.Helper()
+	for i := 0; i < opts.Count; i++ {
+		token := fmt.Sprintf("%s%d", opts.Prefix, i)
+		mustCreateSession(db, t, SessionCreateOpts{
+			UserID:  opts.UserID,
+			Token:   token,
+			Expires: time.Now().Add(opts.ExpiresOffset),
+		})
+	}
 }
 
 func TestSessionModel_Create(t *testing.T) {
@@ -193,9 +205,7 @@ func TestSessionModel_MultipleSessionsPerUser(t *testing.T) {
 	user := mustCreateDefaultUser(db, t)
 
 	// Create multiple sessions for same user
-	for i := 0; i < 3; i++ {
-		mustCreateSession(db, t, SessionCreateOpts{UserID: user.ID, Token: "multi-token-" + string(rune(i)), Expires: time.Now().Add(time.Hour)})
-	}
+	mustCreateMultipleSessions(db, t, MultipleSessionsOpts{UserID: user.ID, Count: 3, Prefix: "multi-token-", ExpiresOffset: time.Hour})
 
 	var sessions []Session
 	err := db.Where("user_id = ?", user.ID).Find(&sessions).Error
@@ -218,9 +228,7 @@ func TestSessionModel_DeleteExpiredSessions(t *testing.T) {
 	user := mustCreateDefaultUser(db, t)
 
 	// Create expired sessions
-	for i := 0; i < 5; i++ {
-		mustCreateSession(db, t, SessionCreateOpts{UserID: user.ID, Token: "cleanup-token-" + string(rune(i)), Expires: time.Now().Add(-time.Hour)})
-	}
+	mustCreateMultipleSessions(db, t, MultipleSessionsOpts{UserID: user.ID, Count: 5, Prefix: "cleanup-token-", ExpiresOffset: -1 * time.Hour})
 
 	// Delete expired sessions
 	err := db.Where("expires_at < ?", time.Now()).Delete(&Session{}).Error
@@ -239,9 +247,7 @@ func TestSessionModel_CountUserSessions(t *testing.T) {
 	user := mustCreateDefaultUser(db, t)
 
 	// Create sessions
-	for i := 0; i < 4; i++ {
-		mustCreateSession(db, t, SessionCreateOpts{UserID: user.ID, Token: "count-token-" + string(rune(i)), Expires: time.Now().Add(time.Hour)})
-	}
+	mustCreateMultipleSessions(db, t, MultipleSessionsOpts{UserID: user.ID, Count: 4, Prefix: "count-token-", ExpiresOffset: time.Hour})
 
 	var count int64
 	err := db.Model(&Session{}).Where("user_id = ?", user.ID).Count(&count).Error
