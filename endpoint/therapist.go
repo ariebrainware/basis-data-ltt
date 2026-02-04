@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -83,6 +84,14 @@ func validateTherapistID(c *gin.Context) (string, error) {
 		})
 		return "", fmt.Errorf("therapist ID is required")
 	}
+	// Ensure id is a valid unsigned integer to avoid SQL errors from invalid input
+	if _, err := strconv.ParseUint(id, 10, 0); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid therapist ID",
+			Err: err,
+		})
+		return "", fmt.Errorf("invalid therapist id")
+	}
 	return id, nil
 }
 
@@ -114,6 +123,13 @@ func validateTherapistIDParam(c *gin.Context) (string, bool) {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Missing therapist ID",
 			Err: fmt.Errorf("therapist ID is required"),
+		})
+		return "", false
+	}
+	if _, err := strconv.ParseUint(id, 10, 0); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid therapist ID",
+			Err: err,
 		})
 		return "", false
 	}
@@ -440,7 +456,7 @@ func DeleteTherapist(c *gin.Context) {
 
 	var existingTherapist model.Therapist
 	if err := db.First(&existingTherapist, id).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
+		util.CallErrorNotFound(c, util.APIErrorParams{
 			Msg: "Therapist not found",
 			Err: err,
 		})
