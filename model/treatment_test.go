@@ -58,6 +58,36 @@ func daysFromNowStr(days int) string {
 	return time.Now().AddDate(0, 0, days).Format("2006-01-02")
 }
 
+// seedSamePatientTreatments creates `count` treatments for the same patient code.
+func seedSamePatientTreatments(t *testing.T, db *gorm.DB, patientCode string, therapistID uint, count int) {
+	for i := 0; i < count; i++ {
+		createTreatment(t, db, CreateTreatmentParams{
+			PatientCode:   patientCode,
+			TherapistID:   therapistID,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        fmt.Sprintf("Pain type %c", 'A'+i),
+			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
+			Remarks:       fmt.Sprintf("Session %d", 1+i),
+			NextVisit:     daysFromNowStr(7 - i),
+		})
+	}
+}
+
+// seedMultiplePatientTreatments creates `count` treatments for different patient codes.
+func seedMultiplePatientTreatments(t *testing.T, db *gorm.DB, startCodePrefix string, therapistID uint, count int) {
+	for i := 0; i < count; i++ {
+		createTreatment(t, db, CreateTreatmentParams{
+			PatientCode:   fmt.Sprintf("%s%03d", startCodePrefix, i),
+			TherapistID:   therapistID,
+			TreatmentDate: daysFromNowStr(-i),
+			Issues:        fmt.Sprintf("Issue %c", 'A'+i),
+			Treatment:     fmt.Sprintf("Treatment %c", 'A'+i),
+			Remarks:       fmt.Sprintf("Remarks %c", 'A'+i),
+			NextVisit:     daysFromNowStr(7 - i),
+		})
+	}
+}
+
 func TestTreatmentModel_Create(t *testing.T) {
 	db := setupTreatmentTestDB(t)
 	treatment := createTreatment(t, db, CreateTreatmentParams{
@@ -134,21 +164,8 @@ func TestTreatmentModel_Delete(t *testing.T) {
 
 func TestTreatmentModel_ListByPatient(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-
 	patientCode := "P005"
-
-	// Create multiple treatments for same patient
-	for i := 0; i < 3; i++ {
-		createTreatment(t, db, CreateTreatmentParams{
-			PatientCode:   patientCode,
-			TherapistID:   1,
-			TreatmentDate: daysFromNowStr(-i),
-			Issues:        "Pain type " + string(rune('A'+i)),
-			Treatment:     "Treatment " + string(rune('A'+i)),
-			Remarks:       "Session " + string(rune('1'+i)),
-			NextVisit:     daysFromNowStr(7 - i),
-		})
-	}
+	seedSamePatientTreatments(t, db, patientCode, 1, 3)
 
 	var treatments []Treatment
 	err := db.Where("patient_code = ?", patientCode).Find(&treatments).Error
@@ -160,19 +177,8 @@ func TestTreatmentModel_ListByTherapist(t *testing.T) {
 	db := setupTreatmentTestDB(t)
 
 	therapistID := uint(5)
-
 	// Create multiple treatments for same therapist
-	for i := 0; i < 4; i++ {
-		createTreatment(t, db, CreateTreatmentParams{
-			PatientCode:   "P00" + string(rune('6'+i)),
-			TherapistID:   therapistID,
-			TreatmentDate: daysFromNowStr(-i),
-			Issues:        "Issue " + string(rune('A'+i)),
-			Treatment:     "Treatment " + string(rune('A'+i)),
-			Remarks:       "Remarks " + string(rune('A'+i)),
-			NextVisit:     daysFromNowStr(7 - i),
-		})
-	}
+	seedMultiplePatientTreatments(t, db, "P006", therapistID, 4)
 
 	var treatments []Treatment
 	err := db.Where("therapist_id = ?", therapistID).Find(&treatments).Error
@@ -188,7 +194,7 @@ func TestTreatmentModel_ListByDate(t *testing.T) {
 	// Create treatments on specific date
 	for i := 0; i < 2; i++ {
 		createTreatment(t, db, CreateTreatmentParams{
-			PatientCode:   "P10" + string(rune('0'+i)),
+			PatientCode:   fmt.Sprintf("P10%d", i),
 			TherapistID:   1,
 			TreatmentDate: targetDate,
 			Issues:        "Special day treatment",
@@ -270,17 +276,7 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 	patientCode := "PCOUNT"
 
 	// Create multiple treatments
-	for i := 0; i < 6; i++ {
-		createTreatment(t, db, CreateTreatmentParams{
-			PatientCode:   patientCode,
-			TherapistID:   1,
-			TreatmentDate: daysFromNowStr(-i),
-			Issues:        "Count test issue",
-			Treatment:     "Count test treatment",
-			Remarks:       "Testing count",
-			NextVisit:     daysFromNowStr(7 - i),
-		})
-	}
+	seedSamePatientTreatments(t, db, patientCode, 1, 6)
 
 	var count int64
 	err := db.Model(&Treatment{}).Where("patient_code = ?", patientCode).Count(&count).Error
