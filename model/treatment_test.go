@@ -33,7 +33,8 @@ type CreateTreatmentParams struct {
 }
 
 // createTreatment creates a Treatment from params and inserts it into the DB
-func createTreatment(db *gorm.DB, p CreateTreatmentParams) Treatment {
+func createTreatment(t *testing.T, db *gorm.DB, p CreateTreatmentParams) Treatment {
+	t.Helper()
 	treatment := Treatment{
 		PatientCode:   p.PatientCode,
 		TherapistID:   p.TherapistID,
@@ -43,9 +44,8 @@ func createTreatment(db *gorm.DB, p CreateTreatmentParams) Treatment {
 		Remarks:       p.Remarks,
 		NextVisit:     p.NextVisit,
 	}
-	if err := db.Create(&treatment).Error; err != nil {
-		panic(fmt.Sprintf("failed to create treatment in test: %v", err))
-	}
+	err := db.Create(&treatment).Error
+	assert.NoError(t, err)
 	return treatment
 }
 
@@ -60,7 +60,7 @@ func daysFromNowStr(days int) string {
 
 func TestTreatmentModel_Create(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P001",
 		TherapistID:   1,
 		TreatmentDate: todayStr(),
@@ -74,7 +74,7 @@ func TestTreatmentModel_Create(t *testing.T) {
 
 func TestTreatmentModel_Read(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P002",
 		TherapistID:   1,
 		TreatmentDate: "2024-01-15",
@@ -93,7 +93,7 @@ func TestTreatmentModel_Read(t *testing.T) {
 
 func TestTreatmentModel_Update(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P003",
 		TherapistID:   1,
 		TreatmentDate: "2024-01-20",
@@ -114,7 +114,7 @@ func TestTreatmentModel_Update(t *testing.T) {
 
 func TestTreatmentModel_Delete(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P004",
 		TherapistID:   1,
 		TreatmentDate: "2024-01-25",
@@ -139,7 +139,7 @@ func TestTreatmentModel_ListByPatient(t *testing.T) {
 
 	// Create multiple treatments for same patient
 	for i := 0; i < 3; i++ {
-		createTreatment(db, CreateTreatmentParams{
+		createTreatment(t, db, CreateTreatmentParams{
 			PatientCode:   patientCode,
 			TherapistID:   1,
 			TreatmentDate: daysFromNowStr(-i),
@@ -163,7 +163,7 @@ func TestTreatmentModel_ListByTherapist(t *testing.T) {
 
 	// Create multiple treatments for same therapist
 	for i := 0; i < 4; i++ {
-		createTreatment(db, CreateTreatmentParams{
+		createTreatment(t, db, CreateTreatmentParams{
 			PatientCode:   "P00" + string(rune('6'+i)),
 			TherapistID:   therapistID,
 			TreatmentDate: daysFromNowStr(-i),
@@ -187,7 +187,7 @@ func TestTreatmentModel_ListByDate(t *testing.T) {
 
 	// Create treatments on specific date
 	for i := 0; i < 2; i++ {
-		createTreatment(db, CreateTreatmentParams{
+		createTreatment(t, db, CreateTreatmentParams{
 			PatientCode:   "P10" + string(rune('0'+i)),
 			TherapistID:   1,
 			TreatmentDate: targetDate,
@@ -207,7 +207,7 @@ func TestTreatmentModel_ListByDate(t *testing.T) {
 func TestTreatmentModel_AllFields(t *testing.T) {
 	db := setupTreatmentTestDB(t)
 
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P999",
 		TherapistID:   10,
 		TreatmentDate: "2024-03-01",
@@ -227,7 +227,7 @@ func TestTreatmentModel_AllFields(t *testing.T) {
 
 func TestTreatmentModel_Timestamps(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P100",
 		TherapistID:   1,
 		TreatmentDate: todayStr(),
@@ -247,7 +247,7 @@ func TestTreatmentModel_OrderByDate(t *testing.T) {
 	// Create treatments on different dates
 	dates := []string{"2024-01-01", "2024-01-15", "2024-01-10"}
 	for i, date := range dates {
-		createTreatment(db, CreateTreatmentParams{
+		createTreatment(t, db, CreateTreatmentParams{
 			PatientCode:   "PORD" + string(rune('0'+i)),
 			TherapistID:   1,
 			TreatmentDate: date,
@@ -271,7 +271,7 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 
 	// Create multiple treatments
 	for i := 0; i < 6; i++ {
-		createTreatment(db, CreateTreatmentParams{
+		createTreatment(t, db, CreateTreatmentParams{
 			PatientCode:   patientCode,
 			TherapistID:   1,
 			TreatmentDate: daysFromNowStr(-i),
@@ -290,7 +290,7 @@ func TestTreatmentModel_CountByPatient(t *testing.T) {
 
 func TestTreatmentModel_EmptyRemarks(t *testing.T) {
 	db := setupTreatmentTestDB(t)
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P200",
 		TherapistID:   1,
 		TreatmentDate: todayStr(),
@@ -312,7 +312,7 @@ func TestTreatmentModel_LongRemarks(t *testing.T) {
 		"It includes observations, progress notes, recommendations for future treatments, and any concerns " +
 		"that need to be addressed. The remark may span multiple paragraphs and contain specific medical terminology."
 
-	treatment := createTreatment(db, CreateTreatmentParams{
+	treatment := createTreatment(t, db, CreateTreatmentParams{
 		PatientCode:   "P300",
 		TherapistID:   1,
 		TreatmentDate: todayStr(),
