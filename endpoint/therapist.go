@@ -167,9 +167,8 @@ type createTherapistRequest struct {
 
 func validateTherapistRequest(req createTherapistRequest) error {
 	requiredFields := map[string]string{
-		"FullName":    req.FullName,
-		"PhoneNumber": req.PhoneNumber,
-		"NIK":         req.NIK,
+		"FullName": req.FullName,
+		"NIK":      req.NIK,
 	}
 
 	for fieldName, fieldValue := range requiredFields {
@@ -189,7 +188,7 @@ func createTherapistInDB(db *gorm.DB, req createTherapistRequest) error {
 	var existingTherapist model.Therapist
 	return db.Transaction(func(tx *gorm.DB) error {
 		// Check if email and NIK already registered
-		if err := tx.Where("email = ? AND NIK = ?").First(&existingTherapist).Error; err == nil {
+		if err := tx.Where("email = ? AND nik = ?", req.Email, req.NIK).First(&existingTherapist).Error; err == nil {
 			return fmt.Errorf("therapist already registered")
 		}
 

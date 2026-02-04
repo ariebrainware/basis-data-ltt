@@ -1,6 +1,7 @@
 package endpoint_test
 
 import (
+	"log"
 	"os"
 	"testing"
 
@@ -44,5 +45,7 @@ func TestMain(m *testing.M) {
 	// Set Gin mode to match the environment variable
 	gin.SetMode("release")
 
-	os.Exit(m.Run())
+	code := m.Run()
+	log.Printf("TestMain exit code: %d", code)
+	os.Exit(code)
 }
