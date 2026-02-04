@@ -187,8 +187,8 @@ func createTherapistInDB(db *gorm.DB, req createTherapistRequest) error {
 
 	var existingTherapist model.Therapist
 	return db.Transaction(func(tx *gorm.DB) error {
-		// Check if email and NIK already registered
-		if err := tx.Where("email = ? AND nik = ?", req.Email, req.NIK).First(&existingTherapist).Error; err == nil {
+		// Check if email or NIK already registered (detect either duplicate email or duplicate NIK)
+		if err := tx.Where("email = ? OR nik = ?", req.Email, req.NIK).First(&existingTherapist).Error; err == nil {
 			return fmt.Errorf("therapist already registered")
 		}
 
@@ -259,6 +259,14 @@ func CreateTherapist(c *gin.Context) {
 	}
 
 	if err := createTherapistInDB(db, therapistRequest); err != nil {
+		// Duplicate therapist (email or NIK) is a user error (400). Other errors are server errors.
+		if err != nil && err.Error() == "therapist already registered" {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Therapist already registered",
+				Err: err,
+			})
+			return
+		}
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create therapist",
 			Err: err,
