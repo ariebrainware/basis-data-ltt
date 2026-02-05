@@ -1,4 +1,4 @@
-FROM golang:1.26.7-trixie AS builder
+FROM golang:1.25.7-trixie AS builder
 LABEL maintainer="Arie Brainware"
 
 WORKDIR /src
