@@ -197,8 +197,24 @@ func checkDuplicateDiseaseExcluding(c *gin.Context, db *gorm.DB, req createDisea
 		if value == "" {
 			return true
 		}
+
+		// Whitelist allowed columns to prevent SQL injection via column interpolation.
+		var condition string
+		switch column {
+		case "name":
+			condition = "LOWER(name) = ? AND id != ?"
+		case "codename":
+			condition = "LOWER(codename) = ? AND id != ?"
+		default:
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Invalid column for duplicate check",
+				Err: fmt.Errorf("unsupported column: %s", column),
+			})
+			return false
+		}
+
 		var existing model.Disease
-		err := db.Where(fmt.Sprintf("LOWER(%s) = ? AND id != ?", column), strings.ToLower(value), excludeID).First(&existing).Error
+		err := db.Where(condition, strings.ToLower(value), excludeID).First(&existing).Error
 		if err != nil && err != gorm.ErrRecordNotFound {
 			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to check existing records", Err: err})
 			return false
