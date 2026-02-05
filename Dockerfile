@@ -1,4 +1,4 @@
-FROM golang:1.24-bullseye AS builder
+FROM golang:1.25.7-bullseye AS builder
 LABEL maintainer="Arie Brainware"
 
 WORKDIR /src
