@@ -37,9 +37,6 @@ func ConnectRedis() (*redis.Client, error) {
 		return redisClient, nil
 	}
 
-	cfg := LoadConfig()
-	_ = cfg
-
 	addr := os.Getenv("REDIS_ADDR")
 	if addr == "" {
 		addr = "localhost:6379"
