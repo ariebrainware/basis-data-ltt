@@ -517,8 +517,8 @@ func TestApplyCreatedAtFilterForTreatments(t *testing.T) {
 func TestGetTherapistIDFromSession_Success(t *testing.T) {
 	db := setupEndpointTestDB(t)
 
-	// Setup test data
-	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 2, Email: "test@test.com", Token: "test-token", CreateTherapist: true})
+	// Setup test data - RoleID 3 is required for therapist role
+	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{RoleID: 3, Email: "test@test.com", Token: "test-token", CreateTherapist: true})
 
 	// Test
 	id, err := getTherapistIDFromSession(db, session.SessionToken)

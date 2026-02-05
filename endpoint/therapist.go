@@ -374,14 +374,17 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 
 	// GORM's Updates with a struct will ignore zero-values (e.g., false for booleans).
 	// That means attempting to set IsApproved=false via Updates(struct) will be skipped.
+	// Save the original value before Updates() modifies the struct in memory.
+	originalIsApproved := existingTherapist.IsApproved
+
 	// First perform a general struct update (non-zero fields), then explicitly
 	// update the `is_approved` column if the caller provided a differing boolean value.
 	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
 		return err
 	}
 
-	// If the requested IsApproved differs from the stored value, ensure we persist it.
-	if existingTherapist.IsApproved != therapist.IsApproved {
+	// If the requested IsApproved differs from the original stored value, ensure we persist it.
+	if originalIsApproved != therapist.IsApproved {
 		if err := db.Model(&existingTherapist).Update("is_approved", therapist.IsApproved).Error; err != nil {
 			return err
 		}
