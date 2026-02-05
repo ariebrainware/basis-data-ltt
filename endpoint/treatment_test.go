@@ -54,18 +54,20 @@ func ensureTherapistExists(db *gorm.DB, therapistID uint) model.Therapist {
 		NIK:      fmt.Sprintf("NIK%d", time.Now().UnixNano()),
 		Email:    fmt.Sprintf("therapist%d@test.com", time.Now().UnixNano()),
 	}
-	therapist.ID = therapistID
 	db.Create(&therapist)
 	return therapist
 }
 
 func createTestTreatment(db *gorm.DB, t *testing.T, patientCode string, therapistID uint) model.Treatment {
 	_ = ensurePatientExists(db, patientCode)
-	_ = ensureTherapistExists(db, therapistID)
+	therapist := ensureTherapistExists(db, therapistID)
+	if therapist.ID == 0 {
+		t.Fatalf("failed to ensure therapist exists for test treatment")
+	}
 
 	treatment := model.Treatment{
 		PatientCode:   patientCode,
-		TherapistID:   therapistID,
+		TherapistID:   therapist.ID,
 		TreatmentDate: time.Now().Format("2006-01-02"),
 		Issues:        "Test issues",
 		Treatment:     "Test treatment",
