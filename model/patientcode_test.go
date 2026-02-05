@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,29 +12,41 @@ func setupPatientCodeTestDB(t *testing.T) *gorm.DB {
 	return setupTestDB(t, "patientcode", &PatientCode{})
 }
 
+// createPatientCodeHelper creates a PatientCode record and fails the test on error.
+func createPatientCodeHelper(t *testing.T, db *gorm.DB, p PatientCode) PatientCode {
+	t.Helper()
+	if err := db.Create(&p).Error; err != nil {
+		t.Fatalf("failed to create patient code %q: %v", p.Code, err)
+	}
+	return p
+}
+
+// createPatientCodesHelper creates multiple PatientCode records using a prefix for the Code.
+func createPatientCodesHelper(t *testing.T, db *gorm.DB, alpha string, count int, prefix string) []PatientCode {
+	t.Helper()
+	var created []PatientCode
+	for i := 1; i <= count; i++ {
+		code := fmt.Sprintf("%s%d", prefix, i)
+		p := newPatientCode(alpha, i, code)
+		created = append(created, createPatientCodeHelper(t, db, p))
+	}
+	return created
+}
+
+// newPatientCode constructs a PatientCode with the common fields used in tests.
+func newPatientCode(alpha string, number int, code string) PatientCode {
+	return PatientCode{Alphabet: alpha, Number: number, Code: code}
+}
+
 func TestPatientCodeModel_Create(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
-
-	patientCode := PatientCode{
-		Alphabet: "P",
-		Number:   1,
-		Code:     "P001",
-	}
-
-	err := db.Create(&patientCode).Error
-	assert.NoError(t, err)
+	patientCode := createPatientCodeHelper(t, db, newPatientCode("P", 1, "P001"))
 	assert.NotZero(t, patientCode.ID)
 }
 
 func TestPatientCodeModel_Read(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
-
-	patientCode := PatientCode{
-		Alphabet: "P",
-		Number:   2,
-		Code:     "P002",
-	}
-	db.Create(&patientCode)
+	patientCode := createPatientCodeHelper(t, db, newPatientCode("P", 2, "P002"))
 
 	var found PatientCode
 	err := db.First(&found, patientCode.ID).Error
@@ -44,13 +57,7 @@ func TestPatientCodeModel_Read(t *testing.T) {
 
 func TestPatientCodeModel_Update(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
-
-	patientCode := PatientCode{
-		Alphabet: "P",
-		Number:   3,
-		Code:     "P003",
-	}
-	db.Create(&patientCode)
+	patientCode := createPatientCodeHelper(t, db, newPatientCode("P", 3, "P003"))
 
 	// Update number
 	patientCode.Number = 30
@@ -64,13 +71,7 @@ func TestPatientCodeModel_Update(t *testing.T) {
 
 func TestPatientCodeModel_Delete(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
-
-	patientCode := PatientCode{
-		Alphabet: "P",
-		Number:   4,
-		Code:     "P004",
-	}
-	db.Create(&patientCode)
+	patientCode := createPatientCodeHelper(t, db, newPatientCode("P", 4, "P004"))
 
 	err := db.Delete(&patientCode).Error
 	assert.NoError(t, err)
@@ -84,23 +85,8 @@ func TestPatientCodeModel_ListByAlphabet(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
 	// Create codes with different alphabets
-	for i := 0; i < 5; i++ {
-		code := PatientCode{
-			Alphabet: "J",
-			Number:   i + 1,
-			Code:     "J" + string(rune('0'+i)),
-		}
-		db.Create(&code)
-	}
-
-	for i := 0; i < 3; i++ {
-		code := PatientCode{
-			Alphabet: "K",
-			Number:   i + 1,
-			Code:     "K" + string(rune('0'+i)),
-		}
-		db.Create(&code)
-	}
+	createPatientCodesHelper(t, db, "J", 5, "J")
+	createPatientCodesHelper(t, db, "K", 3, "K")
 
 	var jCodes []PatientCode
 	err := db.Where("alphabet = ?", "J").Find(&jCodes).Error
@@ -111,12 +97,7 @@ func TestPatientCodeModel_ListByAlphabet(t *testing.T) {
 func TestPatientCodeModel_FindByCode(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
-	patientCode := PatientCode{
-		Alphabet: "F",
-		Number:   99,
-		Code:     "FINDME",
-	}
-	db.Create(&patientCode)
+	createPatientCodeHelper(t, db, newPatientCode("F", 99, "FINDME"))
 
 	var found PatientCode
 	err := db.Where("code = ?", "FINDME").First(&found).Error
@@ -128,14 +109,7 @@ func TestPatientCodeModel_SequentialNumbers(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
 	// Create sequential codes
-	for i := 1; i <= 5; i++ {
-		code := PatientCode{
-			Alphabet: "S",
-			Number:   i,
-			Code:     "S" + string(rune('0'+i)),
-		}
-		db.Create(&code)
-	}
+	createPatientCodesHelper(t, db, "S", 5, "S")
 
 	var codes []PatientCode
 	err := db.Where("alphabet = ?", "S").Order("number ASC").Find(&codes).Error
@@ -147,14 +121,7 @@ func TestPatientCodeModel_GetMaxNumber(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
 	// Create codes with various numbers
-	for i := 1; i <= 10; i++ {
-		code := PatientCode{
-			Alphabet: "M",
-			Number:   i,
-			Code:     "M" + string(rune('0'+i)),
-		}
-		db.Create(&code)
-	}
+	createPatientCodesHelper(t, db, "M", 10, "M")
 
 	var maxCode PatientCode
 	err := db.Where("alphabet = ?", "M").Order("number DESC").First(&maxCode).Error
@@ -166,14 +133,7 @@ func TestPatientCodeModel_CountByAlphabet(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
 	// Create codes
-	for i := 0; i < 10; i++ {
-		code := PatientCode{
-			Alphabet: "C",
-			Number:   i + 1,
-			Code:     "COUNT" + string(rune(i)),
-		}
-		db.Create(&code)
-	}
+	createPatientCodesHelper(t, db, "C", 10, "COUNT")
 
 	var count int64
 	err := db.Model(&PatientCode{}).Where("alphabet = ?", "C").Count(&count).Error
@@ -184,33 +144,18 @@ func TestPatientCodeModel_CountByAlphabet(t *testing.T) {
 func TestPatientCodeModel_UniqueCode(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
-	code1 := PatientCode{
-		Alphabet: "U",
-		Number:   1,
-		Code:     "UNIQUE",
-	}
-	err := db.Create(&code1).Error
-	assert.NoError(t, err)
+	createPatientCodeHelper(t, db, newPatientCode("U", 1, "UNIQUE"))
 
 	// SQLite may not enforce unique in memory mode
-	code2 := PatientCode{
-		Alphabet: "U",
-		Number:   2,
-		Code:     "UNIQUE",
-	}
-	err = db.Create(&code2).Error
+	tmp := newPatientCode("U", 2, "UNIQUE")
+	_ = db.Create(&tmp).Error
 	// In production MySQL, this would fail with unique constraint
 }
 
 func TestPatientCodeModel_Timestamps(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
-	patientCode := PatientCode{
-		Alphabet: "T",
-		Number:   1,
-		Code:     "TIMESTAMP",
-	}
-	db.Create(&patientCode)
+	patientCode := createPatientCodeHelper(t, db, newPatientCode("T", 1, "TIMESTAMP"))
 
 	assert.NotZero(t, patientCode.CreatedAt)
 	assert.NotZero(t, patientCode.UpdatedAt)
@@ -220,14 +165,7 @@ func TestPatientCodeModel_GetLatestByAlphabet(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
 	// Create some codes
-	for i := 1; i <= 5; i++ {
-		code := PatientCode{
-			Alphabet: "L",
-			Number:   i,
-			Code:     "FIRST" + string(rune('0'+i)),
-		}
-		db.Create(&code)
-	}
+	createPatientCodesHelper(t, db, "L", 5, "FIRST")
 
 	var latest PatientCode
 	err := db.Where("alphabet = ?", "L").Order("number DESC").First(&latest).Error
@@ -239,14 +177,7 @@ func TestPatientCodeModel_ListAll(t *testing.T) {
 	db := setupPatientCodeTestDB(t)
 
 	// Create multiple codes
-	for i := 0; i < 7; i++ {
-		code := PatientCode{
-			Alphabet: "A",
-			Number:   i + 1,
-			Code:     "ALL" + string(rune('0'+i)),
-		}
-		db.Create(&code)
-	}
+	createPatientCodesHelper(t, db, "A", 7, "ALL")
 
 	var allCodes []PatientCode
 	err := db.Find(&allCodes).Error
