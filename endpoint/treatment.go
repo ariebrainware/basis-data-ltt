@@ -73,7 +73,7 @@ func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
 		Select("therapists.id").
 		Joins("JOIN users ON users.id = sessions.user_id").
 		Joins("JOIN therapists ON therapists.email = users.email").
-		Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL", sessionToken, time.Now()).
+		Where("sessions.session_token = ? AND sessions.expires_at > ? AND sessions.deleted_at IS NULL AND users.role_id = 3", sessionToken, time.Now()).
 		Scan(&therapistID).Error
 	if err != nil {
 		return 0, fmt.Errorf("failed to resolve therapist from session: %w", err)
