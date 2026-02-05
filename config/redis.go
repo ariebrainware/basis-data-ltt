@@ -14,7 +14,6 @@ import (
 
 var (
 	redisClient *redis.Client
-	redisOnce   sync.Once
 	redisMutex  sync.Mutex
 )
 
