@@ -348,6 +348,23 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
+	// Ensure the patient exists before proceeding
+	var patient model.Patient
+	if err := db.Where("patient_code = ? AND deleted_at IS NULL", req.PatientCode).First(&patient).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Patient not found",
+				Err: err,
+			})
+			return
+		}
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Database error",
+			Err: err,
+		})
+		return
+	}
+
 	if !checkDuplicateTreatment(c, db, req.TreatmentDate, req.PatientCode) {
 		return
 	}

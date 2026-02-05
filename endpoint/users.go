@@ -264,10 +264,11 @@ func AdminUpdateUser(c *gin.Context) {
 		util.CallUserError(c, util.APIErrorParams{Msg: err.Error(), Err: err})
 		return
 	}
-
-	var req UpdateUserRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request payload", Err: err})
+	req, ok := bindUpdateUserRequest(c)
+	if !ok {
+		return
+	}
+	if !requireUpdateFields(c, req) {
 		return
 	}
 
@@ -488,3 +489,25 @@ func DeleteUser(c *gin.Context) {
 	_ = util.InvalidateUserSessions(uid)
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User deleted"})
 }
+
+func bindUpdateUserRequest(c *gin.Context) (UpdateUserRequest, bool) {
+	var req UpdateUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request payload", Err: err})
+		return UpdateUserRequest{}, false
+	}
+	return req, true
+}
+
+func requireUpdateFields(c *gin.Context, req UpdateUserRequest) bool {
+	if validateUpdateRequest(&req) {
+		return true
+	}
+	util.CallUserError(c, util.APIErrorParams{
+		Msg: "At least one field (name, email, or password) must be provided",
+		Err: fmt.Errorf("no fields to update"),
+	})
+	return false
+}
+
+// Helper functions for listing and pagination exist earlier in the file

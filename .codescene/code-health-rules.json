@@ -1,0 +1,120 @@
+{
+    "version": "1.0",
+    "name": "Standard Code Health Rules",
+    "description": "Balanced code-health rule set (test coverage, duplication, complexity, churn, code smells, security). Gates configured to require overall code health >= 9.0 to pass.",
+    "scale": {
+        "min": 0,
+        "max": 10,
+        "precision": 1
+    },
+    "gates": {
+        "pass_score": 9.0,
+        "fail_fast": {
+            "security_findings": {
+                "operator": ">",
+                "value": 0,
+                "reason": "Any security finding blocks the gate"
+            },
+            "critical_hotspots": {
+                "operator": ">=",
+                "value": 1,
+                "reason": "Critical hotspots (high complexity + high churn) block the gate"
+            }
+        }
+    },
+    "metrics": [
+        {
+            "id": "test_coverage",
+            "weight": 0.25,
+            "type": "ratio",
+            "expected_range": {
+                "good": 0.8,
+                "excellent": 0.9
+            },
+            "scoring": "linear",
+            "notes": "Coverage mapped to 0..10 (0% -> 0, 100% -> 10). Prefer >=80%."
+        },
+        {
+            "id": "duplication",
+            "weight": 0.15,
+            "type": "ratio",
+            "expected_range": {
+                "good": 0.05,
+                "excellent": 0.02
+            },
+            "scoring": "inverse-linear",
+            "notes": "Lower duplication yields higher score. 0% duplication => 10."
+        },
+        {
+            "id": "cyclomatic_complexity",
+            "weight": 0.20,
+            "type": "composite",
+            "expected_range": {
+                "good": 5,
+                "acceptable": 10,
+                "poor": 20
+            },
+            "scoring": "inverse-normalized",
+            "notes": "Normalized per-file/module then aggregated; lower is better."
+        },
+        {
+            "id": "code_churn",
+            "weight": 0.15,
+            "type": "ratio",
+            "expected_range": {
+                "good": 0.05,
+                "warning": 0.15
+            },
+            "scoring": "inverse-linear",
+            "notes": "High recent churn lowers score; measured over configurable time window."
+        },
+        {
+            "id": "code_smells",
+            "weight": 0.15,
+            "type": "count",
+            "expected_range": {
+                "good": 0,
+                "warning": 10
+            },
+            "scoring": "inverse-normalized",
+            "notes": "Count of static-analysis issues (low severity weighted less)."
+        },
+        {
+            "id": "security_findings",
+            "weight": 0.10,
+            "type": "count",
+            "expected_range": {
+                "good": 0,
+                "warning": 1
+            },
+            "scoring": "inverse-with-block",
+            "notes": "Any non-zero critical security finding will block gate (see gates.fail_fast)."
+        }
+    ],
+    "calculation": {
+        "method": "weighted_sum",
+        "metric_score_range": "0..10",
+        "normalization": "Each metric scored 0..10 then multiplied by weight; final score is sum of weighted scores.",
+        "example": {
+            "coverage": {
+                "value": 0.85,
+                "score": 8.5,
+                "contribution": 2.125
+            },
+            "note": "Final score must be >= 9.2 for gates to pass and no fail_fast conditions triggered."
+        }
+    },
+    "reporting": {
+        "output_fields": [
+            "overall_score",
+            "per_metric_scores",
+            "fail_fast_violations",
+            "recommendations"
+        ],
+        "severity_thresholds": {
+            "info": 8.0,
+            "warning": 6.0,
+            "critical": 4.0
+        }
+    }
+}

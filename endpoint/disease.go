@@ -191,45 +191,47 @@ func checkDuplicateDisease(c *gin.Context, db *gorm.DB, name, codename string) b
 }
 
 // checkDuplicateDiseaseExcluding checks if a disease with the given name or codename already exists, excluding a specific disease ID
-func checkDuplicateDiseaseExcluding(c *gin.Context, db *gorm.DB, name, codename string, excludeID uint) bool {
-	if name != "" {
-		var existingDisease model.Disease
-		err := db.Where("LOWER(name) = ? AND id != ?", strings.ToLower(name), excludeID).First(&existingDisease).Error
-		if err != nil && err != gorm.ErrRecordNotFound {
+func checkDuplicateDiseaseExcluding(c *gin.Context, db *gorm.DB, req createDiseaseRequest, excludeID uint) bool {
+	// Helper to check a single column for duplicates while excluding an ID.
+	check := func(column, value, userMsg string) bool {
+		if value == "" {
+			return true
+		}
+
+		// Whitelist allowed columns to prevent SQL injection via column interpolation.
+		var condition string
+		switch column {
+		case "name":
+			condition = "LOWER(name) = ? AND id != ?"
+		case "codename":
+			condition = "LOWER(codename) = ? AND id != ?"
+		default:
 			util.CallServerError(c, util.APIErrorParams{
-				Msg: "Failed to check existing diseases",
-				Err: err,
+				Msg: "Invalid column for duplicate check",
+				Err: fmt.Errorf("unsupported column: %s", column),
 			})
+			return false
+		}
+
+		var existing model.Disease
+		err := db.Where(condition, strings.ToLower(value), excludeID).First(&existing).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to check existing records", Err: err})
 			return false
 		}
 		if err == nil {
-			util.CallUserError(c, util.APIErrorParams{
-				Msg: "Disease with similar name already exists",
-				Err: fmt.Errorf("disease already exists"),
-			})
+			util.CallUserError(c, util.APIErrorParams{Msg: userMsg, Err: fmt.Errorf("duplicate %s", column)})
 			return false
 		}
+		return true
 	}
 
-	if codename != "" {
-		var existingDisease model.Disease
-		err := db.Where("LOWER(codename) = ? AND id != ?", strings.ToLower(codename), excludeID).First(&existingDisease).Error
-		if err != nil && err != gorm.ErrRecordNotFound {
-			util.CallServerError(c, util.APIErrorParams{
-				Msg: "Failed to check existing codenames",
-				Err: err,
-			})
-			return false
-		}
-		if err == nil {
-			util.CallUserError(c, util.APIErrorParams{
-				Msg: "Disease with this codename already exists",
-				Err: fmt.Errorf("codename already exists"),
-			})
-			return false
-		}
+	if !check("name", req.Name, "Disease with similar name already exists") {
+		return false
 	}
-
+	if !check("codename", req.Codename, "Disease with this codename already exists") {
+		return false
+	}
 	return true
 }
 
@@ -345,7 +347,7 @@ func UpdateDisease(c *gin.Context) {
 	normalizeUpdateRequest(&diseaseRequest)
 
 	// Check for duplicates, excluding the current disease
-	if !checkDuplicateDiseaseExcluding(c, db, diseaseRequest.Name, diseaseRequest.Codename, existingDisease.ID) {
+	if !checkDuplicateDiseaseExcluding(c, db, diseaseRequest, existingDisease.ID) {
 		return
 	}
 

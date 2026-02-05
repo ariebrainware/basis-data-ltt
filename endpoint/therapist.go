@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
@@ -83,6 +84,14 @@ func validateTherapistID(c *gin.Context) (string, error) {
 		})
 		return "", fmt.Errorf("therapist ID is required")
 	}
+	// Ensure id is a valid unsigned integer to avoid SQL errors from invalid input
+	if _, err := strconv.ParseUint(id, 10, 0); err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid therapist ID",
+			Err: err,
+		})
+		return "", fmt.Errorf("invalid therapist id")
+	}
 	return id, nil
 }
 
@@ -103,6 +112,8 @@ func getTherapistByID(c *gin.Context, db *gorm.DB) (string, model.Therapist, err
 
 	return id, therapist, nil
 }
+
+// helper: use `validateTherapistID` which returns an error and sends responses
 
 // GetTherapistInfo godoc
 // @Summary      Get therapist information
@@ -151,9 +162,8 @@ type createTherapistRequest struct {
 
 func validateTherapistRequest(req createTherapistRequest) error {
 	requiredFields := map[string]string{
-		"FullName":    req.FullName,
-		"PhoneNumber": req.PhoneNumber,
-		"NIK":         req.NIK,
+		"FullName": req.FullName,
+		"NIK":      req.NIK,
 	}
 
 	for fieldName, fieldValue := range requiredFields {
@@ -172,8 +182,8 @@ func createTherapistInDB(db *gorm.DB, req createTherapistRequest) error {
 
 	var existingTherapist model.Therapist
 	return db.Transaction(func(tx *gorm.DB) error {
-		// Check if email and NIK already registered
-		if err := tx.Where("email = ? AND NIK = ?").First(&existingTherapist).Error; err == nil {
+		// Check if email or NIK already registered (detect either duplicate email or duplicate NIK)
+		if err := tx.Where("email = ? OR nik = ?", req.Email, req.NIK).First(&existingTherapist).Error; err == nil {
 			return fmt.Errorf("therapist already registered")
 		}
 
@@ -244,6 +254,14 @@ func CreateTherapist(c *gin.Context) {
 	}
 
 	if err := createTherapistInDB(db, therapistRequest); err != nil {
+		// Duplicate therapist (email or NIK) is a user error (400). Other errors are server errors.
+		if err.Error() == "therapist already registered" {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Therapist already registered",
+				Err: err,
+			})
+			return
+		}
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create therapist",
 			Err: err,
@@ -315,28 +333,26 @@ func TherapistApproval(c *gin.Context) {
 		return
 	}
 
-	handleTherapistApproval(c, db, true)
+	handleTherapistApproval(c, db)
 }
 
-func handleTherapistApproval(c *gin.Context, db *gorm.DB, isApproval bool) {
+func handleTherapistApproval(c *gin.Context, db *gorm.DB) {
 	id, therapist, err := getTherapistAndBindJSON(c)
 	if err != nil {
 		return
 	}
-
-	if isApproval && !therapist.IsApproved {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Changes allowed only for approval and it must be true",
-			Err: fmt.Errorf("misinterpretation of request"),
-		})
-		return
-	}
-
 	handleTherapistUpdate(c, db, id, therapist)
 }
 
 func handleTherapistUpdate(c *gin.Context, db *gorm.DB, id string, therapist model.Therapist) {
 	if err := updateTherapistInDB(db, id, therapist); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallErrorNotFound(c, util.APIErrorParams{
+				Msg: "Therapist not found",
+				Err: err,
+			})
+			return
+		}
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update therapist",
 			Err: err,
@@ -356,8 +372,22 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 		return err
 	}
 
+	// GORM's Updates with a struct will ignore zero-values (e.g., false for booleans).
+	// That means attempting to set IsApproved=false via Updates(struct) will be skipped.
+	// Save the original value before Updates() modifies the struct in memory.
+	originalIsApproved := existingTherapist.IsApproved
+
+	// First perform a general struct update (non-zero fields), then explicitly
+	// update the `is_approved` column if the caller provided a differing boolean value.
 	if err := db.Model(&existingTherapist).Updates(therapist).Error; err != nil {
 		return err
+	}
+
+	// If the requested IsApproved differs from the original stored value, ensure we persist it.
+	if originalIsApproved != therapist.IsApproved {
+		if err := db.Model(&existingTherapist).Update("is_approved", therapist.IsApproved).Error; err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -408,7 +438,7 @@ func DeleteTherapist(c *gin.Context) {
 
 	var existingTherapist model.Therapist
 	if err := db.First(&existingTherapist, id).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{
+		util.CallErrorNotFound(c, util.APIErrorParams{
 			Msg: "Therapist not found",
 			Err: err,
 		})
