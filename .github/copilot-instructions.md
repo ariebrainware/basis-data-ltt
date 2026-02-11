@@ -14,7 +14,7 @@ A Go REST API backend for managing patient data, treatments, and therapy session
 - **util/**: Helper functions for password hashing, error handling, and API responses
 
 ### Data Flow
-1. **Request** → CORS middleware validates API token → Route handler in endpoint/
+1. **Request** → CORS middleware handles cross-origin requests → Route handler in endpoint/
 2. **Handler** → Loads DB connection from config singleton → Uses model structs with GORM queries
 3. **Response** → Standardized via `util.CallSuccessOK()` and util error helper functions
 
@@ -47,7 +47,6 @@ docker build -t basis-data-ltt . && docker run -p 19091:19091 basis-data-ltt
 Key variables (see README.md for full list):
 - `APPENV`: local|production (controls logging verbosity)
 - `APPPORT`: Server port (default 19091)
-- `APITOKEN`: Bearer token for API validation
 - `JWTSECRET`: Secret key for JWT token signing and password hashing (required)
 - `DBHOST`, `DBPORT`, `DBNAME`, `DBUSER`, `DBPASS`: MySQL connection
 
