@@ -28,9 +28,6 @@ type HeaderSpec struct {
 	Default string
 }
 
-// APIToken is a small type alias to avoid primitive obsession when passing tokens
-type APIToken string
-
 // getenvOrDefault returns the environment value for key or the provided default.
 func getenvOrDefault(key, def string) string {
 	v := os.Getenv(key)
@@ -131,19 +128,6 @@ func tryParseRedisSession(val string) (uint, uint32, bool) {
 	return uint(uid64), uint32(rid64), true
 }
 
-// tokenValidatorTyped accepts an APIToken to reduce primitive string usage
-func tokenValidatorTyped(c *gin.Context, expected APIToken) bool {
-	if c.Request.Method == http.MethodOptions {
-		return true
-	}
-	token := strings.TrimSpace(c.GetHeader("Authorization"))
-	if token != string(expected) {
-		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid API token"})
-		return false
-	}
-	return true
-}
-
 func setCorsHeaders(c *gin.Context) {
 	configs := []HeaderSpec{
 		{Name: "Access-Control-Allow-Origin", EnvKey: "CORSALLOWORIGIN", Default: "http://localhost:3000"},
@@ -176,14 +160,9 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Skip token validation for Swagger documentation routes
+		// Skip special handling for Swagger documentation routes
 		if strings.HasPrefix(c.Request.URL.Path, "/swagger/") {
 			c.Next()
-			return
-		}
-
-		// Call tokenValidator after handling preflight.
-		if !tokenValidatorTyped(c, APIToken(fmt.Sprintf("Bearer %s", os.Getenv("APITOKEN")))) {
 			return
 		}
 

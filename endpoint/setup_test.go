@@ -28,7 +28,6 @@ func TestMain(m *testing.M) {
 	if err := os.Setenv("JWTSECRET", testJWTSecret); err != nil {
 		panic("failed to set JWTSECRET: " + err.Error())
 	}
-	// APITOKEN removed from configuration; tests don't rely on a global API token
 	if err := os.Setenv("GINMODE", "release"); err != nil {
 		panic("failed to set GINMODE: " + err.Error())
 	}

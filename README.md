@@ -75,7 +75,6 @@ go mod download
 # Application Configuration
 APPENV=local        # local|development|production|test
 APPPORT=19091
-APITOKEN=<api-token-for-cors-middleware>
 JWTSECRET=<jwt-secret-used-for-signing> # Use a strong secret (min 32 chars)
 GINMODE=debug
 

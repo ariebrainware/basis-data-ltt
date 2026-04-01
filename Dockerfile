@@ -41,7 +41,6 @@ ENV TZ=Asia/Jakarta
 
 # Runtime environment variables (can be set at docker build or run time)
 ARG APPNAME
-ARG APITOKEN
 ARG APPENV
 ARG APPPORT
 ARG GINMODE
@@ -56,7 +55,6 @@ ARG REDIS_PASS
 ARG REDIS_DB
 
 ENV APPNAME=$APPNAME \
-    APITOKEN=$APITOKEN \
     APPENV=$APPENV \
     APPPORT=$APPPORT \
     GINMODE=$GINMODE \

@@ -105,16 +105,12 @@ func setupTestRouter(db *gorm.DB) *gin.Engine {
 
 // requestOpts groups optional parameters for HTTP requests
 type requestOpts struct {
-	apiToken     string
 	sessionToken string
 }
 
 // performRequest executes an HTTP request and validates response status
 func performRequest(t *testing.T, r http.Handler, params requestParams, opts requestOpts) *httptest.ResponseRecorder {
 	headers := map[string]string{}
-	if opts.apiToken != "" {
-		headers["Authorization"] = "Bearer " + opts.apiToken
-	}
 	if opts.sessionToken != "" {
 		headers["session-token"] = opts.sessionToken
 	}
@@ -152,11 +148,11 @@ func validateAndDecodeResponse(t *testing.T, rr *httptest.ResponseRecorder, meth
 }
 
 // testSignup performs signup and returns token
-func testSignup(t *testing.T, r http.Handler, apiToken string) string {
+func testSignup(t *testing.T, r http.Handler) string {
 	signupBody := map[string]string{"name": "Test User", "email": "test@example.com", "password": "pass1234"}
 	b, _ := json.Marshal(signupBody)
 
-	rr := performRequest(t, r, requestParams{method: "POST", path: "/signup", body: b}, requestOpts{apiToken: apiToken})
+	rr := performRequest(t, r, requestParams{method: "POST", path: "/signup", body: b}, requestOpts{})
 	data := validateAndDecodeResponse(t, rr, "POST", "/signup")
 
 	var signupToken string
@@ -167,11 +163,11 @@ func testSignup(t *testing.T, r http.Handler, apiToken string) string {
 }
 
 // testLogin performs login and returns session token
-func testLogin(t *testing.T, r http.Handler, apiToken string) string {
+func testLogin(t *testing.T, r http.Handler) string {
 	loginBody := map[string]string{"email": "test@example.com", "password": "pass1234"}
 	b, _ := json.Marshal(loginBody)
 
-	rr := performRequest(t, r, requestParams{method: "POST", path: "/login", body: b}, requestOpts{apiToken: apiToken})
+	rr := performRequest(t, r, requestParams{method: "POST", path: "/login", body: b}, requestOpts{})
 	data := validateAndDecodeResponse(t, rr, "POST", "/login")
 
 	var loginData struct {
@@ -190,7 +186,6 @@ func testLogin(t *testing.T, r http.Handler, apiToken string) string {
 
 // validateTokenOpts groups parameters for token validation
 type validateTokenOpts struct {
-	apiToken      string
 	sessionToken  string
 	expectSuccess bool
 }
@@ -198,7 +193,6 @@ type validateTokenOpts struct {
 // testValidateToken validates a session token
 func testValidateToken(t *testing.T, r http.Handler, opts validateTokenOpts) {
 	rr := performRequest(t, r, requestParams{method: "GET", path: "/token/validate"}, requestOpts{
-		apiToken:     opts.apiToken,
 		sessionToken: opts.sessionToken,
 	})
 
@@ -211,7 +205,7 @@ func testValidateToken(t *testing.T, r http.Handler, opts validateTokenOpts) {
 }
 
 // testCreatePatient creates a patient
-func testCreatePatient(t *testing.T, r http.Handler, apiToken string) {
+func testCreatePatient(t *testing.T, r http.Handler) {
 	patientBody := map[string]interface{}{
 		"full_name":    "Patient One",
 		"gender":       "Male",
@@ -222,7 +216,7 @@ func testCreatePatient(t *testing.T, r http.Handler, apiToken string) {
 		"phone_number": []string{"081200000"},
 	}
 	b, _ := json.Marshal(patientBody)
-	_ = performRequest(t, r, requestParams{method: "POST", path: "/patient", body: b}, requestOpts{apiToken: apiToken})
+	_ = performRequest(t, r, requestParams{method: "POST", path: "/patient", body: b}, requestOpts{})
 }
 
 // testLogout performs logout
@@ -233,33 +227,29 @@ func testLogout(t *testing.T, r http.Handler, opts requestOpts) {
 func TestIntegrationFlow(t *testing.T) {
 	db := setupTestDB(t)
 	r := setupTestRouter(db)
-	apiToken := "test-api-token"
 
 	// 1) Signup
-	testSignup(t, r, apiToken)
+	testSignup(t, r)
 
 	// 2) Login
-	sessionToken := testLogin(t, r, apiToken)
+	sessionToken := testLogin(t, r)
 
 	// 3) Validate token (should be valid)
 	testValidateToken(t, r, validateTokenOpts{
-		apiToken:      apiToken,
 		sessionToken:  sessionToken,
 		expectSuccess: true,
 	})
 
 	// 4) Create patient (public)
-	testCreatePatient(t, r, apiToken)
+	testCreatePatient(t, r)
 
 	// 5) Logout
 	testLogout(t, r, requestOpts{
-		apiToken:     apiToken,
 		sessionToken: sessionToken,
 	})
 
 	// 6) Validate token again (should fail)
 	testValidateToken(t, r, validateTokenOpts{
-		apiToken:      apiToken,
 		sessionToken:  sessionToken,
 		expectSuccess: false,
 	})

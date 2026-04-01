@@ -16,14 +16,12 @@ import (
 )
 
 type testSetupParams struct {
-	secret   string
-	apiToken string
+	secret string
 }
 
 func setupTestEnv(t *testing.T, params testSetupParams) (*config.Config, *gorm.DB) {
 	t.Setenv("APPENV", "test")
 	t.Setenv("JWTSECRET", params.secret)
-	t.Setenv("APITOKEN", params.apiToken)
 	util.SetJWTSecret(params.secret)
 
 	cfg := config.LoadConfig()
@@ -60,10 +58,9 @@ func setupTestRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 func sendPatientRequest(r *gin.Engine, patientData map[string]interface{}) (*httptest.ResponseRecorder, error) {
 	b, _ := json.Marshal(patientData)
 	return doRequest(r, requestParams{
-		method:  "POST",
-		path:    "/patient",
-		body:    b,
-		headers: map[string]string{"Authorization": "Bearer test-api-token"},
+		method: "POST",
+		path:   "/patient",
+		body:   b,
 	})
 }
 
@@ -92,8 +89,7 @@ func assertDuplicateResponse(t *testing.T, rr *httptest.ResponseRecorder, bodyCo
 
 func TestCreatePatient_InMemoryDB(t *testing.T) {
 	cfg, db := setupTestEnv(t, testSetupParams{
-		secret:   "test-secret",
-		apiToken: "test-api-token",
+		secret: "test-secret",
 	})
 	cleanupTestData(t, db)
 
@@ -129,8 +125,7 @@ func TestCreatePatient_InMemoryDB(t *testing.T) {
 
 func TestCreatePatient_DuplicateDetection(t *testing.T) {
 	cfg, db := setupTestEnv(t, testSetupParams{
-		secret:   "test-secret",
-		apiToken: "test-api-token",
+		secret: "test-secret",
 	})
 	cleanupTestData(t, db)
 
@@ -178,8 +173,7 @@ func TestCreatePatient_DuplicateDetection(t *testing.T) {
 
 func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
 	cfg, db := setupTestEnv(t, testSetupParams{
-		secret:   "test-secret",
-		apiToken: "test-api-token",
+		secret: "test-secret",
 	})
 	cleanupTestData(t, db)
 
