@@ -160,12 +160,6 @@ func CORSMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Skip special handling for Swagger documentation routes
-		if strings.HasPrefix(c.Request.URL.Path, "/swagger/") {
-			c.Next()
-			return
-		}
-
 		c.Next()
 	}
 }
