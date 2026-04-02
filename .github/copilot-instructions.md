@@ -10,7 +10,7 @@ A Go REST API backend for managing patient data, treatments, and therapy session
 - **config/**: Singleton pattern for loading environment variables and establishing MySQL connections
 - **endpoint/**: HTTP handlers organized by domain (authentication, patient, disease, treatment, therapist)
 - **model/**: GORM models with auto-migration support (Patient, User, Disease, Treatment, Session, Therapist, Role, PatientCode)
-- **middleware/**: CORS configuration and JWT token validation
+- **middleware/**: CORS configuration, session-token validation, and role-based access middleware
 - **util/**: Helper functions for password hashing, error handling, and API responses
 
 ### Data Flow
@@ -20,7 +20,7 @@ A Go REST API backend for managing patient data, treatments, and therapy session
 
 ### Critical Design Decisions
 - **Singleton Config**: `config.LoadConfig()` uses `sync.Once` for thread-safe initialization (see [config/config.go](../config/config.go))
-- **Middleware Authentication**: Token validation via `Authorization: Bearer <token>` header, except OPTIONS preflight requests
+- **Middleware Authentication**: `CORSMiddleware()` handles CORS/preflight only. Authentication is enforced by `ValidateLoginToken()` using the `session-token` header, with Redis-first lookup and DB fallback.
 - **Auto-migration**: Models are auto-migrated on startup; add new models to migration list in [main.go](../main.go)
 - **Timezone**: Hardcoded Asia/Jakarta; TLS timezone data embedded in binary
 
@@ -102,7 +102,7 @@ See [main.go](../main.go) for complete routing configuration.
 Endpoints import and use model structs directly with GORM queries. No service layer abstraction—business logic resides in endpoint handlers.
 
 ### Middleware → Models
-JWT validation middleware ([middleware/middleware.go](../middleware/middleware.go)) verifies tokens but does not load user context into request (add if needed).
+Session validation middleware ([middleware/middleware.go](../middleware/middleware.go)) validates `session-token` against Redis (when available) or MySQL sessions, then stores `user_id` and `role_id` in Gin context for downstream handlers and authorization checks.
 
 ## Testing & Debugging
 - No automated tests currently exist in the repository
@@ -116,7 +116,7 @@ JWT validation middleware ([middleware/middleware.go](../middleware/middleware.g
 |------|---------|
 | [main.go](../main.go) | Route setup, migrations, server initialization |
 | [config/config.go](../config/config.go) | Singleton config & MySQL connection |
-| [middleware/middleware.go](../middleware/middleware.go) | CORS + JWT token validation |
+| [middleware/middleware.go](../middleware/middleware.go) | CORS, session validation, and role/owner authorization helpers |
 | [endpoint/authentication.go](../endpoint/authentication.go) | Login, signup, token handling |
 | [model/patient.go](../model/patient.go) | Patient entity with GORM tags |
 | [util/helperfunc.go](../util/helperfunc.go) | Standardized error/success responses |
@@ -131,7 +131,7 @@ JWT validation middleware ([middleware/middleware.go](../middleware/middleware.g
 5. Use util error functions for responses
 
 ### Modifying Authentication
-JWT implementation in [endpoint/token.go](../endpoint/token.go); middleware validation in [middleware/middleware.go](../middleware/middleware.go). Token expiry and claims logic centralized in token.go.
+Session validation and authorization middleware live in [middleware/middleware.go](../middleware/middleware.go). Session inspection endpoint logic lives in [endpoint/token.go](../endpoint/token.go).
 
 ### Database Schema Changes
 Models control schema via GORM tags. Update struct → update migration list → restart server. Use `gorm.Model` for standard audit fields.
