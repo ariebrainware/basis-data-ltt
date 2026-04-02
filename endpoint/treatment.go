@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -89,7 +90,8 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
-		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age").
+		Joins("LEFT JOIN pricings ON pricings.treatment_id = treatments.id").
+		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, COALESCE(pricings.price, 0) as price").
 		Where("patients.deleted_at IS NULL")
 }
 
@@ -307,16 +309,49 @@ func checkDuplicateTreatment(c *gin.Context, db *gorm.DB, date string, patientCo
 	return true
 }
 
-func createTreatmentRecord(db *gorm.DB, req model.TreatementRequest) error {
-	return db.Create(&model.Treatment{
-		TreatmentDate: req.TreatmentDate,
-		PatientCode:   req.PatientCode,
-		TherapistID:   req.TherapistID,
-		Issues:        req.Issues,
-		Treatment:     strings.Join(req.Treatment, ","),
-		Remarks:       req.Remarks,
-		NextVisit:     req.NextVisit,
-	}).Error
+func resolveTreatmentTherapistID(c *gin.Context, db *gorm.DB, req model.TreatementRequest) (uint, error) {
+	if roleID, ok := middleware.GetRoleID(c); ok && roleID == model.RoleTherapist {
+		return getTherapistIDFromSession(db, c.GetHeader("session-token"))
+	}
+
+	if req.TherapistID == 0 {
+		return 0, fmt.Errorf("therapist id is required")
+	}
+
+	return req.TherapistID, nil
+}
+
+func createTreatmentAndPricingRecord(c *gin.Context, db *gorm.DB, req model.TreatementRequest) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		therapistID, err := resolveTreatmentTherapistID(c, tx, req)
+		if err != nil {
+			return err
+		}
+
+		treatment := model.Treatment{
+			TreatmentDate: req.TreatmentDate,
+			PatientCode:   req.PatientCode,
+			TherapistID:   therapistID,
+			Issues:        req.Issues,
+			Treatment:     strings.Join(req.Treatment, ","),
+			Remarks:       req.Remarks,
+			NextVisit:     req.NextVisit,
+		}
+		if err := tx.Create(&treatment).Error; err != nil {
+			return err
+		}
+
+		pricing := model.Pricing{
+			TreatmentID: treatment.ID,
+			TherapistID: therapistID,
+			Price:       req.Price,
+		}
+		if err := tx.Create(&pricing).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // CreateTreatment godoc
@@ -369,7 +404,7 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
-	if err := createTreatmentRecord(db, req); err != nil {
+	if err := createTreatmentAndPricingRecord(c, db, req); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create treatment",
 			Err: err,

@@ -58,7 +58,7 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 		t.Fatalf("failed to connect test DB: %v", err)
 	}
 
-	testModels := []interface{}{&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}}
+	testModels := []interface{}{&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.PatientCode{}}
 	t.Cleanup(func() {
 		_ = db.Migrator().DropTable(testModels...)
 	})

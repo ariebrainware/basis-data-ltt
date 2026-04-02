@@ -152,6 +152,7 @@ func createPatientIfNotExists(db *gorm.DB, t *testing.T, patientCode, email stri
 type TreatmentRequestOpts struct {
 	PatientCode   string
 	TherapistID   uint
+	Price         int64
 	TreatmentDate string // defaults to today if empty
 	Issues        string
 	Treatment     []string
@@ -181,6 +182,7 @@ func buildTreatmentRequest(opts TreatmentRequestOpts) map[string]interface{} {
 	return map[string]interface{}{
 		"patient_code":   opts.PatientCode,
 		"therapist_id":   opts.TherapistID,
+		"price":          opts.Price,
 		"treatment_date": opts.TreatmentDate,
 		"issues":         opts.Issues,
 		"treatment":      opts.Treatment,
@@ -299,11 +301,20 @@ func TestCreateTreatment_Success(t *testing.T) {
 	reqBody := buildTreatmentRequest(TreatmentRequestOpts{
 		PatientCode: "CREATE001",
 		TherapistID: 1,
+		Price:       250000,
 	})
 	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
 	assert.NoError(t, err)
 	assertTreatmentSuccessResponse(t, w, response)
+
+	var createdTreatment model.Treatment
+	assert.NoError(t, db.Where("patient_code = ?", "CREATE001").First(&createdTreatment).Error)
+
+	var pricing model.Pricing
+	assert.NoError(t, db.Where("treatment_id = ?", createdTreatment.ID).First(&pricing).Error)
+	assert.Equal(t, uint(1), pricing.TherapistID)
+	assert.Equal(t, int64(250000), pricing.Price)
 }
 
 func TestCreateTreatment_InvalidJSON(t *testing.T) {

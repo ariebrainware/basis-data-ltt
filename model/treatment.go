@@ -23,6 +23,7 @@ type TreatementRequest struct {
 	TreatmentDate string   `json:"treatment_date" example:"2025-01-15"`
 	PatientCode   string   `json:"patient_code" example:"J001"`
 	TherapistID   uint     `json:"therapist_id" example:"1"`
+	Price         int64    `json:"price" example:"250000"`
 	Issues        string   `json:"issues" example:"Back pain"`
 	Treatment     []string `json:"treatment,omitempty" example:"Massage therapy,Exercise"`
 	Remarks       string   `json:"remarks,omitempty" example:"Patient showed improvement"`
@@ -36,4 +37,5 @@ type ListTreatementResponse struct {
 	TherapistName string `json:"therapist_name" gorm:"column:therapist_name" example:"Dr. John Smith"`
 	PatientName   string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
 	Age           int    `json:"age" gorm:"column:age" example:"30"`
+	Price         int64  `json:"price" gorm:"column:price" example:"250000"`
 }
