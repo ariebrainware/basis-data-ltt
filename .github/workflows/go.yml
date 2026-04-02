@@ -58,13 +58,12 @@ jobs:
           docker stop basis-data-ltt
           docker rm basis-data-ltt
         fi
-        if [ -z "${{ secrets.APITOKEN }}" ] || [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
+        if [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
           echo "One or more required environment variables are missing."
           exit 1
         fi
         docker run --name=basis-data-ltt -d -p 19091:19091 --network=baota_net \
           --env=APPNAME=${{ vars.APPNAME }} \
-          --env=APITOKEN=${{ secrets.APITOKEN }} \
           --env=APPENV=${{ vars.APPENV }} \
           --env=JWTSECRET=${{ secrets.JWTSECRET }} \
           --env=APPPORT=${{ vars.APPPORT }} \
@@ -123,13 +122,12 @@ jobs:
         fi
         docker stop basis-data-ltt || true
         docker rm basis-data-ltt || true
-        if [ -z "${{ secrets.APITOKEN }}" ] || [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
+        if [ -z "${{ secrets.JWTSECRET }}" ] || [ -z "${{ vars.APPNAME }}" ] || [ -z "${{ vars.APPENV }}" ]; then
           echo "One or more required environment variables are missing."
           exit 1
         fi
         docker run --name=basis-data-ltt -d -p 19091:19091 --restart=always --network=baota_net \
           --env=APPNAME=${{ vars.APPNAME }} \
-          --env=APITOKEN=${{ secrets.APITOKEN }} \
           --env=APPENV=${{ vars.APPENV }} \
           --env=JWTSECRET=${{ secrets.JWTSECRET }} \
           --env=APPPORT=${{ vars.APPPORT }} \

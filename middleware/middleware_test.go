@@ -194,44 +194,6 @@ func TestSetCorsHeadersDefaults(t *testing.T) {
 	}
 }
 
-func TestTokenValidator(t *testing.T) {
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-
-	// OPTIONS should bypass token validation
-	c.Request = httptest.NewRequest("OPTIONS", "/", nil)
-	if !tokenValidatorTyped(c, "anything") {
-		t.Fatalf("expected tokenValidatorTyped to allow OPTIONS method")
-	}
-
-	// Non-OPTIONS must match expected token
-	expected := APIToken("Bearer secret-token")
-	if err := os.Setenv("APITOKEN", "secret-token"); err != nil {
-		t.Fatalf("failed to set APITOKEN: %v", err)
-	}
-	defer func() { _ = os.Unsetenv("APITOKEN") }()
-
-	c.Request = httptest.NewRequest("GET", "/", nil)
-	c.Request.Header.Set("Authorization", string(expected))
-	ok := tokenValidatorTyped(c, expected)
-	if !ok {
-		t.Fatalf("expected tokenValidatorTyped to accept matching token")
-	}
-
-	// mismatch should abort and return false
-	c2w := httptest.NewRecorder()
-	c2, _ := gin.CreateTestContext(c2w)
-	c2.Request = httptest.NewRequest("GET", "/", nil)
-	c2.Request.Header.Set("Authorization", "Bearer bad")
-	ok2 := tokenValidatorTyped(c2, expected)
-	if ok2 {
-		t.Fatalf("expected tokenValidatorTyped to reject bad token")
-	}
-	if c2w.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401 on bad token, got %d", c2w.Code)
-	}
-}
-
 func TestDatabaseMiddlewareAndGetDB(t *testing.T) {
 	r := gin.New()
 	// Use a zero-value gorm.DB pointer as a placeholder

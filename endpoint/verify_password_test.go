@@ -95,7 +95,6 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	b, _ := json.Marshal(signupBody)
 	rr := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/signup", bytesNewBuffer(b))
-	req.Header.Set("Authorization", "Bearer test-api-token")
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
@@ -111,7 +110,6 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	b, _ = json.Marshal(loginBody)
 	rr = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/login", bytesNewBuffer(b))
-	req.Header.Set("Authorization", "Bearer test-api-token")
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
@@ -137,7 +135,6 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	b, _ = json.Marshal(vpBody)
 	rr = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))
-	req.Header.Set("Authorization", "Bearer test-api-token")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("session-token", loginData.Token)
 	r.ServeHTTP(rr, req)
@@ -163,7 +160,6 @@ func TestVerifyPasswordIntegration(t *testing.T) {
 	b, _ = json.Marshal(vpBody)
 	rr = httptest.NewRecorder()
 	req, _ = http.NewRequest("POST", "/verify-password", bytesNewBuffer(b))
-	req.Header.Set("Authorization", "Bearer test-api-token")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("session-token", loginData.Token)
 	r.ServeHTTP(rr, req)
