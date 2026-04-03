@@ -14,8 +14,8 @@ GEOIP_DIR=$(dirname "$GEOIP_PATH")
 if [ -z "${GEOIP_URL:-}" ] && [ -n "${GITHUB_REPO:-}" ] && [ -n "${GITHUB_RELEASE_TAG:-}" ]; then
   GEOIP_URL="https://github.com/${GITHUB_REPO}/releases/download/${GITHUB_RELEASE_TAG}/$(basename "$GEOIP_PATH")"
   # If a token is provided, use it for authenticated downloads from private repos
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    AUTH_HEADER="Authorization: token ${GITHUB_TOKEN}"
+  if [ -n "${GH_TOKEN:-}" ]; then
+    AUTH_HEADER="Authorization: token ${GH_TOKEN}"
   fi
 fi
 

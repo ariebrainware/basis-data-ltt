@@ -49,11 +49,11 @@ Set environment variables securely (e.g. `/etc/default/ltt`):
 ```
 GITHUB_REPO=owner/repo
 GITHUB_RELEASE_TAG=v-geoip-20260130010101
-GITHUB_TOKEN="<short-lived-token>"
+GH_TOKEN="<short-lived-token>"
 GEOIP_DB_PATH=/etc/geoip/GeoLite2-Country.mmdb
 ```
 
-The `deploy/download_geoip.sh` script will construct the releases URL when `GITHUB_REPO` and `GITHUB_RELEASE_TAG` are present and will use `GITHUB_TOKEN` for authenticated downloads if provided.
+The `deploy/download_geoip.sh` script will construct the releases URL when `GITHUB_REPO` and `GITHUB_RELEASE_TAG` are present and will use `GH_TOKEN` for authenticated downloads if provided.
 
 Notes:
 - Prefer short-lived tokens (rotate often) or have your deployment CI fetch the asset and place it on the target host.
