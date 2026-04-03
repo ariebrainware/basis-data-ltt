@@ -8,12 +8,12 @@ BUCKET=${BUCKET:-my-secure-bucket}
 KEY_PREFIX=${KEY_PREFIX:-geoip}
 FILE=${1:-data/GeoLite2-Country.mmdb}
 # Optional: provider can be 's3' or 'github'. If not set, script will prefer S3 unless
-# `GITHUB_REPO` and `GH_TOKEN`/`GITHUB_TOKEN` are provided and `PROVIDER=github`.
+# `GITHUB_REPO` and `GH_TOKEN`/`GH_TOKEN` are provided and `PROVIDER=github`.
 PROVIDER=${PROVIDER:-}
 
 # GitHub variables (for provider=github)
 GH_REPO=${GH_REPO:-$GITHUB_REPO}
-GH_TOKEN=${GH_TOKEN:-$GITHUB_TOKEN}
+GH_TOKEN=${GH_TOKEN:-$GH_TOKEN}
 
 
 if [ ! -f "$FILE" ]; then
@@ -33,7 +33,7 @@ case "$PROVIDER" in
     if command -v gh >/dev/null 2>&1; then
       TAG=${TAG:-geoip-$(date +%Y%m%d%H%M%S)}
       echo "Creating release $TAG on $GH_REPO and uploading assets"
-      # Ensure GH auth; gh uses GH_TOKEN/GITHUB_TOKEN env or local auth
+      # Ensure GH auth; gh uses GH_TOKEN/GH_TOKEN env or local auth
       gh repo set-default "$GH_REPO" >/dev/null 2>&1 || true
       gh release create "$TAG" --title "$TAG" --notes "GeoIP DB" --draft || true
       gh release upload "$TAG" "$FILE" "$FILE.sha256" --clobber

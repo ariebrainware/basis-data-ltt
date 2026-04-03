@@ -22,6 +22,7 @@ dockers:
     dockerfile: Dockerfile.release
 
 release:
+  replace_existing_artifacts: true
   github:
     owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
     name: "{{ index (split .Env.GITHUB_REPOSITORY \"/\") 1 }}"
