@@ -18,7 +18,7 @@ func setupPricingEndpointTest(t *testing.T) (*gin.Engine, *gorm.DB) {
 	return r, db
 }
 
-func createPricingPrerequisites(t *testing.T, db *gorm.DB) (model.Treatment, model.Therapist) {
+func createPricingPrerequisites(t *testing.T, db *gorm.DB) model.Therapist {
 	t.Helper()
 
 	therapist := model.Therapist{
@@ -39,26 +39,13 @@ func createPricingPrerequisites(t *testing.T, db *gorm.DB) (model.Treatment, mod
 		t.Fatalf("create patient: %v", err)
 	}
 
-	treatment := model.Treatment{
-		TreatmentDate: time.Now().Format("2006-01-02"),
-		PatientCode:   patient.PatientCode,
-		TherapistID:   therapist.ID,
-		Issues:        "Pricing issues",
-		Treatment:     "Pricing treatment",
-		Remarks:       "Pricing remarks",
-		NextVisit:     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
-	}
-	if err := db.Create(&treatment).Error; err != nil {
-		t.Fatalf("create treatment: %v", err)
-	}
-
-	return treatment, therapist
+	return therapist
 }
 
 func createPricingRecordForTest(t *testing.T, db *gorm.DB, price int64) model.Pricing {
 	t.Helper()
-	treatment, therapist := createPricingPrerequisites(t, db)
-	pricing := model.Pricing{TreatmentID: treatment.ID, TherapistID: therapist.ID, Price: price}
+	therapist := createPricingPrerequisites(t, db)
+	pricing := model.Pricing{TherapistID: therapist.ID, Price: price}
 	if err := db.Create(&pricing).Error; err != nil {
 		t.Fatalf("create pricing: %v", err)
 	}
@@ -85,7 +72,7 @@ func doPricingIDRequest(
 
 func TestCreatePricing_Success(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
-	treatment, therapist := createPricingPrerequisites(t, db)
+	therapist := createPricingPrerequisites(t, db)
 
 	w, response, err := doRequestWithHandler(r, requestSpec{
 		method:       http.MethodPost,
@@ -93,7 +80,6 @@ func TestCreatePricing_Success(t *testing.T) {
 		requestPath:  "/pricing",
 		handler:      CreatePricing,
 		body: map[string]interface{}{
-			"treatment_id": treatment.ID,
 			"therapist_id": therapist.ID,
 			"price":        int64(275000),
 		},
@@ -104,15 +90,15 @@ func TestCreatePricing_Success(t *testing.T) {
 	assert.True(t, response["success"].(bool))
 
 	var pricing model.Pricing
-	assert.NoError(t, db.Where("treatment_id = ?", treatment.ID).First(&pricing).Error)
+	assert.NoError(t, db.Where("therapist_id = ?", therapist.ID).First(&pricing).Error)
 	assert.Equal(t, int64(275000), pricing.Price)
 }
 
 func TestCreatePricing_DuplicateTreatment(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
-	treatment, therapist := createPricingPrerequisites(t, db)
+	therapist := createPricingPrerequisites(t, db)
 
-	first := model.Pricing{TreatmentID: treatment.ID, TherapistID: therapist.ID, Price: 100000}
+	first := model.Pricing{TherapistID: therapist.ID, Price: 100000}
 	assert.NoError(t, db.Create(&first).Error)
 
 	w, _, err := doRequestWithHandler(r, requestSpec{
@@ -121,7 +107,6 @@ func TestCreatePricing_DuplicateTreatment(t *testing.T) {
 		requestPath:  "/pricing",
 		handler:      CreatePricing,
 		body: map[string]interface{}{
-			"treatment_id": treatment.ID,
 			"therapist_id": therapist.ID,
 			"price":        int64(200000),
 		},
@@ -133,8 +118,8 @@ func TestCreatePricing_DuplicateTreatment(t *testing.T) {
 
 func TestListPricings_Success(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
-	treatment, therapist := createPricingPrerequisites(t, db)
-	assert.NoError(t, db.Create(&model.Pricing{TreatmentID: treatment.ID, TherapistID: therapist.ID, Price: 300000}).Error)
+	therapist := createPricingPrerequisites(t, db)
+	assert.NoError(t, db.Create(&model.Pricing{TherapistID: therapist.ID, Price: 300000}).Error)
 
 	w, response, err := doRequestWithHandler(r, requestSpec{
 		method:       http.MethodGet,

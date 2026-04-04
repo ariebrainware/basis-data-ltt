@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/ariebrainware/basis-data-ltt/middleware"
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
@@ -35,10 +36,6 @@ func getPricingIDParam(c *gin.Context) (string, bool) {
 }
 
 func validateCreatePricingInput(c *gin.Context, req createPricingRequest) bool {
-	if req.TreatmentID == 0 {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: treatment_id is required", Err: fmt.Errorf("treatment_id is required")})
-		return false
-	}
 	if req.TherapistID == 0 {
 		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: therapist_id is required", Err: fmt.Errorf("therapist_id is required")})
 		return false
@@ -48,39 +45,6 @@ func validateCreatePricingInput(c *gin.Context, req createPricingRequest) bool {
 		return false
 	}
 	return true
-}
-
-func ensurePricingRelationsExist(c *gin.Context, db *gorm.DB, treatmentID, therapistID uint) bool {
-	var treatment model.Treatment
-	if err := db.First(&treatment, treatmentID).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Treatment not found", Err: err})
-		return false
-	}
-
-	var therapist model.Therapist
-	if err := db.First(&therapist, therapistID).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
-		return false
-	}
-
-	return true
-}
-
-func pricingExistsForTreatment(db *gorm.DB, treatmentID uint, excludeID uint) (bool, error) {
-	q := db.Where("treatment_id = ?", treatmentID)
-	if excludeID != 0 {
-		q = q.Where("id != ?", excludeID)
-	}
-
-	var pricing model.Pricing
-	err := q.First(&pricing).Error
-	if err == gorm.ErrRecordNotFound {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
 
 // ListPricings godoc
@@ -149,6 +113,37 @@ func GetPricingInfo(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing retrieved", Data: pricing})
 }
 
+func resolveTherapistID(c *gin.Context, db *gorm.DB, req model.TreatementRequest) (uint, error) {
+	if roleID, ok := middleware.GetRoleID(c); ok && roleID == model.RoleTherapist {
+		return getTherapistIDFromSession(db, c.GetHeader("session-token"))
+	}
+
+	if req.TherapistID == 0 {
+		return 0, fmt.Errorf("therapist id is required")
+	}
+
+	return req.TherapistID, nil
+}
+
+func createPricingRecord(c *gin.Context, db *gorm.DB, req model.TreatementRequest) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		therapistID, err := resolveTherapistID(c, tx, req)
+		if err != nil {
+			return err
+		}
+
+		pricing := model.Pricing{
+			TherapistID: therapistID,
+			Price:       req.Price,
+		}
+		if err := tx.Create(&pricing).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
 // CreatePricing godoc
 // @Summary      Create a new pricing
 // @Description  Add a new pricing record for a treatment
@@ -179,21 +174,7 @@ func CreatePricing(c *gin.Context) {
 		return
 	}
 
-	if !ensurePricingRelationsExist(c, db, req.TreatmentID, req.TherapistID) {
-		return
-	}
-
-	exists, err := pricingExistsForTreatment(db, req.TreatmentID, 0)
-	if err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to check existing pricing", Err: err})
-		return
-	}
-	if exists {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Pricing for this treatment already exists", Err: fmt.Errorf("duplicate treatment_id")})
-		return
-	}
-
-	pricing := model.Pricing{TreatmentID: req.TreatmentID, TherapistID: req.TherapistID, Price: req.Price}
+	pricing := model.Pricing{TherapistID: req.TherapistID, Price: req.Price}
 	if err := db.Create(&pricing).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to create pricing", Err: err})
 		return
@@ -241,30 +222,6 @@ func UpdatePricing(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
-
-	if req.TreatmentID != nil {
-		if *req.TreatmentID == 0 {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: treatment_id must be > 0", Err: fmt.Errorf("invalid treatment_id")})
-			return
-		}
-		exists, err := pricingExistsForTreatment(db, *req.TreatmentID, pricing.ID)
-		if err != nil {
-			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to check existing pricing", Err: err})
-			return
-		}
-		if exists {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Pricing for this treatment already exists", Err: fmt.Errorf("duplicate treatment_id")})
-			return
-		}
-
-		var treatment model.Treatment
-		if err := db.First(&treatment, *req.TreatmentID).Error; err != nil {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Treatment not found", Err: err})
-			return
-		}
-
-		updates["treatment_id"] = *req.TreatmentID
-	}
 
 	if req.TherapistID != nil {
 		if *req.TherapistID == 0 {

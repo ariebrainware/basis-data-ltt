@@ -15,7 +15,6 @@ func TestPricingModel_CreateReadUpdateDelete(t *testing.T) {
 	db := setupPricingTestDB(t)
 
 	pricing := Pricing{
-		TreatmentID: 1,
 		TherapistID: 2,
 		Price:       250000,
 	}
