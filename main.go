@@ -204,13 +204,21 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		}
 
 		pricing := auth.Group("/pricing")
-		pricing.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
+		pricing.Use(middleware.RequireRole(model.RoleAdmin))
 		{
 			pricing.GET("", endpoint.ListPricings)
 			pricing.POST("", endpoint.CreatePricing)
 			pricing.GET("/:id", endpoint.GetPricingInfo)
 			pricing.PATCH("/:id", endpoint.UpdatePricing)
 			pricing.DELETE("/:id", endpoint.DeletePricing)
+		}
+
+		transaction := auth.Group("/transaction")
+		transaction.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			transaction.GET("", endpoint.ListTransactions)
+			transaction.GET("/:id", endpoint.GetTransactionInfo)
+			transaction.PATCH("/:id", endpoint.UpdateTransaction)
 		}
 
 		therapist := auth.Group("/therapist")
