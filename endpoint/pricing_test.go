@@ -94,6 +94,24 @@ func TestCreatePricing_Success(t *testing.T) {
 	assert.Equal(t, int64(275000), pricing.Price)
 }
 
+func TestCreatePricing_TherapistNotRegistered(t *testing.T) {
+	r, _ := setupPricingEndpointTest(t)
+
+	w, _, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPost,
+		registerPath: "/pricing",
+		requestPath:  "/pricing",
+		handler:      CreatePricing,
+		body: map[string]interface{}{
+			"therapist_id": uint(999999),
+			"price":        int64(275000),
+		},
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestCreatePricing_DuplicateTreatment(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
 	therapist := createPricingPrerequisites(t, db)
@@ -133,6 +151,28 @@ func TestListPricings_Success(t *testing.T) {
 	assert.True(t, response["success"].(bool))
 }
 
+func TestListPricings_ExcludeOrphanPricing(t *testing.T) {
+	r, db := setupPricingEndpointTest(t)
+	therapist := createPricingPrerequisites(t, db)
+	assert.NoError(t, db.Create(&model.Pricing{TherapistID: therapist.ID, Price: 300000}).Error)
+	assert.NoError(t, db.Delete(&therapist).Error)
+
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodGet,
+		registerPath: "/pricing",
+		requestPath:  "/pricing?limit=10&offset=0",
+		handler:      ListPricings,
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	data, ok := response["data"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, data, 0)
+}
+
 func TestGetPricingInfo_Success(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
 	pricing := createPricingRecordForTest(t, db, 310000)
@@ -142,6 +182,20 @@ func TestGetPricingInfo_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, status)
 	assert.True(t, response["success"].(bool))
+}
+
+func TestGetPricingInfo_TherapistNotRegistered(t *testing.T) {
+	r, db := setupPricingEndpointTest(t)
+	pricing := createPricingRecordForTest(t, db, 310000)
+
+	var therapist model.Therapist
+	assert.NoError(t, db.First(&therapist, pricing.TherapistID).Error)
+	assert.NoError(t, db.Delete(&therapist).Error)
+
+	status, _, err := doPricingIDRequest(r, http.MethodGet, GetPricingInfo, pricing.ID, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, status)
 }
 
 func TestUpdatePricing_Success(t *testing.T) {
@@ -159,6 +213,16 @@ func TestUpdatePricing_Success(t *testing.T) {
 	assert.Equal(t, int64(350000), updated.Price)
 }
 
+func TestUpdatePricing_TherapistNotRegistered(t *testing.T) {
+	r, db := setupPricingEndpointTest(t)
+	pricing := createPricingRecordForTest(t, db, 320000)
+
+	status, _, err := doPricingIDRequest(r, http.MethodPatch, UpdatePricing, pricing.ID, map[string]interface{}{"therapist_id": uint(999999)})
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, status)
+}
+
 func TestDeletePricing_Success(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
 	pricing := createPricingRecordForTest(t, db, 330000)
@@ -171,4 +235,18 @@ func TestDeletePricing_Success(t *testing.T) {
 
 	var deleted model.Pricing
 	assert.Error(t, db.First(&deleted, pricing.ID).Error)
+}
+
+func TestDeletePricing_TherapistNotRegistered(t *testing.T) {
+	r, db := setupPricingEndpointTest(t)
+	pricing := createPricingRecordForTest(t, db, 330000)
+
+	var therapist model.Therapist
+	assert.NoError(t, db.First(&therapist, pricing.TherapistID).Error)
+	assert.NoError(t, db.Delete(&therapist).Error)
+
+	status, _, err := doPricingIDRequest(r, http.MethodDelete, DeletePricing, pricing.ID, nil)
+
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, status)
 }

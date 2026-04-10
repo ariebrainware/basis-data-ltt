@@ -12,13 +12,11 @@ import (
 )
 
 type createPricingRequest struct {
-	TreatmentID uint  `json:"treatment_id"`
 	TherapistID uint  `json:"therapist_id"`
 	Price       int64 `json:"price"`
 }
 
 type updatePricingRequest struct {
-	TreatmentID *uint  `json:"treatment_id"`
 	TherapistID *uint  `json:"therapist_id"`
 	Price       *int64 `json:"price"`
 }
@@ -47,6 +45,21 @@ func validateCreatePricingInput(c *gin.Context, req createPricingRequest) bool {
 	return true
 }
 
+func ensureTherapistRegistered(db *gorm.DB, therapistID uint) error {
+	var therapist model.Therapist
+	if err := db.First(&therapist, therapistID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return fmt.Errorf("therapist_id %d is not registered", therapistID)
+		}
+		return err
+	}
+	return nil
+}
+
+func ensurePricingTherapistRegistered(db *gorm.DB, pricing model.Pricing) error {
+	return ensureTherapistRegistered(db, pricing.TherapistID)
+}
+
 // ListPricings godoc
 // @Summary      List all pricings
 // @Description  Get a paginated list of pricing records
@@ -71,7 +84,13 @@ func ListPricings(c *gin.Context) {
 	}
 
 	var pricings []model.Pricing
-	if err := db.Order("id DESC").Limit(limit).Offset(offset).Find(&pricings).Error; err != nil {
+	if err := db.Table("pricings").
+		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
+		Where("therapists.deleted_at IS NULL").
+		Order("pricings.id DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&pricings).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricings", Err: err})
 		return
 	}
@@ -110,6 +129,11 @@ func GetPricingInfo(c *gin.Context) {
 		return
 	}
 
+	if err := ensurePricingTherapistRegistered(db, pricing); err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
+		return
+	}
+
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing retrieved", Data: pricing})
 }
 
@@ -129,6 +153,10 @@ func createPricingRecord(c *gin.Context, db *gorm.DB, req model.TreatementReques
 	return db.Transaction(func(tx *gorm.DB) error {
 		therapistID, err := resolveTherapistID(c, tx, req)
 		if err != nil {
+			return err
+		}
+
+		if err := ensureTherapistRegistered(tx, therapistID); err != nil {
 			return err
 		}
 
@@ -171,6 +199,11 @@ func CreatePricing(c *gin.Context) {
 
 	db, ok := getDBOrAbort(c)
 	if !ok {
+		return
+	}
+
+	if err := ensureTherapistRegistered(db, req.TherapistID); err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
 		return
 	}
 
@@ -229,8 +262,7 @@ func UpdatePricing(c *gin.Context) {
 			return
 		}
 
-		var therapist model.Therapist
-		if err := db.First(&therapist, *req.TherapistID).Error; err != nil {
+		if err := ensureTherapistRegistered(db, *req.TherapistID); err != nil {
 			util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
 			return
 		}
@@ -292,6 +324,11 @@ func DeletePricing(c *gin.Context) {
 	var pricing model.Pricing
 	if err := db.First(&pricing, id).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{Msg: "Pricing not found", Err: err})
+		return
+	}
+
+	if err := ensurePricingTherapistRegistered(db, pricing); err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
 		return
 	}
 
