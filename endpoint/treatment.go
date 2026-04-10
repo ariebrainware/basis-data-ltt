@@ -308,6 +308,59 @@ func checkDuplicateTreatment(c *gin.Context, db *gorm.DB, date string, patientCo
 	return true
 }
 
+func createTreatmentAndTransaction(c *gin.Context, db *gorm.DB, req model.TreatementRequest) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		therapistID, err := resolveTherapistID(c, tx, req)
+		if err != nil {
+			return err
+		}
+
+		if err := ensureTherapistRegistered(tx, therapistID); err != nil {
+			return err
+		}
+
+		var pricing model.Pricing
+		if err := tx.Where("therapist_id = ?", therapistID).Order("id DESC").First(&pricing).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return fmt.Errorf("pricing not found for therapist")
+			}
+			return err
+		}
+
+		treatment := model.Treatment{
+			TreatmentDate: req.TreatmentDate,
+			PatientCode:   req.PatientCode,
+			TherapistID:   therapistID,
+			Issues:        req.Issues,
+			Treatment:     strings.Join(req.Treatment, ","),
+			Remarks:       req.Remarks,
+			NextVisit:     req.NextVisit,
+		}
+		if err := tx.Create(&treatment).Error; err != nil {
+			return err
+		}
+
+		paymentStatus := req.Transaction.PaymentStatus
+		if paymentStatus == "" {
+			paymentStatus = "unpaid"
+		}
+
+		transaction := model.Transaction{
+			TreatmentID:   treatment.ID,
+			TherapistID:   therapistID,
+			Amount:        pricing.Price,
+			Remarks:       req.Transaction.Remarks,
+			PaymentMethod: req.Transaction.PaymentMethod,
+			PaymentStatus: paymentStatus,
+		}
+		if err := tx.Create(&transaction).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
 // CreateTreatment godoc
 // @Summary      Create a new treatment
 // @Description  Add a new treatment record
@@ -358,7 +411,7 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
-	if err := createPricingRecord(c, db, req); err != nil {
+	if err := createTreatmentAndTransaction(c, db, req); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create treatment",
 			Err: err,

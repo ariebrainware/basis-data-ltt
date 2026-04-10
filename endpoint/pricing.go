@@ -149,29 +149,6 @@ func resolveTherapistID(c *gin.Context, db *gorm.DB, req model.TreatementRequest
 	return req.TherapistID, nil
 }
 
-func createPricingRecord(c *gin.Context, db *gorm.DB, req model.TreatementRequest) error {
-	return db.Transaction(func(tx *gorm.DB) error {
-		therapistID, err := resolveTherapistID(c, tx, req)
-		if err != nil {
-			return err
-		}
-
-		if err := ensureTherapistRegistered(tx, therapistID); err != nil {
-			return err
-		}
-
-		pricing := model.Pricing{
-			TherapistID: therapistID,
-			Price:       req.Price,
-		}
-		if err := tx.Create(&pricing).Error; err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
 // CreatePricing godoc
 // @Summary      Create a new pricing
 // @Description  Add a new pricing record for a treatment

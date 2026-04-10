@@ -112,7 +112,7 @@ func TestCreatePricing_TherapistNotRegistered(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
-func TestCreatePricing_DuplicateTreatment(t *testing.T) {
+func TestCreatePricing_AllowMultipleRecordsPerTherapist(t *testing.T) {
 	r, db := setupPricingEndpointTest(t)
 	therapist := createPricingPrerequisites(t, db)
 
@@ -131,7 +131,11 @@ func TestCreatePricing_DuplicateTreatment(t *testing.T) {
 	})
 
 	assert.NoError(t, err)
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var count int64
+	assert.NoError(t, db.Model(&model.Pricing{}).Where("therapist_id = ?", therapist.ID).Count(&count).Error)
+	assert.Equal(t, int64(2), count)
 }
 
 func TestListPricings_Success(t *testing.T) {
