@@ -121,8 +121,28 @@ func migrateAndSeed(db *gorm.DB) error {
 		}
 	}
 
-	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.PatientCode{}, &model.SecurityLog{}); err != nil {
+	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}); err != nil {
 		return err
+	}
+
+	// Legacy column drops: only run when RUN_LEGACY_MIGRATIONS=true to avoid
+	// table locks or unintended schema changes on every startup.
+	if os.Getenv("RUN_LEGACY_MIGRATIONS") == "true" {
+		if db.Migrator().HasColumn(&model.Pricing{}, "treatment_id") {
+			if err := db.Migrator().DropColumn(&model.Pricing{}, "treatment_id"); err != nil {
+				log.Printf("Warning: failed to drop pricings.treatment_id: %v", err)
+			} else {
+				log.Println("Dropped legacy pricings.treatment_id column")
+			}
+		}
+
+		if db.Migrator().HasColumn(&model.Transaction{}, "additional_charge") {
+			if err := db.Migrator().DropColumn(&model.Transaction{}, "additional_charge"); err != nil {
+				log.Printf("Warning: failed to drop transactions.additional_charge: %v", err)
+			} else {
+				log.Println("Dropped legacy transactions.additional_charge column")
+			}
+		}
 	}
 
 	return model.SeedRoles(db)
@@ -185,6 +205,24 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 			disease.GET("/:id", endpoint.GetDiseaseInfo)
 			disease.PATCH("/:id", endpoint.UpdateDisease)
 			disease.DELETE("/:id", endpoint.DeleteDisease)
+		}
+
+		pricing := auth.Group("/pricing")
+		pricing.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			pricing.GET("", endpoint.ListPricings)
+			pricing.POST("", endpoint.CreatePricing)
+			pricing.GET("/:id", endpoint.GetPricingInfo)
+			pricing.PATCH("/:id", endpoint.UpdatePricing)
+			pricing.DELETE("/:id", endpoint.DeletePricing)
+		}
+
+		transaction := auth.Group("/transaction")
+		transaction.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			transaction.GET("", endpoint.ListTransactions)
+			transaction.GET("/:id", endpoint.GetTransactionInfo)
+			transaction.PATCH("/:id", endpoint.UpdateTransaction)
 		}
 
 		therapist := auth.Group("/therapist")

@@ -23,6 +23,8 @@ var EndpointTestModels = []interface{}{
 	&model.Therapist{},
 	&model.Role{},
 	&model.Treatment{},
+	&model.Pricing{},
+	&model.Transaction{},
 	&model.PatientCode{},
 }
 

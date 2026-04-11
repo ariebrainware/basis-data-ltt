@@ -30,7 +30,7 @@ func setupTestEnv(t *testing.T, params testSetupParams) (*config.Config, *gorm.D
 		t.Fatalf("connect test db: %v", err)
 	}
 
-	testModels := []interface{}{&model.Patient{}, &model.PatientCode{}, &model.Role{}, &model.User{}}
+	testModels := []interface{}{&model.Patient{}, &model.PatientCode{}, &model.Role{}, &model.User{}, &model.Pricing{}}
 	if err := db.AutoMigrate(testModels...); err != nil {
 		t.Fatalf("auto migrate: %v", err)
 	}

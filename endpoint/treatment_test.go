@@ -293,17 +293,29 @@ func TestListTreatments_WithSessionTherapist(t *testing.T) {
 func TestCreateTreatment_Success(t *testing.T) {
 	r, db := setupTreatmentTest(t)
 
+	therapist := model.Therapist{FullName: "Therapist One", Email: "therapist1@test.com"}
+	assert.NoError(t, db.Create(&therapist).Error)
+	assert.NoError(t, db.Create(&model.Pricing{TherapistID: therapist.ID, Price: 250000}).Error)
+
 	// Create patient
 	_ = createPatientIfNotExists(db, t, "CREATE001", "create@test.com")
 
 	reqBody := buildTreatmentRequest(TreatmentRequestOpts{
 		PatientCode: "CREATE001",
-		TherapistID: 1,
+		TherapistID: therapist.ID,
 	})
 	w, response, err := doRequestWithHandler(r, requestSpec{method: http.MethodPost, registerPath: "/treatment", requestPath: "/treatment", handler: CreateTreatment, body: reqBody})
 
 	assert.NoError(t, err)
 	assertTreatmentSuccessResponse(t, w, response)
+
+	var createdTreatment model.Treatment
+	assert.NoError(t, db.Where("patient_code = ?", "CREATE001").First(&createdTreatment).Error)
+
+	var transaction model.Transaction
+	assert.NoError(t, db.Where("treatment_id = ?", createdTreatment.ID).First(&transaction).Error)
+	assert.Equal(t, therapist.ID, transaction.TherapistID)
+	assert.Equal(t, int64(250000), transaction.Amount)
 }
 
 func TestCreateTreatment_InvalidJSON(t *testing.T) {

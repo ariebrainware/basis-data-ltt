@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,6 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+// treatmentUserError represents a user-facing (HTTP 400) error in treatment operations.
+type treatmentUserError struct {
+	msg string
+}
+
+func (e *treatmentUserError) Error() string { return e.msg }
 
 // treatmentQueryParams encapsulates all query parameters for treatment listing
 type treatmentQueryParams struct {
@@ -89,7 +97,20 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
-		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age").
+		Joins(`LEFT JOIN (
+			SELECT p1.therapist_id, p1.price
+			FROM pricings p1
+			INNER JOIN (
+				SELECT therapist_id, MAX(id) AS max_id
+				FROM pricings
+				WHERE deleted_at IS NULL
+				GROUP BY therapist_id
+			) latest_pricings
+				ON latest_pricings.therapist_id = p1.therapist_id
+				AND latest_pricings.max_id = p1.id
+			WHERE p1.deleted_at IS NULL
+		) AS pricings ON pricings.therapist_id = treatments.therapist_id`).
+		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, COALESCE(pricings.price, 0) as price").
 		Where("patients.deleted_at IS NULL")
 }
 
@@ -307,16 +328,66 @@ func checkDuplicateTreatment(c *gin.Context, db *gorm.DB, date string, patientCo
 	return true
 }
 
-func createTreatmentRecord(db *gorm.DB, req model.TreatementRequest) error {
-	return db.Create(&model.Treatment{
-		TreatmentDate: req.TreatmentDate,
-		PatientCode:   req.PatientCode,
-		TherapistID:   req.TherapistID,
-		Issues:        req.Issues,
-		Treatment:     strings.Join(req.Treatment, ","),
-		Remarks:       req.Remarks,
-		NextVisit:     req.NextVisit,
-	}).Error
+func createTreatmentAndTransaction(c *gin.Context, db *gorm.DB, req model.TreatementRequest) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		therapistID, err := resolveTherapistID(c, tx, req)
+		if err != nil {
+			return &treatmentUserError{msg: err.Error()}
+		}
+
+		if err := ensureTherapistRegistered(tx, therapistID); err != nil {
+			return &treatmentUserError{msg: err.Error()}
+		}
+
+		var pricing model.Pricing
+		if err := tx.Model(&model.Pricing{}).Where("therapist_id = ?", therapistID).Order("id DESC").First(&pricing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return &treatmentUserError{msg: "pricing not found for therapist"}
+			}
+			return err
+		}
+
+		treatment := model.Treatment{
+			TreatmentDate: req.TreatmentDate,
+			PatientCode:   req.PatientCode,
+			TherapistID:   therapistID,
+			Issues:        req.Issues,
+			Treatment:     strings.Join(req.Treatment, ","),
+			Remarks:       req.Remarks,
+			NextVisit:     req.NextVisit,
+		}
+		if err := tx.Create(&treatment).Error; err != nil {
+			return err
+		}
+
+		paymentStatus := req.Transaction.PaymentStatus
+		if paymentStatus == "" {
+			paymentStatus = "unpaid"
+		}
+
+		validStatuses := map[string]bool{
+			"unpaid":  true,
+			"paid":    true,
+			"partial": true,
+		}
+		if !validStatuses[paymentStatus] {
+			return &treatmentUserError{msg: "payment_status must be 'unpaid', 'paid', or 'partial'"}
+		}
+
+		transaction := model.Transaction{
+			TreatmentID:   treatment.ID,
+			TherapistID:   therapistID,
+			Amount:        pricing.Price,
+			Remarks:       req.Transaction.Remarks,
+			PaymentMethod: req.Transaction.PaymentMethod,
+			PaymentStatus: paymentStatus,
+		}
+		if err := tx.Create(&transaction).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // CreateTreatment godoc
@@ -369,11 +440,19 @@ func CreateTreatment(c *gin.Context) {
 		return
 	}
 
-	if err := createTreatmentRecord(db, req); err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to create treatment",
-			Err: err,
-		})
+	if err := createTreatmentAndTransaction(c, db, req); err != nil {
+		var ue *treatmentUserError
+		if errors.As(err, &ue) {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: ue.msg,
+				Err: err,
+			})
+		} else {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to create treatment",
+				Err: err,
+			})
+		}
 		return
 	}
 

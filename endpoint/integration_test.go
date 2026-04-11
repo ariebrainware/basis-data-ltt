@@ -59,6 +59,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&model.Therapist{},
 		&model.Role{},
 		&model.Treatment{},
+		&model.Pricing{},
+		&model.Transaction{},
 		&model.PatientCode{},
 	}
 
