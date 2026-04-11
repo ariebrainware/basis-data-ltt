@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,6 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+// treatmentUserError represents a user-facing (HTTP 400) error in treatment operations.
+type treatmentUserError struct {
+	msg string
+}
+
+func (e *treatmentUserError) Error() string { return e.msg }
 
 // treatmentQueryParams encapsulates all query parameters for treatment listing
 type treatmentQueryParams struct {
@@ -324,17 +332,17 @@ func createTreatmentAndTransaction(c *gin.Context, db *gorm.DB, req model.Treate
 	return db.Transaction(func(tx *gorm.DB) error {
 		therapistID, err := resolveTherapistID(c, tx, req)
 		if err != nil {
-			return err
+			return &treatmentUserError{msg: err.Error()}
 		}
 
 		if err := ensureTherapistRegistered(tx, therapistID); err != nil {
-			return err
+			return &treatmentUserError{msg: err.Error()}
 		}
 
 		var pricing model.Pricing
-		if err := tx.Where("therapist_id = ?", therapistID).Order("id DESC").First(&pricing).Error; err != nil {
-			if err == gorm.ErrRecordNotFound {
-				return fmt.Errorf("pricing not found for therapist")
+		if err := tx.Model(&model.Pricing{}).Where("therapist_id = ?", therapistID).Order("id DESC").First(&pricing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return &treatmentUserError{msg: "pricing not found for therapist"}
 			}
 			return err
 		}
@@ -355,6 +363,15 @@ func createTreatmentAndTransaction(c *gin.Context, db *gorm.DB, req model.Treate
 		paymentStatus := req.Transaction.PaymentStatus
 		if paymentStatus == "" {
 			paymentStatus = "unpaid"
+		}
+
+		validStatuses := map[string]bool{
+			"unpaid":  true,
+			"paid":    true,
+			"partial": true,
+		}
+		if !validStatuses[paymentStatus] {
+			return &treatmentUserError{msg: "payment_status must be 'unpaid', 'paid', or 'partial'"}
 		}
 
 		transaction := model.Transaction{
@@ -424,10 +441,18 @@ func CreateTreatment(c *gin.Context) {
 	}
 
 	if err := createTreatmentAndTransaction(c, db, req); err != nil {
-		util.CallServerError(c, util.APIErrorParams{
-			Msg: "Failed to create treatment",
-			Err: err,
-		})
+		var ue *treatmentUserError
+		if errors.As(err, &ue) {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: ue.msg,
+				Err: err,
+			})
+		} else {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to create treatment",
+				Err: err,
+			})
+		}
 		return
 	}
 

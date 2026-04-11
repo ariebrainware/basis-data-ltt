@@ -84,9 +84,9 @@ func ListPricings(c *gin.Context) {
 	}
 
 	var pricings []model.Pricing
-	if err := db.Table("pricings").
+	if err := db.Model(&model.Pricing{}).
 		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
-		Where("therapists.deleted_at IS NULL").
+		Where("therapists.deleted_at IS NULL AND pricings.deleted_at IS NULL").
 		Order("pricings.id DESC").
 		Limit(limit).
 		Offset(offset).

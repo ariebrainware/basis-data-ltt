@@ -1,6 +1,7 @@
 module github.com/ariebrainware/basis-data-ltt
 
 go 1.25
+
 toolchain go1.25.7
 
 require (

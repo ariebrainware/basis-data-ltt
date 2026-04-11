@@ -125,19 +125,23 @@ func migrateAndSeed(db *gorm.DB) error {
 		return err
 	}
 
-	if db.Migrator().HasColumn(&model.Pricing{}, "treatment_id") {
-		if err := db.Migrator().DropColumn(&model.Pricing{}, "treatment_id"); err != nil {
-			log.Printf("Warning: failed to drop pricings.treatment_id: %v", err)
-		} else {
-			log.Println("Dropped legacy pricings.treatment_id column")
+	// Legacy column drops: only run when RUN_LEGACY_MIGRATIONS=true to avoid
+	// table locks or unintended schema changes on every startup.
+	if os.Getenv("RUN_LEGACY_MIGRATIONS") == "true" {
+		if db.Migrator().HasColumn(&model.Pricing{}, "treatment_id") {
+			if err := db.Migrator().DropColumn(&model.Pricing{}, "treatment_id"); err != nil {
+				log.Printf("Warning: failed to drop pricings.treatment_id: %v", err)
+			} else {
+				log.Println("Dropped legacy pricings.treatment_id column")
+			}
 		}
-	}
 
-	if db.Migrator().HasColumn(&model.Transaction{}, "additional_charge") {
-		if err := db.Migrator().DropColumn(&model.Transaction{}, "additional_charge"); err != nil {
-			log.Printf("Warning: failed to drop transactions.additional_charge: %v", err)
-		} else {
-			log.Println("Dropped legacy transactions.additional_charge column")
+		if db.Migrator().HasColumn(&model.Transaction{}, "additional_charge") {
+			if err := db.Migrator().DropColumn(&model.Transaction{}, "additional_charge"); err != nil {
+				log.Printf("Warning: failed to drop transactions.additional_charge: %v", err)
+			} else {
+				log.Println("Dropped legacy transactions.additional_charge column")
+			}
 		}
 	}
 
