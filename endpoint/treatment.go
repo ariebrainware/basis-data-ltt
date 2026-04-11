@@ -89,7 +89,19 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
-		Joins("LEFT JOIN pricings ON pricings.therapist_id = treatments.therapist_id").
+		Joins(`LEFT JOIN (
+			SELECT p1.therapist_id, p1.price
+			FROM pricings p1
+			INNER JOIN (
+				SELECT therapist_id, MAX(id) AS max_id
+				FROM pricings
+				WHERE deleted_at IS NULL
+				GROUP BY therapist_id
+			) latest_pricings
+				ON latest_pricings.therapist_id = p1.therapist_id
+				AND latest_pricings.max_id = p1.id
+			WHERE p1.deleted_at IS NULL
+		) AS pricings ON pricings.therapist_id = treatments.therapist_id`).
 		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, COALESCE(pricings.price, 0) as price").
 		Where("patients.deleted_at IS NULL")
 }
