@@ -13,3 +13,37 @@ type Transaction struct {
 	PaymentMethod string `json:"payment_method" example:"cash"`
 	PaymentStatus string `json:"payment_status" gorm:"default:'unpaid'" example:"unpaid"`
 }
+
+// ListTransactionResponse represents transaction list data with patient details.
+// @Description Transaction list response information
+type ListTransactionResponse struct {
+	Transaction
+	PatientName   string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
+	TreatmentDate string `json:"treatment_date" gorm:"column:treatment_date" example:"2025-01-15"`
+}
+
+// PaymentStatusSummary represents counts of transactions by payment status.
+type PaymentStatusSummary struct {
+	Paid    int64 `json:"paid" example:"5"`
+	Partial int64 `json:"partial" example:"2"`
+	Unpaid  int64 `json:"unpaid" example:"3"`
+}
+
+// TherapistPatientCount represents the count of unique patients handled by a therapist.
+type TherapistPatientCount struct {
+	TherapistName string `json:"therapist_name" example:"Dr. John Smith"`
+	PatientCount  int64  `json:"patient_count" example:"10"`
+}
+
+// TransactionSummary represents aggregated transaction data.
+type TransactionSummary struct {
+	TotalAmountToday       int64                   `json:"total_amount_today" example:"1250000"`
+	PaymentStatusCounts    PaymentStatusSummary    `json:"payment_status_counts"`
+	TherapistPatientCounts []TherapistPatientCount `json:"therapist_patient_counts"`
+}
+
+// ListTransactionsResponseData groups transactions with summary information.
+type ListTransactionsResponseData struct {
+	Transactions []ListTransactionResponse `json:"transactions"`
+	Summary      TransactionSummary        `json:"summary"`
+}
