@@ -68,7 +68,7 @@ func TestListTransactions_ReturnsPatientName(t *testing.T) {
 	// Verify summary is present
 	summary := data["summary"].(map[string]interface{})
 	assert.NotNil(t, summary)
-	assert.Equal(t, float64(125000), summary["total_amount_today"]) // Should be the amount we created today
+	assert.Equal(t, float64(125000), summary["total_amount"]) // Should be the amount we created today
 
 	paymentStatusCounts := summary["payment_status_counts"].(map[string]interface{})
 	assert.Equal(t, float64(1), paymentStatusCounts["paid"]) // Created transaction is paid
@@ -154,7 +154,7 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 	assert.Equal(t, float64(100000), first["amount"])
 
 	summary := data["summary"].(map[string]interface{})
-	assert.Equal(t, float64(100000), summary["total_amount_today"])
+	assert.Equal(t, float64(100000), summary["total_amount"])
 
 	paymentStatusCounts := summary["payment_status_counts"].(map[string]interface{})
 	assert.Equal(t, float64(1), paymentStatusCounts["paid"])

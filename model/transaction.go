@@ -37,7 +37,7 @@ type TherapistPatientCount struct {
 
 // TransactionSummary represents aggregated transaction data.
 type TransactionSummary struct {
-	TotalAmountToday       int64                   `json:"total_amount_today" example:"1250000"`
+	TotalAmount            int64                   `json:"total_amount" example:"1250000"`
 	PaymentStatusCounts    PaymentStatusSummary    `json:"payment_status_counts"`
 	TherapistPatientCounts []TherapistPatientCount `json:"therapist_patient_counts"`
 }

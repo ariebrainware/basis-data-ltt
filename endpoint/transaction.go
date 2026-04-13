@@ -119,13 +119,13 @@ func ListTransactions(c *gin.Context) {
 		targetDate = dateFilter
 	}
 
-	// Total amount for today
-	var totalAmountToday int64
+	// Total amount for the target date
+	var totalAmount int64
 	if err := db.Model(&model.Transaction{}).
 		Select("COALESCE(SUM(transactions.amount), 0) as total").
 		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
 		Where("DATE(treatments.treatment_date) = ?", targetDate).
-		Row().Scan(&totalAmountToday); err != nil {
+		Row().Scan(&totalAmount); err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate total amount", Err: err})
 		return
 	}
@@ -172,7 +172,7 @@ func ListTransactions(c *gin.Context) {
 	}
 
 	summary := model.TransactionSummary{
-		TotalAmountToday:       totalAmountToday,
+		TotalAmount:            totalAmount,
 		PaymentStatusCounts:    statusSummary,
 		TherapistPatientCounts: therapistPatientCounts,
 	}
