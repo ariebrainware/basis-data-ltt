@@ -21,6 +21,11 @@ type updatePricingRequest struct {
 	Price       *int64 `json:"price"`
 }
 
+type pricingWithTherapist struct {
+	model.Pricing
+	TherapistName string `json:"therapist_name" gorm:"column:therapist_name"`
+}
+
 func getPricingIDParam(c *gin.Context) (string, bool) {
 	id := c.Param("id")
 	if id == "" {
@@ -83,14 +88,15 @@ func ListPricings(c *gin.Context) {
 		return
 	}
 
-	var pricings []model.Pricing
-	if err := db.Model(&model.Pricing{}).
+	var pricings []pricingWithTherapist
+	if err := db.Table("pricings").
+		Select("pricings.*, therapists.full_name as therapist_name").
 		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
 		Where("therapists.deleted_at IS NULL AND pricings.deleted_at IS NULL").
 		Order("pricings.id DESC").
 		Limit(limit).
 		Offset(offset).
-		Find(&pricings).Error; err != nil {
+		Scan(&pricings).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricings", Err: err})
 		return
 	}
