@@ -186,6 +186,10 @@ func TestGetPricingInfo_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, status)
 	assert.True(t, response["success"].(bool))
+
+	data, ok := response["data"].(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "Pricing Therapist", data["therapist_name"])
 }
 
 func TestGetPricingInfo_TherapistNotRegistered(t *testing.T) {

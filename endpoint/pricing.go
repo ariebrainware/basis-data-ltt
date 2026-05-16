@@ -113,7 +113,7 @@ func ListPricings(c *gin.Context) {
 // @Security     BearerAuth
 // @Security     SessionToken
 // @Param        id path string true "Pricing ID"
-// @Success      200 {object} util.APIResponse{data=model.Pricing} "Pricing retrieved"
+// @Success      200 {object} util.APIResponse{data=pricingWithTherapist} "Pricing retrieved"
 // @Failure      400 {object} util.APIResponse "Invalid ID or pricing not found"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
@@ -129,18 +129,17 @@ func GetPricingInfo(c *gin.Context) {
 		return
 	}
 
-	var pricing model.Pricing
-	if err := db.First(&pricing, id).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Pricing not found", Err: err})
-		return
-	}
-
-	if err := ensurePricingTherapistRegistered(db, pricing); err != nil {
+	var pricingInfo pricingWithTherapist
+	if err := db.Table("pricings").
+		Select("pricings.*, therapists.full_name as therapist_name").
+		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
+		Where("pricings.id = ? AND therapists.deleted_at IS NULL AND pricings.deleted_at IS NULL", id).
+		First(&pricingInfo).Error; err != nil {
 		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
 		return
 	}
 
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing retrieved", Data: pricing})
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing retrieved", Data: pricingInfo})
 }
 
 func resolveTherapistID(c *gin.Context, db *gorm.DB, req model.TreatementRequest) (uint, error) {
