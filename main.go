@@ -155,6 +155,11 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	r.Use(middleware.DatabaseMiddleware(db))
 	r.Use(middleware.EndpointCallLogger())
 
+	// Expose debug route only in non-production environments
+	if cfg.AppEnv != "production" {
+		r.GET("/debug/dbinfo", endpoint.DebugDBInfo)
+	}
+
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Welcome to %s!", cfg.AppName)})
 	})

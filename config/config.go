@@ -32,6 +32,21 @@ type Config struct {
 var config *Config
 var once sync.Once
 
+func buildMySQLDSN(cfg *Config, password string) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, password, cfg.DBHost, cfg.DBPort, cfg.DBName)
+}
+
+// MySQLDSN returns the resolved MySQL DSN. When redactPassword is true,
+// the password portion is replaced with a placeholder for safe logging.
+func MySQLDSN(redactPassword bool) string {
+	cfg := LoadConfig()
+	password := cfg.DBPass
+	if redactPassword {
+		password = "***"
+	}
+	return buildMySQLDSN(cfg, password)
+}
+
 // ResetConfigForTesting resets the package-level config singleton and
 // initialization guard. Tests may call this to ensure a fresh config
 // is loaded when changing environment variables between runs.
@@ -66,6 +81,11 @@ func LoadConfig() *Config {
 		if envFile != "" {
 			if err := godotenv.Load(envFile); err != nil {
 				log.Printf("Error loading %s file: %v", envFile, err)
+				if appEnv == "development" && envFile == ".env.dev2" {
+					if fallbackErr := godotenv.Load(".env"); fallbackErr != nil {
+						log.Printf("Error loading fallback .env file: %v", fallbackErr)
+					}
+				}
 			}
 		}
 
@@ -134,7 +154,7 @@ func ConnectMySQL() (*gorm.DB, error) {
 		return db, nil
 	}
 	// Build the Data Source Name (DSN) using the configuration values.
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	dsn := buildMySQLDSN(cfg, cfg.DBPass)
 	gormConfig := &gorm.Config{}
 	if cfg.AppEnv == "production" {
 		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
@@ -150,6 +170,11 @@ func ConnectMySQL() (*gorm.DB, error) {
 			),
 		}
 	}
+	// Log connection info (without password) for debugging in non-production.
+	if cfg.AppEnv != "production" {
+		log.Printf("Connecting to MySQL DSN: %s", buildMySQLDSN(cfg, "***"))
+	}
+
 	// Open a database connection.
 	db, err := gorm.Open(mysql.Open(dsn), gormConfig)
 	if err != nil {

@@ -17,8 +17,9 @@ type createPricingRequest struct {
 }
 
 type updatePricingRequest struct {
-	TherapistID *uint  `json:"therapist_id"`
-	Price       *int64 `json:"price"`
+	TherapistID *uint   `json:"therapist_id"`
+	Price       *int64  `json:"price"`
+	Description *string `json:"description"`
 }
 
 type pricingWithTherapist struct {
@@ -258,6 +259,10 @@ func UpdatePricing(c *gin.Context) {
 			return
 		}
 		updates["price"] = *req.Price
+	}
+
+	if req.Description != nil {
+		updates["description"] = *req.Description
 	}
 
 	if len(updates) == 0 {
