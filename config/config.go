@@ -27,13 +27,16 @@ type Config struct {
 	DBName          string `json:"dbname"`
 	DBUSER          string `json:"dbuser"`
 	DBPass          string `json:"dbpass"`
+	DBTimeout       string `json:"dbtimeout"`
+	DBReadTimeout   string `json:"dbreadtimeout"`
+	DBWriteTimeout  string `json:"dbwritetimeout"`
 }
 
 var config *Config
 var once sync.Once
 
 func buildMySQLDSN(cfg *Config, password string) string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, password, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local&timeout=%s&readTimeout=%s&writeTimeout=%s", cfg.DBUSER, password, cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBTimeout, cfg.DBReadTimeout, cfg.DBWriteTimeout)
 }
 
 // MySQLDSN returns the resolved MySQL DSN. When redactPassword is true,
@@ -100,6 +103,20 @@ func LoadConfig() *Config {
 			shutdownTimeout = 5 // Default to 5 seconds if not specified or invalid
 		}
 
+		// Set default database timeout values if not specified
+		dbTimeout := os.Getenv("DBTIMEOUT")
+		if dbTimeout == "" {
+			dbTimeout = "10s"
+		}
+		dbReadTimeout := os.Getenv("DBREADTIMEOUT")
+		if dbReadTimeout == "" {
+			dbReadTimeout = "30s"
+		}
+		dbWriteTimeout := os.Getenv("DBWRITETIMEOUT")
+		if dbWriteTimeout == "" {
+			dbWriteTimeout = "30s"
+		}
+
 		// Initialize the Config struct with values from environment variables.
 		config = &Config{
 			AppName:         os.Getenv("APPNAME"),
@@ -112,6 +129,9 @@ func LoadConfig() *Config {
 			DBName:          os.Getenv("DBNAME"),
 			DBUSER:          os.Getenv("DBUSER"),
 			DBPass:          os.Getenv("DBPASS"),
+			DBTimeout:       dbTimeout,
+			DBReadTimeout:   dbReadTimeout,
+			DBWriteTimeout:  dbWriteTimeout,
 		}
 	})
 	return config
