@@ -76,7 +76,7 @@ func ensurePricingTherapistRegistered(db *gorm.DB, pricing model.Pricing) error 
 // @Security     SessionToken
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
-// @Success      200 {object} util.APIResponse{data=[]model.Pricing} "Pricings retrieved"
+// @Success      200 {object} util.APIResponse{data=[]pricingWithTherapist} "Pricings retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /pricing [get]
@@ -89,7 +89,7 @@ func ListPricings(c *gin.Context) {
 		return
 	}
 
-	var pricings []pricingWithTherapist
+	pricings := make([]pricingWithTherapist, 0)
 	if err := db.Table("pricings").
 		Select("pricings.*, therapists.full_name as therapist_name").
 		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").

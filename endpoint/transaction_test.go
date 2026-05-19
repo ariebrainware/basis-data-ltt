@@ -11,6 +11,7 @@ import (
 
 func TestListTransactions_ReturnsPatientName(t *testing.T) {
 	r, db := setupEndpointTest(t)
+	now := time.Now()
 
 	patient := model.Patient{
 		FullName:    "Patient Alpha",
@@ -27,13 +28,13 @@ func TestListTransactions_ReturnsPatientName(t *testing.T) {
 	assert.NoError(t, db.Create(&therapist).Error)
 
 	treatment := model.Treatment{
-		TreatmentDate: time.Now().Format("2006-01-02"),
+		TreatmentDate: now.Format("2006-01-02"),
 		PatientCode:   patient.PatientCode,
 		TherapistID:   therapist.ID,
 		Issues:        "Headache",
 		Treatment:     "Massage",
 		Remarks:       "Initial session",
-		NextVisit:     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
+		NextVisit:     now.AddDate(0, 0, 7).Format("2006-01-02"),
 	}
 	assert.NoError(t, db.Create(&treatment).Error)
 
@@ -63,7 +64,7 @@ func TestListTransactions_ReturnsPatientName(t *testing.T) {
 
 	first := transactions[0].(map[string]interface{})
 	assert.Equal(t, "Patient Alpha", first["patient_name"])
-	assert.Equal(t, time.Now().Format("2006-01-02"), first["treatment_date"])
+	assert.Equal(t, now.Format("2006-01-02"), first["treatment_date"])
 
 	// Verify summary is present
 	summary := data["summary"].(map[string]interface{})
@@ -79,6 +80,7 @@ func TestListTransactions_ReturnsPatientName(t *testing.T) {
 
 func TestListTransactions_WithDateFilter(t *testing.T) {
 	r, db := setupEndpointTest(t)
+	now := time.Now()
 
 	patient := model.Patient{
 		FullName:    "Patient Beta",
@@ -94,8 +96,8 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 	}
 	assert.NoError(t, db.Create(&therapist).Error)
 
-	today := time.Now().Format("2006-01-02")
-	otherDate := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+	today := now.Format("2006-01-02")
+	otherDate := now.AddDate(0, 0, -1).Format("2006-01-02")
 
 	todayTreatment := model.Treatment{
 		TreatmentDate: today,
@@ -104,7 +106,7 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 		Issues:        "Neck pain",
 		Treatment:     "Therapy A",
 		Remarks:       "Today session",
-		NextVisit:     time.Now().AddDate(0, 0, 7).Format("2006-01-02"),
+		NextVisit:     now.AddDate(0, 0, 7).Format("2006-01-02"),
 	}
 	assert.NoError(t, db.Create(&todayTreatment).Error)
 
@@ -115,7 +117,7 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 		Issues:        "Back pain",
 		Treatment:     "Therapy B",
 		Remarks:       "Old session",
-		NextVisit:     time.Now().AddDate(0, 0, 8).Format("2006-01-02"),
+		NextVisit:     now.AddDate(0, 0, 8).Format("2006-01-02"),
 	}
 	assert.NoError(t, db.Create(&oldTreatment).Error)
 
@@ -165,6 +167,78 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 	firstTherapist := therapistPatientCounts[0].(map[string]interface{})
 	assert.Equal(t, "Therapist Beta", firstTherapist["therapist_name"])
 	assert.Equal(t, float64(1), firstTherapist["patient_count"])
+}
+
+func TestListTransactions_WithoutDateFilterSummaryMatchesReturnedScope(t *testing.T) {
+	r, db := setupEndpointTest(t)
+
+	patient := model.Patient{
+		FullName:    "Patient Epsilon",
+		PatientCode: "TP006",
+		Email:       "transaction-patient-epsilon@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Epsilon",
+		NIK:      "NIK-TRX-006",
+		Email:    "transaction-therapist-epsilon@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	treatmentOne := model.Treatment{
+		TreatmentDate: "2026-04-14",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Issue one",
+		Treatment:     "Therapy one",
+		Remarks:       "First",
+		NextVisit:     "2026-04-20",
+	}
+	assert.NoError(t, db.Create(&treatmentOne).Error)
+
+	treatmentTwo := model.Treatment{
+		TreatmentDate: "2026-04-15",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Issue two",
+		Treatment:     "Therapy two",
+		Remarks:       "Second",
+		NextVisit:     "2026-04-21",
+	}
+	assert.NoError(t, db.Create(&treatmentTwo).Error)
+
+	assert.NoError(t, db.Create(&model.Transaction{
+		TreatmentID:   treatmentOne.ID,
+		TherapistID:   therapist.ID,
+		Amount:        100000,
+		PaymentMethod: "cash",
+		PaymentStatus: "paid",
+	}).Error)
+	assert.NoError(t, db.Create(&model.Transaction{
+		TreatmentID:   treatmentTwo.ID,
+		TherapistID:   therapist.ID,
+		Amount:        200000,
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}).Error)
+
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodGet,
+		registerPath: "/transaction",
+		requestPath:  "/transaction",
+		handler:      ListTransactions,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	data := response["data"].(map[string]interface{})
+	transactions := data["transactions"].([]interface{})
+	assert.Len(t, transactions, 2)
+
+	summary := data["summary"].(map[string]interface{})
+	assert.Equal(t, float64(300000), summary["total_amount"])
 }
 
 func TestListTransactions_WithTreatmentDateAndISODate(t *testing.T) {

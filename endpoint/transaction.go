@@ -138,7 +138,7 @@ func ListTransactions(c *gin.Context) {
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	dateScope, err := getTransactionDateScope(c)
 	if err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid date filter. Use treatment_date or start_date/end_date with YYYY-MM-DD values", Err: err})
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid date filter. Use treatment_date or start_date/end_date with YYYY-MM-DD or RFC3339 values", Err: err})
 		return
 	}
 
@@ -164,12 +164,8 @@ func ListTransactions(c *gin.Context) {
 		return
 	}
 
-	// Calculate summary
+	// Calculate summary for the same filter scope as transaction list.
 	summaryScope := dateScope
-	if summaryScope.startDate == "" {
-		today := time.Now().Format("2006-01-02")
-		summaryScope = transactionDateScope{startDate: today, endDate: today}
-	}
 
 	// Total amount for the target date
 	var totalAmount int64

@@ -68,7 +68,7 @@ func DebugDBInfo(c *gin.Context) {
 
 	// Use Unscoped to include soft-deleted rows for diagnosis.
 	var user model.User
-	if err := db.Unscoped().Select("id, email, created_at, updated_at, deleted_at").Where("email = ?", email).First(&user).Error; err != nil {
+	if err := db.Unscoped().Select("id, name, email, role_id, created_at, updated_at, deleted_at").Where("email = ?", email).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			util.CallErrorNotFound(c, util.APIErrorParams{Msg: "User not found", Err: err})
 			return
