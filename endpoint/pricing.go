@@ -130,13 +130,29 @@ func GetPricingInfo(c *gin.Context) {
 		return
 	}
 
+	var pricing model.Pricing
+	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&pricing).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Pricing not found", Err: err})
+			return
+		}
+
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricing", Err: err})
+		return
+	}
+
 	var pricingInfo pricingWithTherapist
 	if err := db.Table("pricings").
 		Select("pricings.*, therapists.full_name as therapist_name").
 		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
 		Where("pricings.id = ? AND therapists.deleted_at IS NULL AND pricings.deleted_at IS NULL", id).
 		First(&pricingInfo).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
+			return
+		}
+
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricing", Err: err})
 		return
 	}
 
