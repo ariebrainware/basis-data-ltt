@@ -30,16 +30,7 @@ func getTransactionIDParam(c *gin.Context) (string, bool) {
 }
 
 func getTransactionDateFilter(c *gin.Context) (string, error) {
-	raw := c.Query("date")
-	if raw == "" {
-		raw = c.Query("limiter")
-	}
-	if raw == "" {
-		raw = c.Query("treatment_date")
-	}
-	if raw == "" {
-		raw = c.Query("group_by_date")
-	}
+	raw := c.Query("treatment_date")
 	if raw == "" {
 		return "", nil
 	}
@@ -72,10 +63,7 @@ func getTransactionDateFilter(c *gin.Context) (string, error) {
 // @Security     SessionToken
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
-// @Param        date query string false "Filter by treatment date (YYYY-MM-DD). Also accepts RFC3339 datetime."
-// @Param        limiter query string false "Alias for date filter"
-// @Param        treatment_date query string false "Alias for date filter"
-// @Param        group_by_date query string false "Alias for date filter"
+// @Param        treatment_date query string false "Filter by treatment date (YYYY-MM-DD). Also accepts RFC3339 datetime."
 // @Success      200 {object} util.APIResponse{data=model.ListTransactionsResponseData} "Transactions retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"

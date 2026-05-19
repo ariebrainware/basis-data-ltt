@@ -138,7 +138,7 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 	w, response, err := doRequestWithHandler(r, requestSpec{
 		method:       http.MethodGet,
 		registerPath: "/transaction",
-		requestPath:  "/transaction?date=" + today,
+		requestPath:  "/transaction?treatment_date=" + today,
 		handler:      ListTransactions,
 	})
 	assert.NoError(t, err)
@@ -167,7 +167,7 @@ func TestListTransactions_WithDateFilter(t *testing.T) {
 	assert.Equal(t, float64(1), firstTherapist["patient_count"])
 }
 
-func TestListTransactions_WithLimiterAliasAndISODate(t *testing.T) {
+func TestListTransactions_WithTreatmentDateAndISODate(t *testing.T) {
 	r, db := setupEndpointTest(t)
 
 	patient := model.Patient{
@@ -228,7 +228,7 @@ func TestListTransactions_WithLimiterAliasAndISODate(t *testing.T) {
 	w, response, err := doRequestWithHandler(r, requestSpec{
 		method:       http.MethodGet,
 		registerPath: "/transaction",
-		requestPath:  "/transaction?limiter=2026-04-10T00:00:00.000Z",
+		requestPath:  "/transaction?treatment_date=2026-04-10T00:00:00.000Z",
 		handler:      ListTransactions,
 	})
 	assert.NoError(t, err)
@@ -244,7 +244,7 @@ func TestListTransactions_WithLimiterAliasAndISODate(t *testing.T) {
 	assert.Equal(t, float64(150000), first["amount"])
 }
 
-func TestListTransactions_WithGroupByDateAlias(t *testing.T) {
+func TestListTransactions_WithTreatmentDateAlias(t *testing.T) {
 	r, db := setupEndpointTest(t)
 
 	patient := model.Patient{
@@ -292,7 +292,7 @@ func TestListTransactions_WithGroupByDateAlias(t *testing.T) {
 	w, response, err := doRequestWithHandler(r, requestSpec{
 		method:       http.MethodGet,
 		registerPath: "/transaction",
-		requestPath:  "/transaction?group_by_date=" + targetDate,
+		requestPath:  "/transaction?treatment_date=" + targetDate,
 		handler:      ListTransactions,
 	})
 	assert.NoError(t, err)
