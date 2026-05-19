@@ -8,6 +8,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type updateTransactionRequest struct {
@@ -29,10 +30,14 @@ func getTransactionIDParam(c *gin.Context) (string, bool) {
 	return id, true
 }
 
-func getTransactionDateFilter(c *gin.Context) (string, error) {
-	raw := c.Query("treatment_date")
+type transactionDateScope struct {
+	startDate string
+	endDate   string
+}
+
+func normalizeTransactionDate(raw string) (string, error) {
 	if raw == "" {
-		return "", nil
+		return "", fmt.Errorf("date is required")
 	}
 
 	if len(raw) >= 10 {
@@ -53,6 +58,64 @@ func getTransactionDateFilter(c *gin.Context) (string, error) {
 	return raw, nil
 }
 
+func getTransactionDateScope(c *gin.Context) (transactionDateScope, error) {
+	treatmentDate := c.Query("treatment_date")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	hasTreatmentDate := treatmentDate != ""
+	hasRange := startDate != "" || endDate != ""
+
+	if hasTreatmentDate && hasRange {
+		return transactionDateScope{}, fmt.Errorf("use either treatment_date or start_date/end_date")
+	}
+
+	if hasRange {
+		if startDate == "" || endDate == "" {
+			return transactionDateScope{}, fmt.Errorf("both start_date and end_date are required")
+		}
+
+		normalizedStart, err := normalizeTransactionDate(startDate)
+		if err != nil {
+			return transactionDateScope{}, err
+		}
+
+		normalizedEnd, err := normalizeTransactionDate(endDate)
+		if err != nil {
+			return transactionDateScope{}, err
+		}
+
+		if normalizedStart > normalizedEnd {
+			return transactionDateScope{}, fmt.Errorf("start_date must be before or equal to end_date")
+		}
+
+		return transactionDateScope{startDate: normalizedStart, endDate: normalizedEnd}, nil
+	}
+
+	if hasTreatmentDate {
+		normalizedDate, err := normalizeTransactionDate(treatmentDate)
+		if err != nil {
+			return transactionDateScope{}, err
+		}
+
+		return transactionDateScope{startDate: normalizedDate, endDate: normalizedDate}, nil
+	}
+
+	return transactionDateScope{}, nil
+}
+
+func applyTransactionDateScope(query *gorm.DB, scope transactionDateScope) *gorm.DB {
+	if scope.startDate == "" {
+		return query
+	}
+
+	if scope.startDate == scope.endDate {
+		return query.Where("DATE(treatments.treatment_date) = ?", scope.startDate)
+	}
+
+	return query.Where("DATE(treatments.treatment_date) BETWEEN ? AND ?", scope.startDate, scope.endDate)
+}
+
 // ListTransactions godoc
 // @Summary      List all transactions
 // @Description  Get a paginated list of transaction records
@@ -64,6 +127,8 @@ func getTransactionDateFilter(c *gin.Context) (string, error) {
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
 // @Param        treatment_date query string false "Filter by treatment date (YYYY-MM-DD). Also accepts RFC3339 datetime."
+// @Param        start_date query string false "Start date for a date range filter (YYYY-MM-DD)."
+// @Param        end_date query string false "End date for a date range filter (YYYY-MM-DD)."
 // @Success      200 {object} util.APIResponse{data=model.ListTransactionsResponseData} "Transactions retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
@@ -71,9 +136,9 @@ func getTransactionDateFilter(c *gin.Context) (string, error) {
 func ListTransactions(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	dateFilter, err := getTransactionDateFilter(c)
+	dateScope, err := getTransactionDateScope(c)
 	if err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid date format. Use YYYY-MM-DD", Err: err})
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid date filter. Use treatment_date or start_date/end_date with YYYY-MM-DD values", Err: err})
 		return
 	}
 
@@ -88,9 +153,7 @@ func ListTransactions(c *gin.Context) {
 		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code")
 
-	if dateFilter != "" {
-		txQuery = txQuery.Where("DATE(treatments.treatment_date) = ?", dateFilter)
-	}
+	txQuery = applyTransactionDateScope(txQuery, dateScope)
 
 	if err := txQuery.
 		Order("transactions.id DESC").
@@ -102,17 +165,17 @@ func ListTransactions(c *gin.Context) {
 	}
 
 	// Calculate summary
-	targetDate := time.Now().Format("2006-01-02")
-	if dateFilter != "" {
-		targetDate = dateFilter
+	summaryScope := dateScope
+	if summaryScope.startDate == "" {
+		today := time.Now().Format("2006-01-02")
+		summaryScope = transactionDateScope{startDate: today, endDate: today}
 	}
 
 	// Total amount for the target date
 	var totalAmount int64
-	if err := db.Model(&model.Transaction{}).
+	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
 		Select("COALESCE(SUM(transactions.amount), 0) as total").
 		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
-		Where("DATE(treatments.treatment_date) = ?", targetDate).
 		Row().Scan(&totalAmount); err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate total amount", Err: err})
 		return
@@ -124,10 +187,9 @@ func ListTransactions(c *gin.Context) {
 		Count  int64
 	}
 	var paymentCounts []PaymentCount
-	if err := db.Model(&model.Transaction{}).
+	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
 		Select("payment_status as status, COUNT(*) as count").
 		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
-		Where("DATE(treatments.treatment_date) = ?", targetDate).
 		Group("payment_status").
 		Scan(&paymentCounts).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate payment status counts", Err: err})
@@ -148,10 +210,9 @@ func ListTransactions(c *gin.Context) {
 
 	// Therapist patient counts
 	var therapistPatientCounts []model.TherapistPatientCount
-	if err := db.Model(&model.Treatment{}).
+	if err := applyTransactionDateScope(db.Model(&model.Treatment{}), summaryScope).
 		Select("therapists.full_name as therapist_name, COUNT(DISTINCT treatments.patient_code) as patient_count").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
-		Where("DATE(treatments.treatment_date) = ?", targetDate).
 		Group("therapists.id, therapists.full_name").
 		Order("therapists.full_name").
 		Scan(&therapistPatientCounts).Error; err != nil {

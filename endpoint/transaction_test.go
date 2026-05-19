@@ -307,3 +307,107 @@ func TestListTransactions_WithTreatmentDateAlias(t *testing.T) {
 	assert.Equal(t, targetDate, first["treatment_date"])
 	assert.Equal(t, float64(110000), first["amount"])
 }
+
+func TestListTransactions_WithDateRange(t *testing.T) {
+	r, db := setupEndpointTest(t)
+
+	patient := model.Patient{
+		FullName:    "Patient Range",
+		PatientCode: "TP005",
+		Email:       "transaction-patient-range@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Range",
+		NIK:      "NIK-TRX-005",
+		Email:    "transaction-therapist-range@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	dateOne := "2026-04-01"
+	dateTwo := "2026-04-02"
+	dateThree := "2026-04-04"
+
+	treatmentOne := model.Treatment{
+		TreatmentDate: dateOne,
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "First issue",
+		Treatment:     "Range therapy 1",
+		Remarks:       "First range day",
+		NextVisit:     "2026-04-08",
+	}
+	assert.NoError(t, db.Create(&treatmentOne).Error)
+
+	treatmentTwo := model.Treatment{
+		TreatmentDate: dateTwo,
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Second issue",
+		Treatment:     "Range therapy 2",
+		Remarks:       "Second range day",
+		NextVisit:     "2026-04-09",
+	}
+	assert.NoError(t, db.Create(&treatmentTwo).Error)
+
+	treatmentThree := model.Treatment{
+		TreatmentDate: dateThree,
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Outside issue",
+		Treatment:     "Outside therapy",
+		Remarks:       "Outside range",
+		NextVisit:     "2026-04-10",
+	}
+	assert.NoError(t, db.Create(&treatmentThree).Error)
+
+	assert.NoError(t, db.Create(&model.Transaction{
+		TreatmentID:   treatmentOne.ID,
+		TherapistID:   therapist.ID,
+		Amount:        100000,
+		PaymentMethod: "cash",
+		PaymentStatus: "paid",
+	}).Error)
+	assert.NoError(t, db.Create(&model.Transaction{
+		TreatmentID:   treatmentTwo.ID,
+		TherapistID:   therapist.ID,
+		Amount:        200000,
+		PaymentMethod: "cash",
+		PaymentStatus: "partial",
+	}).Error)
+	assert.NoError(t, db.Create(&model.Transaction{
+		TreatmentID:   treatmentThree.ID,
+		TherapistID:   therapist.ID,
+		Amount:        300000,
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}).Error)
+
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodGet,
+		registerPath: "/transaction",
+		requestPath:  "/transaction?start_date=2026-04-01&end_date=2026-04-02",
+		handler:      ListTransactions,
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	data := response["data"].(map[string]interface{})
+	transactions := data["transactions"].([]interface{})
+	assert.Len(t, transactions, 2)
+
+	first := transactions[0].(map[string]interface{})
+	second := transactions[1].(map[string]interface{})
+	assert.Equal(t, dateTwo, first["treatment_date"])
+	assert.Equal(t, dateOne, second["treatment_date"])
+
+	summary := data["summary"].(map[string]interface{})
+	assert.Equal(t, float64(300000), summary["total_amount"])
+
+	paymentStatusCounts := summary["payment_status_counts"].(map[string]interface{})
+	assert.Equal(t, float64(1), paymentStatusCounts["paid"])
+	assert.Equal(t, float64(1), paymentStatusCounts["partial"])
+	assert.Equal(t, float64(0), paymentStatusCounts["unpaid"])
+}
