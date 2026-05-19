@@ -179,6 +179,11 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 		auth.GET("/user/:id", middleware.RequireRoleOrOwner(model.RoleAdmin), endpoint.GetUserInfo)
 		auth.PATCH("/user/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateUserByID)
 
+		// Expose debug route only in non-production environments and admin-only.
+		if cfg.AppEnv != "production" {
+			auth.GET("/debug/dbinfo", middleware.RequireRole(model.RoleAdmin), endpoint.DebugDBInfo)
+		}
+
 		patient := auth.Group("/patient")
 		patient.Use(middleware.RequireRole(model.RoleAdmin))
 		{

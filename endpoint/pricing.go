@@ -17,8 +17,14 @@ type createPricingRequest struct {
 }
 
 type updatePricingRequest struct {
-	TherapistID *uint  `json:"therapist_id"`
-	Price       *int64 `json:"price"`
+	TherapistID *uint   `json:"therapist_id"`
+	Price       *int64  `json:"price"`
+	Description *string `json:"description"`
+}
+
+type pricingWithTherapist struct {
+	model.Pricing
+	TherapistName string `json:"therapist_name" gorm:"column:therapist_name"`
 }
 
 func getPricingIDParam(c *gin.Context) (string, bool) {
@@ -70,7 +76,7 @@ func ensurePricingTherapistRegistered(db *gorm.DB, pricing model.Pricing) error 
 // @Security     SessionToken
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
-// @Success      200 {object} util.APIResponse{data=[]model.Pricing} "Pricings retrieved"
+// @Success      200 {object} util.APIResponse{data=[]pricingWithTherapist} "Pricings retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /pricing [get]
@@ -83,14 +89,15 @@ func ListPricings(c *gin.Context) {
 		return
 	}
 
-	var pricings []model.Pricing
-	if err := db.Model(&model.Pricing{}).
+	pricings := make([]pricingWithTherapist, 0)
+	if err := db.Table("pricings").
+		Select("pricings.*, therapists.full_name as therapist_name").
 		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
 		Where("therapists.deleted_at IS NULL AND pricings.deleted_at IS NULL").
 		Order("pricings.id DESC").
 		Limit(limit).
 		Offset(offset).
-		Find(&pricings).Error; err != nil {
+		Scan(&pricings).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricings", Err: err})
 		return
 	}
@@ -107,7 +114,7 @@ func ListPricings(c *gin.Context) {
 // @Security     BearerAuth
 // @Security     SessionToken
 // @Param        id path string true "Pricing ID"
-// @Success      200 {object} util.APIResponse{data=model.Pricing} "Pricing retrieved"
+// @Success      200 {object} util.APIResponse{data=pricingWithTherapist} "Pricing retrieved"
 // @Failure      400 {object} util.APIResponse "Invalid ID or pricing not found"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
@@ -124,17 +131,32 @@ func GetPricingInfo(c *gin.Context) {
 	}
 
 	var pricing model.Pricing
-	if err := db.First(&pricing, id).Error; err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Pricing not found", Err: err})
+	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&pricing).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Pricing not found", Err: err})
+			return
+		}
+
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricing", Err: err})
 		return
 	}
 
-	if err := ensurePricingTherapistRegistered(db, pricing); err != nil {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
+	var pricingInfo pricingWithTherapist
+	if err := db.Table("pricings").
+		Select("pricings.*, therapists.full_name as therapist_name").
+		Joins("JOIN therapists ON therapists.id = pricings.therapist_id").
+		Where("pricings.id = ? AND therapists.deleted_at IS NULL AND pricings.deleted_at IS NULL", id).
+		First(&pricingInfo).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Therapist not found", Err: err})
+			return
+		}
+
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve pricing", Err: err})
 		return
 	}
 
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing retrieved", Data: pricing})
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing retrieved", Data: pricingInfo})
 }
 
 func resolveTherapistID(c *gin.Context, db *gorm.DB, req model.TreatementRequest) (uint, error) {
@@ -253,6 +275,10 @@ func UpdatePricing(c *gin.Context) {
 			return
 		}
 		updates["price"] = *req.Price
+	}
+
+	if req.Description != nil {
+		updates["description"] = *req.Description
 	}
 
 	if len(updates) == 0 {

@@ -3,10 +3,12 @@ package endpoint
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/ariebrainware/basis-data-ltt/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type updateTransactionRequest struct {
@@ -28,6 +30,92 @@ func getTransactionIDParam(c *gin.Context) (string, bool) {
 	return id, true
 }
 
+type transactionDateScope struct {
+	startDate string
+	endDate   string
+}
+
+func normalizeTransactionDate(raw string) (string, error) {
+	if raw == "" {
+		return "", fmt.Errorf("date is required")
+	}
+
+	if len(raw) >= 10 {
+		candidate := raw[:10]
+		if _, err := time.Parse("2006-01-02", candidate); err == nil {
+			return candidate, nil
+		}
+	}
+
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.Format("2006-01-02"), nil
+	}
+
+	if _, err := time.Parse("2006-01-02", raw); err != nil {
+		return "", err
+	}
+
+	return raw, nil
+}
+
+func getTransactionDateScope(c *gin.Context) (transactionDateScope, error) {
+	treatmentDate := c.Query("treatment_date")
+	startDate := c.Query("start_date")
+	endDate := c.Query("end_date")
+
+	hasTreatmentDate := treatmentDate != ""
+	hasRange := startDate != "" || endDate != ""
+
+	if hasTreatmentDate && hasRange {
+		return transactionDateScope{}, fmt.Errorf("use either treatment_date or start_date/end_date")
+	}
+
+	if hasRange {
+		if startDate == "" || endDate == "" {
+			return transactionDateScope{}, fmt.Errorf("both start_date and end_date are required")
+		}
+
+		normalizedStart, err := normalizeTransactionDate(startDate)
+		if err != nil {
+			return transactionDateScope{}, err
+		}
+
+		normalizedEnd, err := normalizeTransactionDate(endDate)
+		if err != nil {
+			return transactionDateScope{}, err
+		}
+
+		if normalizedStart > normalizedEnd {
+			return transactionDateScope{}, fmt.Errorf("start_date must be before or equal to end_date")
+		}
+
+		return transactionDateScope{startDate: normalizedStart, endDate: normalizedEnd}, nil
+	}
+
+	if hasTreatmentDate {
+		normalizedDate, err := normalizeTransactionDate(treatmentDate)
+		if err != nil {
+			return transactionDateScope{}, err
+		}
+
+		return transactionDateScope{startDate: normalizedDate, endDate: normalizedDate}, nil
+	}
+
+	return transactionDateScope{}, nil
+}
+
+func applyTransactionDateScope(query *gorm.DB, scope transactionDateScope) *gorm.DB {
+	if scope.startDate == "" {
+		return query
+	}
+
+	if scope.startDate == scope.endDate {
+		return query.Where("DATE(treatments.treatment_date) = ?", scope.startDate)
+	}
+
+	return query.Where("DATE(treatments.treatment_date) BETWEEN ? AND ?", scope.startDate, scope.endDate)
+}
+
 // ListTransactions godoc
 // @Summary      List all transactions
 // @Description  Get a paginated list of transaction records
@@ -38,21 +126,37 @@ func getTransactionIDParam(c *gin.Context) (string, bool) {
 // @Security     SessionToken
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
-// @Success      200 {object} util.APIResponse{data=[]model.Transaction} "Transactions retrieved"
+// @Param        treatment_date query string false "Filter by treatment date (YYYY-MM-DD). Also accepts RFC3339 datetime."
+// @Param        start_date query string false "Start date for a date range filter (YYYY-MM-DD)."
+// @Param        end_date query string false "End date for a date range filter (YYYY-MM-DD)."
+// @Success      200 {object} util.APIResponse{data=model.ListTransactionsResponseData} "Transactions retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /transaction [get]
 func ListTransactions(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	dateScope, err := getTransactionDateScope(c)
+	if err != nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid date filter. Use treatment_date or start_date/end_date with YYYY-MM-DD or RFC3339 values", Err: err})
+		return
+	}
 
 	db, ok := getDBOrAbort(c)
 	if !ok {
 		return
 	}
 
-	var transactions []model.Transaction
-	if err := db.Order("id DESC").
+	var transactions []model.ListTransactionResponse
+	txQuery := db.Model(&model.Transaction{}).
+		Select("transactions.*, patients.full_name as patient_name, treatments.treatment_date").
+		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code")
+
+	txQuery = applyTransactionDateScope(txQuery, dateScope)
+
+	if err := txQuery.
+		Order("transactions.id DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&transactions).Error; err != nil {
@@ -60,7 +164,70 @@ func ListTransactions(c *gin.Context) {
 		return
 	}
 
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Transactions retrieved", Data: transactions})
+	// Calculate summary for the same filter scope as transaction list.
+	summaryScope := dateScope
+
+	// Total amount for the target date
+	var totalAmount int64
+	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
+		Select("COALESCE(SUM(transactions.amount), 0) as total").
+		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
+		Row().Scan(&totalAmount); err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate total amount", Err: err})
+		return
+	}
+
+	// Payment status counts
+	type PaymentCount struct {
+		Status string
+		Count  int64
+	}
+	var paymentCounts []PaymentCount
+	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
+		Select("payment_status as status, COUNT(*) as count").
+		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
+		Group("payment_status").
+		Scan(&paymentCounts).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate payment status counts", Err: err})
+		return
+	}
+
+	statusSummary := model.PaymentStatusSummary{}
+	for _, pc := range paymentCounts {
+		switch pc.Status {
+		case "paid":
+			statusSummary.Paid = pc.Count
+		case "partial":
+			statusSummary.Partial = pc.Count
+		case "unpaid":
+			statusSummary.Unpaid = pc.Count
+		}
+	}
+
+	// Therapist patient counts
+	var therapistPatientCounts []model.TherapistPatientCount
+	if err := applyTransactionDateScope(db.Model(&model.Treatment{}), summaryScope).
+		Select("therapists.full_name as therapist_name, COUNT(DISTINCT treatments.patient_code) as patient_count").
+		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
+		Group("therapists.id, therapists.full_name").
+		Order("therapists.full_name").
+		Scan(&therapistPatientCounts).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate therapist patient counts", Err: err})
+		return
+	}
+
+	summary := model.TransactionSummary{
+		TotalAmount:            totalAmount,
+		PaymentStatusCounts:    statusSummary,
+		TherapistPatientCounts: therapistPatientCounts,
+	}
+
+	responseData := model.ListTransactionsResponseData{
+		Transactions: transactions,
+		Summary:      summary,
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Transactions retrieved", Data: responseData})
 }
 
 // GetTransactionInfo godoc

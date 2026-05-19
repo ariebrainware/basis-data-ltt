@@ -27,10 +27,28 @@ type Config struct {
 	DBName          string `json:"dbname"`
 	DBUSER          string `json:"dbuser"`
 	DBPass          string `json:"dbpass"`
+	DBTimeout       string `json:"dbtimeout"`
+	DBReadTimeout   string `json:"dbreadtimeout"`
+	DBWriteTimeout  string `json:"dbwritetimeout"`
 }
 
 var config *Config
 var once sync.Once
+
+func buildMySQLDSN(cfg *Config, password string) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local&timeout=%s&readTimeout=%s&writeTimeout=%s", cfg.DBUSER, password, cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBTimeout, cfg.DBReadTimeout, cfg.DBWriteTimeout)
+}
+
+// MySQLDSN returns the resolved MySQL DSN. When redactPassword is true,
+// the password portion is replaced with a placeholder for safe logging.
+func MySQLDSN(redactPassword bool) string {
+	cfg := LoadConfig()
+	password := cfg.DBPass
+	if redactPassword {
+		password = "***"
+	}
+	return buildMySQLDSN(cfg, password)
+}
 
 // ResetConfigForTesting resets the package-level config singleton and
 // initialization guard. Tests may call this to ensure a fresh config
@@ -66,6 +84,11 @@ func LoadConfig() *Config {
 		if envFile != "" {
 			if err := godotenv.Load(envFile); err != nil {
 				log.Printf("Error loading %s file: %v", envFile, err)
+				if appEnv == "development" && envFile == ".env.dev2" {
+					if fallbackErr := godotenv.Load(".env"); fallbackErr != nil {
+						log.Printf("Error loading fallback .env file: %v", fallbackErr)
+					}
+				}
 			}
 		}
 
@@ -80,6 +103,20 @@ func LoadConfig() *Config {
 			shutdownTimeout = 5 // Default to 5 seconds if not specified or invalid
 		}
 
+		// Set default database timeout values if not specified
+		dbTimeout := os.Getenv("DBTIMEOUT")
+		if dbTimeout == "" {
+			dbTimeout = "10s"
+		}
+		dbReadTimeout := os.Getenv("DBREADTIMEOUT")
+		if dbReadTimeout == "" {
+			dbReadTimeout = "30s"
+		}
+		dbWriteTimeout := os.Getenv("DBWRITETIMEOUT")
+		if dbWriteTimeout == "" {
+			dbWriteTimeout = "30s"
+		}
+
 		// Initialize the Config struct with values from environment variables.
 		config = &Config{
 			AppName:         os.Getenv("APPNAME"),
@@ -92,6 +129,9 @@ func LoadConfig() *Config {
 			DBName:          os.Getenv("DBNAME"),
 			DBUSER:          os.Getenv("DBUSER"),
 			DBPass:          os.Getenv("DBPASS"),
+			DBTimeout:       dbTimeout,
+			DBReadTimeout:   dbReadTimeout,
+			DBWriteTimeout:  dbWriteTimeout,
 		}
 	})
 	return config
@@ -134,7 +174,7 @@ func ConnectMySQL() (*gorm.DB, error) {
 		return db, nil
 	}
 	// Build the Data Source Name (DSN) using the configuration values.
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=Local", cfg.DBUSER, cfg.DBPass, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	dsn := buildMySQLDSN(cfg, cfg.DBPass)
 	gormConfig := &gorm.Config{}
 	if cfg.AppEnv == "production" {
 		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
@@ -150,6 +190,11 @@ func ConnectMySQL() (*gorm.DB, error) {
 			),
 		}
 	}
+	// Log non-sensitive connection info for debugging in non-production.
+	if cfg.AppEnv != "production" {
+		log.Printf("Connecting to MySQL host=%s port=%d db=%s user=%s", cfg.DBHost, cfg.DBPort, cfg.DBName, cfg.DBUSER)
+	}
+
 	// Open a database connection.
 	db, err := gorm.Open(mysql.Open(dsn), gormConfig)
 	if err != nil {
