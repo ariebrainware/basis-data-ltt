@@ -192,7 +192,7 @@ func ConnectMySQL() (*gorm.DB, error) {
 	}
 	// Log connection info (without password) for debugging in non-production.
 	if cfg.AppEnv != "production" {
-		log.Printf("Connecting to MySQL DSN: %s", buildMySQLDSN(cfg, "***"))
+		log.Printf("Connecting to MySQL DSN: %s", MySQLDSN(true))
 	}
 
 	// Open a database connection.
