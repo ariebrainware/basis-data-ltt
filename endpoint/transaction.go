@@ -18,6 +18,17 @@ type updateTransactionRequest struct {
 	PaymentStatus *string `json:"payment_status"`
 }
 
+func isValidTransactionPaymentStatus(status string) bool {
+	validStatuses := map[string]bool{
+		"unpaid":   true,
+		"partial":  true,
+		"cash":     true,
+		"transfer": true,
+	}
+
+	return validStatuses[status]
+}
+
 func getTransactionIDParam(c *gin.Context) (string, bool) {
 	id := c.Param("id")
 	if id == "" {
@@ -321,14 +332,8 @@ func UpdateTransaction(c *gin.Context) {
 	}
 
 	if req.PaymentStatus != nil {
-		// Validate payment status
-		validStatuses := map[string]bool{
-			"unpaid":  true,
-			"paid":    true,
-			"partial": true,
-		}
-		if !validStatuses[*req.PaymentStatus] {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: payment_status must be 'unpaid', 'paid', or 'partial'", Err: fmt.Errorf("invalid payment_status")})
+		if !isValidTransactionPaymentStatus(*req.PaymentStatus) {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: payment_status must be 'cash', 'transfer', 'partial', or 'unpaid'", Err: fmt.Errorf("invalid payment_status")})
 			return
 		}
 		updates["payment_status"] = *req.PaymentStatus

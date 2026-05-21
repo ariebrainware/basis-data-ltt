@@ -2,12 +2,68 @@ package endpoint
 
 import (
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
+	r, db := setupEndpointTest(t)
+
+	patient := model.Patient{
+		FullName:    "Patient Update",
+		PatientCode: "TP007",
+		Email:       "transaction-patient-update@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Update",
+		NIK:      "NIK-TRX-007",
+		Email:    "transaction-therapist-update@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	treatment := model.Treatment{
+		TreatmentDate: "2026-04-16",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Update issue",
+		Treatment:     "Update therapy",
+		Remarks:       "Update session",
+		NextVisit:     "2026-04-23",
+	}
+	assert.NoError(t, db.Create(&treatment).Error)
+
+	transaction := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   therapist.ID,
+		Amount:        180000,
+		Remarks:       "Initial status",
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}
+	assert.NoError(t, db.Create(&transaction).Error)
+
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		handler:      UpdateTransaction,
+		body: map[string]interface{}{
+			"payment_status": "transfer",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	updated := response["data"].(map[string]interface{})
+	assert.Equal(t, "transfer", updated["payment_status"])
+}
 
 func TestListTransactions_ReturnsPatientName(t *testing.T) {
 	r, db := setupEndpointTest(t)

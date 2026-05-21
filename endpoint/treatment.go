@@ -365,13 +365,8 @@ func createTreatmentAndTransaction(c *gin.Context, db *gorm.DB, req model.Treate
 			paymentStatus = "unpaid"
 		}
 
-		validStatuses := map[string]bool{
-			"unpaid":  true,
-			"paid":    true,
-			"partial": true,
-		}
-		if !validStatuses[paymentStatus] {
-			return &treatmentUserError{msg: "payment_status must be 'unpaid', 'paid', or 'partial'"}
+		if !isValidTransactionPaymentStatus(paymentStatus) {
+			return &treatmentUserError{msg: "payment_status must be 'cash', 'transfer', 'partial', or 'unpaid'"}
 		}
 
 		transaction := model.Transaction{
