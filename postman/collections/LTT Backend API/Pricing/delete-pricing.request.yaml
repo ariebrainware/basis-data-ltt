@@ -1,0 +1,8 @@
+$kind: http-request
+name: Delete Pricing
+method: DELETE
+url: '{{baseUrl}}/pricing/{{pricingId}}'
+order: 5000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

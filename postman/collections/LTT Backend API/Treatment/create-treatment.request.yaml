@@ -1,0 +1,27 @@
+$kind: http-request
+name: Create Treatment
+method: POST
+url: '{{baseUrl}}/treatment'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "treatment_date": "2024-01-15",
+      "patient_code": "J001",
+      "therapist_id": 1,
+      "issues": "Back pain",
+      "treatment": ["Massage", "Stretching"],
+      "remarks": "Patient responded well",
+      "next_visit": "2024-01-22",
+      "transaction": {
+        "payment_status": "unpaid",
+        "payment_method": "cash",
+        "remarks": ""
+      }
+    }

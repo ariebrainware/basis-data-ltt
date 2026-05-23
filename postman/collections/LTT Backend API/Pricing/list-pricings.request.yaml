@@ -1,0 +1,15 @@
+$kind: http-request
+name: List Pricings
+method: GET
+url: '{{baseUrl}}/pricing'
+order: 1000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
+queryParams:
+  - key: limit
+    value: '100'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true

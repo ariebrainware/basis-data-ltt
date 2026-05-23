@@ -1,0 +1,18 @@
+$kind: http-request
+name: 'List Users (Admin)'
+method: GET
+url: '{{baseUrl}}/user'
+order: 7000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
+queryParams:
+  - key: limit
+    value: '10'
+    disabled: true
+  - key: cursor
+    value: '0'
+    disabled: true
+  - key: keyword
+    value: ''
+    disabled: true

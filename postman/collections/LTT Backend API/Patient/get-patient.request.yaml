@@ -1,0 +1,8 @@
+$kind: http-request
+name: 'Get Patient Info (Admin)'
+method: GET
+url: '{{baseUrl}}/patient/{{patientId}}'
+order: 3000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

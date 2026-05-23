@@ -1,0 +1,8 @@
+$kind: http-request
+name: 'Delete Therapist (Admin)'
+method: DELETE
+url: '{{baseUrl}}/therapist/{{therapistId}}'
+order: 6000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

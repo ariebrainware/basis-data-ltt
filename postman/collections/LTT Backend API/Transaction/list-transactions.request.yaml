@@ -1,0 +1,24 @@
+$kind: http-request
+name: List Transactions
+method: GET
+url: '{{baseUrl}}/transaction'
+order: 1000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
+queryParams:
+  - key: limit
+    value: '100'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true
+  - key: treatment_date
+    value: '2024-01-15'
+    disabled: true
+  - key: start_date
+    value: '2024-01-01'
+    disabled: true
+  - key: end_date
+    value: '2024-01-31'
+    disabled: true

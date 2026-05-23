@@ -1,0 +1,8 @@
+$kind: http-request
+name: Validate Token
+method: GET
+url: '{{baseUrl}}/token/validate'
+order: 4000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

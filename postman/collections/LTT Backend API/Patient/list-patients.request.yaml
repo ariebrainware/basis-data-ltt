@@ -1,0 +1,27 @@
+$kind: http-request
+name: 'List Patients (Admin)'
+method: GET
+url: '{{baseUrl}}/patient'
+order: 2000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
+queryParams:
+  - key: limit
+    value: '10'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true
+  - key: keyword
+    value: ''
+    disabled: true
+  - key: group_by_date
+    value: last_2_days
+    disabled: true
+  - key: sort
+    value: full_name
+    disabled: true
+  - key: sort_dir
+    value: asc
+    disabled: true

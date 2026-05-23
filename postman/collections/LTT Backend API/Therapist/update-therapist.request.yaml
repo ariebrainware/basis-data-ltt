@@ -1,0 +1,20 @@
+$kind: http-request
+name: 'Update Therapist (Admin)'
+method: PATCH
+url: '{{baseUrl}}/therapist/{{therapistId}}'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "full_name": "Dr. Jane Smith",
+      "phone_number": "081234567891",
+      "address": "456 Oak Ave",
+      "weight": 65,
+      "height": 170
+    }

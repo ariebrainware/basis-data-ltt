@@ -1,0 +1,26 @@
+$kind: http-request
+name: 'Create Therapist (Admin)'
+method: POST
+url: '{{baseUrl}}/therapist'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "full_name": "Dr. John Smith",
+      "email": "dr.john@example.com",
+      "password": "password123",
+      "phone_number": "081234567890",
+      "address": "123 Main St",
+      "date_of_birth": "1980-01-01",
+      "nik": "1234567890123456",
+      "weight": 70,
+      "height": 175,
+      "role": "Physical Therapist",
+      "is_approved": false
+    }

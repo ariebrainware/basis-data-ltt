@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Therapist Info
+method: GET
+url: '{{baseUrl}}/therapist/{{therapistId}}'
+order: 2000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
