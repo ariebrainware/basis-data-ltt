@@ -1,0 +1,31 @@
+$kind: collection
+name: LTT Backend API
+description: 'REST API for managing patient data, treatments, and therapy sessions. v1.7.2'
+auth:
+  type: apikey
+  credentials:
+    - key: key
+      value: 'session-token'
+    - key: value
+      value: '{{sessionToken}}'
+    - key: in
+      value: header
+variables:
+  - key: baseUrl
+    value: 'http://localhost:19091'
+  - key: sessionToken
+    value: ''
+  - key: userId
+    value: '1'
+  - key: patientId
+    value: '1'
+  - key: therapistId
+    value: '1'
+  - key: diseaseId
+    value: '1'
+  - key: treatmentId
+    value: '1'
+  - key: pricingId
+    value: '1'
+  - key: transactionId
+    value: '1'

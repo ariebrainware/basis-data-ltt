@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Pricing Info
+method: GET
+url: '{{baseUrl}}/pricing/{{pricingId}}'
+order: 3000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

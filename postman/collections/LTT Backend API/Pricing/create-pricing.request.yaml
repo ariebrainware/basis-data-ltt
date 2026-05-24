@@ -1,0 +1,17 @@
+$kind: http-request
+name: Create Pricing
+method: POST
+url: '{{baseUrl}}/pricing'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "therapist_id": 1,
+      "price": 150000
+    }

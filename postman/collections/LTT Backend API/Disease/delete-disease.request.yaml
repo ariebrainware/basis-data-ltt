@@ -1,0 +1,8 @@
+$kind: http-request
+name: Delete Disease
+method: DELETE
+url: '{{baseUrl}}/disease/{{diseaseId}}'
+order: 5000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

@@ -1,0 +1,8 @@
+$kind: http-request
+name: 'Delete User (Admin)'
+method: DELETE
+url: '{{baseUrl}}/user/{{userId}}'
+order: 10000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

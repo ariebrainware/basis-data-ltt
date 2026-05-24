@@ -1,0 +1,26 @@
+$kind: http-request
+name: Create Patient
+method: POST
+url: '{{baseUrl}}/patient'
+order: 1000
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "full_name": "John Doe",
+      "gender": "Male",
+      "age": 30,
+      "job": "Engineer",
+      "address": "123 Main St",
+      "phone_number": ["081234567890"],
+      "health_history": ["Diabetes"],
+      "surgery_history": "Appendectomy 2020",
+      "patient_code": "",
+      "email": "john@example.com",
+      "password": "password123"
+    }

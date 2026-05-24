@@ -1,0 +1,18 @@
+$kind: http-request
+name: 'Update User by ID (Admin)'
+method: PATCH
+url: '{{baseUrl}}/user/{{userId}}'
+order: 9000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "name": "Updated Name",
+      "email": "updated@example.com",
+      "password": "newpassword123"
+    }

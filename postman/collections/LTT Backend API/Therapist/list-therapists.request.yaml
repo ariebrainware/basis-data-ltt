@@ -1,0 +1,21 @@
+$kind: http-request
+name: List Therapists
+method: GET
+url: '{{baseUrl}}/therapist'
+order: 1000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
+queryParams:
+  - key: limit
+    value: '10'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true
+  - key: keyword
+    value: ''
+    disabled: true
+  - key: group_by_date
+    value: last_2_days
+    disabled: true

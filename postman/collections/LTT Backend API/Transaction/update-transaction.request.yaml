@@ -1,0 +1,19 @@
+$kind: http-request
+name: Update Transaction
+method: PATCH
+url: '{{baseUrl}}/transaction/{{transactionId}}'
+order: 3000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "amount": 150000,
+      "remarks": "Paid in full",
+      "payment_method": "cash",
+      "payment_status": "cash"
+    }
