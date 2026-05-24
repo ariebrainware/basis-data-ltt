@@ -2,15 +2,17 @@ $kind: collection
 name: LTT Backend API
 description: 'REST API for managing patient data, treatments, and therapy sessions. v1.7.2'
 auth:
-  type: bearer
+  type: apikey
   credentials:
-    - key: token
-      value: '{{bearerToken}}'
+    - key: key
+      value: 'session-token'
+    - key: value
+      value: '{{sessionToken}}'
+    - key: in
+      value: header
 variables:
   - key: baseUrl
     value: 'http://localhost:19091'
-  - key: bearerToken
-    value: ''
   - key: sessionToken
     value: ''
   - key: userId
