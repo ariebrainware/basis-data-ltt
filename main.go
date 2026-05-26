@@ -121,7 +121,7 @@ func migrateAndSeed(db *gorm.DB) error {
 		}
 	}
 
-	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}); err != nil {
+	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}, &model.Item{}); err != nil {
 		return err
 	}
 
@@ -220,6 +220,16 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 			pricing.GET("/:id", endpoint.GetPricingInfo)
 			pricing.PATCH("/:id", endpoint.UpdatePricing)
 			pricing.DELETE("/:id", endpoint.DeletePricing)
+		}
+
+		item := auth.Group("/item")
+		item.Use(middleware.RequireRole(model.RoleAdmin))
+		{
+			item.GET("", endpoint.ListItems)
+			item.POST("", endpoint.CreateItem)
+			item.GET("/:id", endpoint.GetItemInfo)
+			item.PATCH("/:id", endpoint.UpdateItem)
+			item.DELETE("/:id", endpoint.DeleteItem)
 		}
 
 		transaction := auth.Group("/transaction")
