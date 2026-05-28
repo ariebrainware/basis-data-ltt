@@ -46,6 +46,83 @@ func validateCreateItemInput(c *gin.Context, req createItemRequest) bool {
 	return true
 }
 
+func loadItemOrAbort(c *gin.Context, db *gorm.DB, id string) (model.Item, bool) {
+	var item model.Item
+	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&item).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Item not found", Err: err})
+			return model.Item{}, false
+		}
+
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve item", Err: err})
+		return model.Item{}, false
+	}
+
+	return item, true
+}
+
+func buildItemUpdates(c *gin.Context, req updateItemRequest) (map[string]interface{}, bool) {
+	updates := make(map[string]interface{})
+
+	if !addItemNameUpdate(c, updates, req.Name) {
+		return nil, false
+	}
+
+	if !addItemQuantityUpdate(c, updates, req.Quantity) {
+		return nil, false
+	}
+
+	if !addItemPriceUpdate(c, updates, req.Price) {
+		return nil, false
+	}
+
+	if len(updates) == 0 {
+		util.CallUserError(c, util.APIErrorParams{Msg: "No fields to update", Err: fmt.Errorf("empty update payload")})
+		return nil, false
+	}
+
+	return updates, true
+}
+
+func addItemNameUpdate(c *gin.Context, updates map[string]interface{}, name *string) bool {
+	if name == nil {
+		return true
+	}
+	if *name == "" {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: name must not be empty", Err: fmt.Errorf("invalid name")})
+		return false
+	}
+
+	updates["name"] = *name
+	return true
+}
+
+func addItemQuantityUpdate(c *gin.Context, updates map[string]interface{}, quantity *int) bool {
+	if quantity == nil {
+		return true
+	}
+	if *quantity < 0 {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: quantity must be >= 0", Err: fmt.Errorf("invalid quantity")})
+		return false
+	}
+
+	updates["quantity"] = *quantity
+	return true
+}
+
+func addItemPriceUpdate(c *gin.Context, updates map[string]interface{}, price *int64) bool {
+	if price == nil {
+		return true
+	}
+	if *price < 0 {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: price must be >= 0", Err: fmt.Errorf("invalid price")})
+		return false
+	}
+
+	updates["price"] = *price
+	return true
+}
+
 // ListItems godoc
 // @Summary      List all items
 // @Description  Get a paginated list of items
@@ -103,14 +180,8 @@ func GetItemInfo(c *gin.Context) {
 		return
 	}
 
-	var item model.Item
-	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&item).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Item not found", Err: err})
-			return
-		}
-
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve item", Err: err})
+	item, ok := loadItemOrAbort(c, db, id)
+	if !ok {
 		return
 	}
 
@@ -188,42 +259,13 @@ func UpdateItem(c *gin.Context) {
 		return
 	}
 
-	var item model.Item
-	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&item).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Item not found", Err: err})
-			return
-		}
-
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve item", Err: err})
+	item, ok := loadItemOrAbort(c, db, id)
+	if !ok {
 		return
 	}
 
-	updates := map[string]interface{}{}
-	if req.Name != nil {
-		if *req.Name == "" {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: name must not be empty", Err: fmt.Errorf("invalid name")})
-			return
-		}
-		updates["name"] = *req.Name
-	}
-	if req.Quantity != nil {
-		if *req.Quantity < 0 {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: quantity must be >= 0", Err: fmt.Errorf("invalid quantity")})
-			return
-		}
-		updates["quantity"] = *req.Quantity
-	}
-	if req.Price != nil {
-		if *req.Price < 0 {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: price must be >= 0", Err: fmt.Errorf("invalid price")})
-			return
-		}
-		updates["price"] = *req.Price
-	}
-
-	if len(updates) == 0 {
-		util.CallUserError(c, util.APIErrorParams{Msg: "No fields to update", Err: fmt.Errorf("empty update payload")})
+	updates, ok := buildItemUpdates(c, req)
+	if !ok {
 		return
 	}
 
@@ -265,14 +307,8 @@ func DeleteItem(c *gin.Context) {
 		return
 	}
 
-	var item model.Item
-	if err := db.Where("id = ? AND deleted_at IS NULL", id).First(&item).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Item not found", Err: err})
-			return
-		}
-
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve item", Err: err})
+	item, ok := loadItemOrAbort(c, db, id)
+	if !ok {
 		return
 	}
 
