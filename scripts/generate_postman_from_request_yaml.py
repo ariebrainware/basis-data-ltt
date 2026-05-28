@@ -9,44 +9,48 @@ COL_DIR = ROOT / 'postman' / 'collections' / 'LTT Backend API'
 OUT = ROOT / 'postman' / 'collections' / 'LTT_Backend_API.postman_collection.json'
 
 
-def parse_request_file(p: Path):
-    data = yaml.safe_load(p.read_text())
-    name = data.get('name') or p.stem
-    method = data.get('method', 'GET').upper()
-    url = data.get('url', '')
-    headers = data.get('headers') or []
-    query = data.get('queryParams') or []
-    body = data.get('body')
-    order = data.get('order', 0)
-
-    # build request entry
-    req = {
-        'name': name,
-        'request': {
-            'method': method,
-            'header': [{'key': h.get('key'), 'value': h.get('value')} for h in headers],
-            'url': {
-                'raw': url,
-                'host': ['{{baseUrl}}'],
-                'path': [seg for seg in url.replace('{{baseUrl}}', '').split('/') if seg != '']
-            },
-            'description': data.get('description', '')
-        },
-        'order': order
+def build_request_url(url: str):
+    return {
+        'raw': url,
+        'host': ['{{baseUrl}}'],
+        'path': [seg for seg in url.replace('{{baseUrl}}', '').split('/') if seg != '']
     }
 
+
+def build_headers(headers):
+    return [{'key': h.get('key'), 'value': h.get('value')} for h in headers]
+
+
+def build_query_params(query):
+    return [{'key': q.get('key'), 'value': q.get('value'), 'disabled': q.get('disabled', False)} for q in query]
+
+
+def build_body(body):
+    return {'mode': 'raw', 'raw': body.get('content')}
+
+
+def parse_request_file(p: Path):
+    data = yaml.safe_load(p.read_text())
+    url = data.get('url', '')
+    req = {
+        'name': data.get('name') or p.stem,
+        'request': {
+            'method': data.get('method', 'GET').upper(),
+            'header': build_headers(data.get('headers') or []),
+            'url': build_request_url(url),
+            'description': data.get('description', '')
+        },
+        'order': data.get('order', 0)
+    }
+
+    query = data.get('queryParams') or []
     if query:
         # attach query params into url.raw as well (Postman supports params separately)
-        qlist = []
-        for q in query:
-            qlist.append({'key': q.get('key'), 'value': q.get('value'), 'disabled': q.get('disabled', False)})
-        req['request']['url']['query'] = qlist
+        req['request']['url']['query'] = build_query_params(query)
 
+    body = data.get('body')
     if body:
-        if body.get('type') == 'json':
-            req['request']['body'] = {'mode': 'raw', 'raw': body.get('content')}
-        else:
-            req['request']['body'] = {'mode': 'raw', 'raw': body.get('content')}
+        req['request']['body'] = build_body(body)
 
     return req
 
