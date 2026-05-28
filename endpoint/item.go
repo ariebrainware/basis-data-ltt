@@ -61,13 +61,16 @@ func validateCreateItemInput(c *gin.Context, req createItemRequest) bool {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /item [get]
 func ListItems(c *gin.Context) {
+	limit := parsePositiveInt(c.Query("limit"), 100, 100)
+	offset := parsePositiveInt(c.Query("offset"), 0, 0)
+
 	db, ok := getDBOrAbort(c)
 	if !ok {
 		return
 	}
 
 	var items []model.Item
-	if err := db.Where("deleted_at IS NULL").Order("id DESC").Find(&items).Error; err != nil {
+	if err := db.Where("deleted_at IS NULL").Order("id DESC").Limit(limit).Offset(offset).Find(&items).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve items", Err: err})
 		return
 	}
