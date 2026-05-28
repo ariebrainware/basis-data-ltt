@@ -64,15 +64,36 @@ func loadItemOrAbort(c *gin.Context, db *gorm.DB, id string) (model.Item, bool) 
 func buildItemUpdates(c *gin.Context, req updateItemRequest) (map[string]interface{}, bool) {
 	updates := make(map[string]interface{})
 
-	if !addItemNameUpdate(c, updates, req.Name) {
+	if !addItemUpdate(c, updates, itemUpdateRule[string]{
+		key:        "name",
+		msg:        "Invalid request body: name must not be empty",
+		invalidErr: fmt.Errorf("invalid name"),
+		valid: func(name string) bool {
+			return name != ""
+		},
+	}, req.Name) {
 		return nil, false
 	}
 
-	if !addItemQuantityUpdate(c, updates, req.Quantity) {
+	if !addItemUpdate(c, updates, itemUpdateRule[int]{
+		key:        "quantity",
+		msg:        "Invalid request body: quantity must be >= 0",
+		invalidErr: fmt.Errorf("invalid quantity"),
+		valid: func(quantity int) bool {
+			return quantity >= 0
+		},
+	}, req.Quantity) {
 		return nil, false
 	}
 
-	if !addItemPriceUpdate(c, updates, req.Price) {
+	if !addItemUpdate(c, updates, itemUpdateRule[int64]{
+		key:        "price",
+		msg:        "Invalid request body: price must be >= 0",
+		invalidErr: fmt.Errorf("invalid price"),
+		valid: func(price int64) bool {
+			return price >= 0
+		},
+	}, req.Price) {
 		return nil, false
 	}
 
@@ -84,42 +105,24 @@ func buildItemUpdates(c *gin.Context, req updateItemRequest) (map[string]interfa
 	return updates, true
 }
 
-func addItemNameUpdate(c *gin.Context, updates map[string]interface{}, name *string) bool {
-	if name == nil {
-		return true
-	}
-	if *name == "" {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: name must not be empty", Err: fmt.Errorf("invalid name")})
-		return false
-	}
-
-	updates["name"] = *name
-	return true
+type itemUpdateRule[T any] struct {
+	key        string
+	msg        string
+	invalidErr error
+	valid      func(T) bool
 }
 
-func addItemQuantityUpdate(c *gin.Context, updates map[string]interface{}, quantity *int) bool {
-	if quantity == nil {
+func addItemUpdate[T any](c *gin.Context, updates map[string]interface{}, rule itemUpdateRule[T], value *T) bool {
+	if value == nil {
 		return true
 	}
-	if *quantity < 0 {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: quantity must be >= 0", Err: fmt.Errorf("invalid quantity")})
+
+	if rule.valid != nil && !rule.valid(*value) {
+		util.CallUserError(c, util.APIErrorParams{Msg: rule.msg, Err: rule.invalidErr})
 		return false
 	}
 
-	updates["quantity"] = *quantity
-	return true
-}
-
-func addItemPriceUpdate(c *gin.Context, updates map[string]interface{}, price *int64) bool {
-	if price == nil {
-		return true
-	}
-	if *price < 0 {
-		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: price must be >= 0", Err: fmt.Errorf("invalid price")})
-		return false
-	}
-
-	updates["price"] = *price
+	updates[rule.key] = *value
 	return true
 }
 
