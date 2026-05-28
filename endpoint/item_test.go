@@ -25,69 +25,104 @@ func setupItemTestRouter(t *testing.T) *gin.Engine {
 func TestItemCRUDFlow(t *testing.T) {
 	r := setupItemTestRouter(t)
 
-	createRecorder := httptest.NewRecorder()
-	createReq := httptest.NewRequest(http.MethodPost, "/item", bytes.NewReader([]byte(`{"name":"Bandage","quantity":10,"price":25000}`)))
-	createReq.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(createRecorder, createReq)
-	if createRecorder.Code != http.StatusOK {
-		t.Fatalf("create item status = %d, want %d, body=%s", createRecorder.Code, http.StatusOK, createRecorder.Body.String())
+	itemID := createTestItem(t, r)
+	assertItemListSuccess(t, r)
+	assertItemFetchSuccess(t, r, itemID)
+	assertItemUpdateSuccess(t, r, itemID)
+	assertItemDeleteSuccess(t, r, itemID)
+	assertDeletedItemReturnsBadRequest(t, r, itemID)
+}
+
+func createTestItem(t *testing.T, r *gin.Engine) string {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/item", bytes.NewReader([]byte(`{"name":"Bandage","quantity":10,"price":25000}`)))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("create item status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
 
-	var createResp map[string]interface{}
-	if err := json.Unmarshal(createRecorder.Body.Bytes(), &createResp); err != nil {
+	var response map[string]interface{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("unmarshal create response: %v", err)
 	}
-	data, ok := createResp["data"].(map[string]interface{})
+
+	data, ok := response["data"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("create response data missing or invalid: %#v", createResp["data"])
-	}
-	itemID := fmt.Sprintf("%.0f", data["ID"].(float64))
-
-	listRecorder := httptest.NewRecorder()
-	r.ServeHTTP(listRecorder, httptest.NewRequest(http.MethodGet, "/item", nil))
-	if listRecorder.Code != http.StatusOK {
-		t.Fatalf("list items status = %d, want %d, body=%s", listRecorder.Code, http.StatusOK, listRecorder.Body.String())
+		t.Fatalf("create response data missing or invalid: %#v", response["data"])
 	}
 
-	getRecorder := httptest.NewRecorder()
-	r.ServeHTTP(getRecorder, httptest.NewRequest(http.MethodGet, "/item/"+itemID, nil))
-	if getRecorder.Code != http.StatusOK {
-		t.Fatalf("get item status = %d, want %d, body=%s", getRecorder.Code, http.StatusOK, getRecorder.Body.String())
+	return fmt.Sprintf("%.0f", data["ID"].(float64))
+}
+
+func assertItemListSuccess(t *testing.T, r *gin.Engine) {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/item", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("list items status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+}
+
+func assertItemFetchSuccess(t *testing.T, r *gin.Engine, itemID string) {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/item/"+itemID, nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("get item status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+}
+
+func assertItemUpdateSuccess(t *testing.T, r *gin.Engine, itemID string) {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPatch, "/item/"+itemID, bytes.NewReader([]byte(`{"quantity":20}`)))
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("update item status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
 
-	updateRecorder := httptest.NewRecorder()
-	updateReq := httptest.NewRequest(http.MethodPatch, "/item/"+itemID, bytes.NewReader([]byte(`{"quantity":20}`)))
-	updateReq.Header.Set("Content-Type", "application/json")
-	r.ServeHTTP(updateRecorder, updateReq)
-	if updateRecorder.Code != http.StatusOK {
-		t.Fatalf("update item status = %d, want %d, body=%s", updateRecorder.Code, http.StatusOK, updateRecorder.Body.String())
-	}
-	var updateResp map[string]interface{}
-	if err := json.Unmarshal(updateRecorder.Body.Bytes(), &updateResp); err != nil {
+	var response map[string]interface{}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatalf("unmarshal update response: %v", err)
 	}
-	updateData, ok := updateResp["data"].(map[string]interface{})
+
+	data, ok := response["data"].(map[string]interface{})
 	if !ok {
-		t.Fatalf("update response data missing or invalid: %#v", updateResp["data"])
+		t.Fatalf("update response data missing or invalid: %#v", response["data"])
 	}
-	quantityValue, ok := updateData["quantity"].(float64)
+
+	quantityValue, ok := data["quantity"].(float64)
 	if !ok {
-		t.Fatalf("update response quantity missing or invalid: %#v", updateData["quantity"])
+		t.Fatalf("update response quantity missing or invalid: %#v", data["quantity"])
 	}
 	if got := int(quantityValue); got != 20 {
 		t.Fatalf("updated quantity = %d, want %d", got, 20)
 	}
+}
 
-	deleteRecorder := httptest.NewRecorder()
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/item/"+itemID, nil)
-	r.ServeHTTP(deleteRecorder, deleteReq)
-	if deleteRecorder.Code != http.StatusOK {
-		t.Fatalf("delete item status = %d, want %d, body=%s", deleteRecorder.Code, http.StatusOK, deleteRecorder.Body.String())
+func assertItemDeleteSuccess(t *testing.T, r *gin.Engine, itemID string) {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodDelete, "/item/"+itemID, nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("delete item status = %d, want %d, body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
 	}
+}
 
-	getDeletedRecorder := httptest.NewRecorder()
-	r.ServeHTTP(getDeletedRecorder, httptest.NewRequest(http.MethodGet, "/item/"+itemID, nil))
-	if getDeletedRecorder.Code != http.StatusBadRequest {
-		t.Fatalf("get deleted item status = %d, want %d, body=%s", getDeletedRecorder.Code, http.StatusBadRequest, getDeletedRecorder.Body.String())
+func assertDeletedItemReturnsBadRequest(t *testing.T, r *gin.Engine, itemID string) {
+	t.Helper()
+
+	recorder := httptest.NewRecorder()
+	r.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/item/"+itemID, nil))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("get deleted item status = %d, want %d, body=%s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
 }
