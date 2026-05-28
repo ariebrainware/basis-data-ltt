@@ -1,0 +1,17 @@
+$kind: http-request
+name: Update Item
+method: PATCH
+url: '{{baseUrl}}/item/{{id}}'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "name": "Bandage",
+      "quantity": 150
+    }
