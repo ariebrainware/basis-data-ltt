@@ -107,45 +107,58 @@ func initDB() (*gorm.DB, error) {
 }
 
 func migrateAndSeed(db *gorm.DB) error {
-	// Pre-migration fix for diseases.codename to avoid unique-index failures
-	if db.Migrator().HasTable(&model.Disease{}) {
-		if err := db.Exec("ALTER TABLE diseases MODIFY codename varchar(191) NULL").Error; err != nil {
-			log.Printf("Warning: failed to alter diseases.codename to NULL-able: %v", err)
-		} else {
-			log.Println("Converted diseases.codename to allow NULLs (if applicable)")
-		}
-		if err := db.Exec("UPDATE diseases SET codename = NULL WHERE codename = ''").Error; err != nil {
-			log.Printf("Warning: failed to nullify empty codename values: %v", err)
-		} else {
-			log.Println("Nullified empty codename values in diseases table (if any)")
-		}
-	}
+	applyDiseaseCodenameMigrationFix(db)
 
 	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}, &model.Item{}); err != nil {
 		return err
 	}
 
-	// Legacy column drops: only run when RUN_LEGACY_MIGRATIONS=true to avoid
-	// table locks or unintended schema changes on every startup.
-	if os.Getenv("RUN_LEGACY_MIGRATIONS") == "true" {
-		if db.Migrator().HasColumn(&model.Pricing{}, "treatment_id") {
-			if err := db.Migrator().DropColumn(&model.Pricing{}, "treatment_id"); err != nil {
-				log.Printf("Warning: failed to drop pricings.treatment_id: %v", err)
-			} else {
-				log.Println("Dropped legacy pricings.treatment_id column")
-			}
-		}
-
-		if db.Migrator().HasColumn(&model.Transaction{}, "additional_charge") {
-			if err := db.Migrator().DropColumn(&model.Transaction{}, "additional_charge"); err != nil {
-				log.Printf("Warning: failed to drop transactions.additional_charge: %v", err)
-			} else {
-				log.Println("Dropped legacy transactions.additional_charge column")
-			}
-		}
-	}
+	runLegacyMigrations(db)
 
 	return model.SeedRoles(db)
+}
+
+func applyDiseaseCodenameMigrationFix(db *gorm.DB) {
+	// Pre-migration fix for diseases.codename to avoid unique-index failures.
+	if !db.Migrator().HasTable(&model.Disease{}) {
+		return
+	}
+
+	if err := db.Exec("ALTER TABLE diseases MODIFY codename varchar(191) NULL").Error; err != nil {
+		log.Printf("Warning: failed to alter diseases.codename to NULL-able: %v", err)
+	} else {
+		log.Println("Converted diseases.codename to allow NULLs (if applicable)")
+	}
+
+	if err := db.Exec("UPDATE diseases SET codename = NULL WHERE codename = ''").Error; err != nil {
+		log.Printf("Warning: failed to nullify empty codename values: %v", err)
+	} else {
+		log.Println("Nullified empty codename values in diseases table (if any)")
+	}
+}
+
+func runLegacyMigrations(db *gorm.DB) {
+	// Legacy column drops: only run when RUN_LEGACY_MIGRATIONS=true to avoid
+	// table locks or unintended schema changes on every startup.
+	if os.Getenv("RUN_LEGACY_MIGRATIONS") != "true" {
+		return
+	}
+
+	dropLegacyColumn(db, &model.Pricing{}, "treatment_id", "pricings.treatment_id")
+	dropLegacyColumn(db, &model.Transaction{}, "additional_charge", "transactions.additional_charge")
+}
+
+func dropLegacyColumn(db *gorm.DB, model interface{}, columnName, label string) {
+	if !db.Migrator().HasColumn(model, columnName) {
+		return
+	}
+
+	if err := db.Migrator().DropColumn(model, columnName); err != nil {
+		log.Printf("Warning: failed to drop %s: %v", label, err)
+		return
+	}
+
+	log.Printf("Dropped legacy %s column", label)
 }
 
 func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
@@ -155,110 +168,122 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	r.Use(middleware.DatabaseMiddleware(db))
 	r.Use(middleware.EndpointCallLogger())
 
+	registerPublicRoutes(r, cfg)
+	registerAuthenticatedRoutes(r, cfg)
+
+	return r
+}
+
+func registerPublicRoutes(r *gin.Engine, cfg *config.Config) {
 	r.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Welcome to %s!", cfg.AppName)})
 	})
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	// Authenticated routes
-	auth := r.Group("/")
-	auth.Use(middleware.ValidateLoginToken())
-	{
-		auth.DELETE("/logout", endpoint.Logout)
-		auth.PATCH("/user", endpoint.UpdateUser)
-		auth.POST("/verify-password", endpoint.VerifyPassword)
-
-		userAdmin := auth.Group("/user")
-		userAdmin.Use(middleware.RequireRole(model.RoleAdmin))
-		{
-			userAdmin.GET("", endpoint.ListUsers)
-			userAdmin.DELETE("/:id", endpoint.DeleteUser)
-		}
-
-		auth.GET("/user/:id", middleware.RequireRoleOrOwner(model.RoleAdmin), endpoint.GetUserInfo)
-		auth.PATCH("/user/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateUserByID)
-
-		// Expose debug route only in non-production environments and admin-only.
-		if cfg.AppEnv != "production" {
-			auth.GET("/debug/dbinfo", middleware.RequireRole(model.RoleAdmin), endpoint.DebugDBInfo)
-		}
-
-		patient := auth.Group("/patient")
-		patient.Use(middleware.RequireRole(model.RoleAdmin))
-		{
-			patient.GET("", endpoint.ListPatients)
-			patient.GET("/:id", endpoint.GetPatientInfo)
-			patient.PATCH("/:id", endpoint.UpdatePatient)
-			patient.DELETE("/:id", endpoint.DeletePatient)
-		}
-
-		treatment := auth.Group("/treatment")
-		treatment.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
-		{
-			treatment.GET("", endpoint.ListTreatments)
-			treatment.POST("", endpoint.CreateTreatment)
-			treatment.PATCH("/:id", endpoint.UpdateTreatment)
-			treatment.DELETE("/:id", endpoint.DeleteTreatment)
-		}
-
-		disease := auth.Group("/disease")
-		disease.Use(middleware.RequireRole(model.RoleAdmin))
-		{
-			disease.GET("", endpoint.ListDiseases)
-			disease.POST("", endpoint.CreateDisease)
-			disease.GET("/:id", endpoint.GetDiseaseInfo)
-			disease.PATCH("/:id", endpoint.UpdateDisease)
-			disease.DELETE("/:id", endpoint.DeleteDisease)
-		}
-
-		pricing := auth.Group("/pricing")
-		pricing.Use(middleware.RequireRole(model.RoleAdmin))
-		{
-			pricing.GET("", endpoint.ListPricings)
-			pricing.POST("", endpoint.CreatePricing)
-			pricing.GET("/:id", endpoint.GetPricingInfo)
-			pricing.PATCH("/:id", endpoint.UpdatePricing)
-			pricing.DELETE("/:id", endpoint.DeletePricing)
-		}
-
-		item := auth.Group("/item")
-		item.Use(middleware.RequireRole(model.RoleAdmin))
-		{
-			item.GET("", endpoint.ListItems)
-			item.POST("", endpoint.CreateItem)
-			item.GET("/:id", endpoint.GetItemInfo)
-			item.PATCH("/:id", endpoint.UpdateItem)
-			item.DELETE("/:id", endpoint.DeleteItem)
-		}
-
-		transaction := auth.Group("/transaction")
-		transaction.Use(middleware.RequireRole(model.RoleAdmin))
-		{
-			transaction.GET("", endpoint.ListTransactions)
-			transaction.GET("/:id", endpoint.GetTransactionInfo)
-			transaction.PATCH("/:id", endpoint.UpdateTransaction)
-		}
-
-		therapist := auth.Group("/therapist")
-		{
-			therapist.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.ListTherapist)
-			therapist.GET("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.GetTherapistInfo)
-			therapist.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateTherapist)
-			therapist.PATCH("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateTherapist)
-			therapist.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTherapist)
-			therapist.PUT("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.TherapistApproval)
-		}
-	}
-
 	r.POST("/patient", endpoint.CreatePatient)
 
 	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 5, Window: 15 * time.Minute})
 	r.POST("/login", authRateLimit, endpoint.Login)
 	r.POST("/signup", authRateLimit, endpoint.Signup)
 	r.GET("/token/validate", endpoint.ValidateToken)
+}
 
-	return r
+func registerAuthenticatedRoutes(r *gin.Engine, cfg *config.Config) {
+	auth := r.Group("/")
+	auth.Use(middleware.ValidateLoginToken())
+
+	auth.DELETE("/logout", endpoint.Logout)
+	auth.PATCH("/user", endpoint.UpdateUser)
+	auth.POST("/verify-password", endpoint.VerifyPassword)
+
+	registerUserRoutes(auth)
+	registerPatientRoutes(auth)
+	registerTreatmentRoutes(auth)
+	registerDiseaseRoutes(auth)
+	registerPricingRoutes(auth)
+	registerItemRoutes(auth)
+	registerTransactionRoutes(auth)
+	registerTherapistRoutes(auth)
+
+	if cfg.AppEnv != "production" {
+		auth.GET("/debug/dbinfo", middleware.RequireRole(model.RoleAdmin), endpoint.DebugDBInfo)
+	}
+}
+
+func registerUserRoutes(auth *gin.RouterGroup) {
+	userAdmin := auth.Group("/user")
+	userAdmin.Use(middleware.RequireRole(model.RoleAdmin))
+	userAdmin.GET("", endpoint.ListUsers)
+	userAdmin.DELETE("/:id", endpoint.DeleteUser)
+
+	auth.GET("/user/:id", middleware.RequireRoleOrOwner(model.RoleAdmin), endpoint.GetUserInfo)
+	auth.PATCH("/user/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateUserByID)
+}
+
+func registerPatientRoutes(auth *gin.RouterGroup) {
+	patient := auth.Group("/patient")
+	patient.Use(middleware.RequireRole(model.RoleAdmin))
+	patient.GET("", endpoint.ListPatients)
+	patient.GET("/:id", endpoint.GetPatientInfo)
+	patient.PATCH("/:id", endpoint.UpdatePatient)
+	patient.DELETE("/:id", endpoint.DeletePatient)
+}
+
+func registerTreatmentRoutes(auth *gin.RouterGroup) {
+	treatment := auth.Group("/treatment")
+	treatment.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
+	treatment.GET("", endpoint.ListTreatments)
+	treatment.POST("", endpoint.CreateTreatment)
+	treatment.PATCH("/:id", endpoint.UpdateTreatment)
+	treatment.DELETE("/:id", endpoint.DeleteTreatment)
+}
+
+func registerDiseaseRoutes(auth *gin.RouterGroup) {
+	disease := auth.Group("/disease")
+	disease.Use(middleware.RequireRole(model.RoleAdmin))
+	disease.GET("", endpoint.ListDiseases)
+	disease.POST("", endpoint.CreateDisease)
+	disease.GET("/:id", endpoint.GetDiseaseInfo)
+	disease.PATCH("/:id", endpoint.UpdateDisease)
+	disease.DELETE("/:id", endpoint.DeleteDisease)
+}
+
+func registerPricingRoutes(auth *gin.RouterGroup) {
+	pricing := auth.Group("/pricing")
+	pricing.Use(middleware.RequireRole(model.RoleAdmin))
+	pricing.GET("", endpoint.ListPricings)
+	pricing.POST("", endpoint.CreatePricing)
+	pricing.GET("/:id", endpoint.GetPricingInfo)
+	pricing.PATCH("/:id", endpoint.UpdatePricing)
+	pricing.DELETE("/:id", endpoint.DeletePricing)
+}
+
+func registerItemRoutes(auth *gin.RouterGroup) {
+	item := auth.Group("/item")
+	item.Use(middleware.RequireRole(model.RoleAdmin))
+	item.GET("", endpoint.ListItems)
+	item.POST("", endpoint.CreateItem)
+	item.GET("/:id", endpoint.GetItemInfo)
+	item.PATCH("/:id", endpoint.UpdateItem)
+	item.DELETE("/:id", endpoint.DeleteItem)
+}
+
+func registerTransactionRoutes(auth *gin.RouterGroup) {
+	transaction := auth.Group("/transaction")
+	transaction.Use(middleware.RequireRole(model.RoleAdmin))
+	transaction.GET("", endpoint.ListTransactions)
+	transaction.GET("/:id", endpoint.GetTransactionInfo)
+	transaction.PATCH("/:id", endpoint.UpdateTransaction)
+}
+
+func registerTherapistRoutes(auth *gin.RouterGroup) {
+	therapist := auth.Group("/therapist")
+	therapist.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.ListTherapist)
+	therapist.GET("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.GetTherapistInfo)
+	therapist.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateTherapist)
+	therapist.PATCH("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateTherapist)
+	therapist.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTherapist)
+	therapist.PUT("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.TherapistApproval)
 }
 
 func createServer(cfg *config.Config, handler http.Handler) *http.Server {
