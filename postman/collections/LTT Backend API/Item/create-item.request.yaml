@@ -1,0 +1,18 @@
+$kind: http-request
+name: Create Item
+method: POST
+url: '{{baseUrl}}/item'
+order: 2000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "name": "Bandage",
+      "quantity": 100,
+      "price": 25000
+    }

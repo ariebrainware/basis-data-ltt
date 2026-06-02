@@ -1,0 +1,8 @@
+$kind: http-request
+name: Delete Item
+method: DELETE
+url: '{{baseUrl}}/item/{{id}}'
+order: 5000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

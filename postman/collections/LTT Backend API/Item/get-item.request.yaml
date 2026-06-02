@@ -1,0 +1,8 @@
+$kind: http-request
+name: Get Item
+method: GET
+url: '{{baseUrl}}/item/{{id}}'
+order: 3000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
