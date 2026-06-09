@@ -65,6 +65,80 @@ func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
 	assert.Equal(t, "transfer", updated["payment_status"])
 }
 
+func TestUpdateTransaction_RecalculatesAmountAndDeductsItemStock(t *testing.T) {
+	r, db := setupEndpointTest(t)
+
+	patient := model.Patient{
+		FullName:    "Patient Item Update",
+		PatientCode: "TP008",
+		Email:       "transaction-patient-item-update@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Item Update",
+		NIK:      "NIK-TRX-008",
+		Email:    "transaction-therapist-item-update@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	assert.NoError(t, db.Create(&model.Pricing{TherapistID: therapist.ID, Price: 175000}).Error)
+
+	itemOne := model.Item{Name: "Bandage", Quantity: 10, Price: 15000}
+	assert.NoError(t, db.Create(&itemOne).Error)
+
+	itemTwo := model.Item{Name: "Saline", Quantity: 8, Price: 25000}
+	assert.NoError(t, db.Create(&itemTwo).Error)
+
+	treatment := model.Treatment{
+		TreatmentDate: "2026-04-18",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Item update issue",
+		Treatment:     "Item update therapy",
+		Remarks:       "Item update session",
+		NextVisit:     "2026-04-25",
+	}
+	assert.NoError(t, db.Create(&treatment).Error)
+
+	transaction := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   therapist.ID,
+		Amount:        175000,
+		Remarks:       "Initial amount",
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}
+	assert.NoError(t, db.Create(&transaction).Error)
+
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		handler:      UpdateTransaction,
+		body: map[string]interface{}{
+			"items": []map[string]interface{}{
+				{"item_id": itemOne.ID, "quantity": 2},
+				{"item_id": itemTwo.ID, "quantity": 3},
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	updated := response["data"].(map[string]interface{})
+	assert.Equal(t, float64(280000), updated["amount"])
+
+	var refreshedItemOne model.Item
+	assert.NoError(t, db.First(&refreshedItemOne, itemOne.ID).Error)
+	assert.Equal(t, 8, refreshedItemOne.Quantity)
+
+	var refreshedItemTwo model.Item
+	assert.NoError(t, db.First(&refreshedItemTwo, itemTwo.ID).Error)
+	assert.Equal(t, 5, refreshedItemTwo.Quantity)
+}
+
 func TestListTransactions_ReturnsPatientName(t *testing.T) {
 	r, db := setupEndpointTest(t)
 	now := time.Now()

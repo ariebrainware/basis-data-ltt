@@ -1,7 +1,9 @@
 package endpoint
 
 import (
+	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"time"
 
@@ -11,19 +13,32 @@ import (
 	"gorm.io/gorm"
 )
 
+type transactionItemRequest struct {
+	ItemID   uint `json:"item_id"`
+	Quantity int  `json:"quantity"`
+}
+
 type updateTransactionRequest struct {
-	Amount        *int64  `json:"amount"`
-	Remarks       *string `json:"remarks"`
-	PaymentMethod *string `json:"payment_method"`
-	PaymentStatus *string `json:"payment_status"`
+	Amount        *int64                   `json:"amount"`
+	Remarks       *string                  `json:"remarks"`
+	PaymentMethod *string                  `json:"payment_method"`
+	PaymentStatus *string                  `json:"payment_status"`
+	Items         []transactionItemRequest `json:"items"`
+}
+
+type transactionUserError struct {
+	msg string
+}
+
+func (e *transactionUserError) Error() string {
+	return e.msg
 }
 
 func isValidTransactionPaymentStatus(status string) bool {
 	validStatuses := map[string]bool{
-		"unpaid":   true,
-		"partial":  true,
-		"cash":     true,
-		"transfer": true,
+		"unpaid":  true,
+		"partial": true,
+		"paid":    true,
 	}
 
 	return validStatuses[status]
@@ -125,6 +140,63 @@ func applyTransactionDateScope(query *gorm.DB, scope transactionDateScope) *gorm
 	}
 
 	return query.Where("DATE(treatments.treatment_date) BETWEEN ? AND ?", scope.startDate, scope.endDate)
+}
+
+func calculateTransactionAmountAndAdjustItems(tx *gorm.DB, therapistID uint, items []transactionItemRequest) (int64, error) {
+	var pricing model.Pricing
+	if err := tx.Model(&model.Pricing{}).Where("therapist_id = ?", therapistID).Order("id DESC").First(&pricing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, &transactionUserError{msg: "pricing not found for therapist"}
+		}
+		return 0, err
+	}
+
+	totalAmount := pricing.Price
+	if len(items) == 0 {
+		return totalAmount, nil
+	}
+
+	aggregatedQuantities := make(map[uint]int)
+	for _, itemRequest := range items {
+		if itemRequest.ItemID == 0 {
+			return 0, &transactionUserError{msg: "item_id is required for each item"}
+		}
+		if itemRequest.Quantity <= 0 {
+			return 0, &transactionUserError{msg: "item quantity must be greater than 0"}
+		}
+		aggregatedQuantities[itemRequest.ItemID] += itemRequest.Quantity
+	}
+
+	itemIDs := make([]uint, 0, len(aggregatedQuantities))
+	for itemID := range aggregatedQuantities {
+		itemIDs = append(itemIDs, itemID)
+	}
+	sort.Slice(itemIDs, func(i, j int) bool { return itemIDs[i] < itemIDs[j] })
+
+	for _, itemID := range itemIDs {
+		quantity := aggregatedQuantities[itemID]
+
+		var item model.Item
+		if err := tx.Where("id = ? AND deleted_at IS NULL", itemID).First(&item).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return 0, &transactionUserError{msg: fmt.Sprintf("item %d not found", itemID)}
+			}
+			return 0, err
+		}
+
+		if item.Quantity < quantity {
+			return 0, &transactionUserError{msg: fmt.Sprintf("insufficient stock for item %d", itemID)}
+		}
+
+		newQuantity := item.Quantity - quantity
+		if err := tx.Model(&item).Update("quantity", newQuantity).Error; err != nil {
+			return 0, err
+		}
+
+		totalAmount += int64(quantity) * item.Price
+	}
+
+	return totalAmount, nil
 }
 
 // ListTransactions godoc
@@ -313,38 +385,55 @@ func UpdateTransaction(c *gin.Context) {
 		return
 	}
 
-	updates := map[string]interface{}{}
+	err := db.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]interface{}{}
 
-	if req.Amount != nil {
-		if *req.Amount < 0 {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: amount must be >= 0", Err: fmt.Errorf("invalid amount")})
+		if req.Amount != nil {
+			if *req.Amount < 0 {
+				return &transactionUserError{msg: "Invalid request body: amount must be >= 0"}
+			}
+			updates["amount"] = *req.Amount
+		}
+
+		if len(req.Items) > 0 {
+			computedAmount, err := calculateTransactionAmountAndAdjustItems(tx, transaction.TherapistID, req.Items)
+			if err != nil {
+				return err
+			}
+			updates["amount"] = computedAmount
+		}
+
+		if req.Remarks != nil {
+			updates["remarks"] = *req.Remarks
+		}
+
+		if req.PaymentMethod != nil {
+			updates["payment_method"] = *req.PaymentMethod
+		}
+
+		if req.PaymentStatus != nil {
+			if !isValidTransactionPaymentStatus(*req.PaymentStatus) {
+				return &transactionUserError{msg: "Invalid request body: payment_status must be 'cash', 'transfer', 'partial', or 'unpaid'"}
+			}
+			updates["payment_status"] = *req.PaymentStatus
+		}
+
+		if len(updates) == 0 {
+			return &transactionUserError{msg: "No fields to update"}
+		}
+
+		if err := tx.Model(&transaction).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		return tx.First(&transaction, transaction.ID).Error
+	})
+	if err != nil {
+		var userErr *transactionUserError
+		if errors.As(err, &userErr) {
+			util.CallUserError(c, util.APIErrorParams{Msg: userErr.msg, Err: err})
 			return
 		}
-		updates["amount"] = *req.Amount
-	}
-
-	if req.Remarks != nil {
-		updates["remarks"] = *req.Remarks
-	}
-
-	if req.PaymentMethod != nil {
-		updates["payment_method"] = *req.PaymentMethod
-	}
-
-	if req.PaymentStatus != nil {
-		if !isValidTransactionPaymentStatus(*req.PaymentStatus) {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: payment_status must be 'cash', 'transfer', 'partial', or 'unpaid'", Err: fmt.Errorf("invalid payment_status")})
-			return
-		}
-		updates["payment_status"] = *req.PaymentStatus
-	}
-
-	if len(updates) == 0 {
-		util.CallUserError(c, util.APIErrorParams{Msg: "No fields to update", Err: fmt.Errorf("empty update payload")})
-		return
-	}
-
-	if err := db.Model(&transaction).Updates(updates).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update transaction", Err: err})
 		return
 	}

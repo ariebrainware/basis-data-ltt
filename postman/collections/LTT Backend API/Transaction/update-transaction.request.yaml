@@ -1,5 +1,5 @@
 $kind: http-request
-name: Update Transaction
+name: Edit Transaction
 method: PATCH
 url: '{{baseUrl}}/transaction/{{transactionId}}'
 order: 3000
@@ -12,8 +12,17 @@ body:
   type: json
   content: |-
     {
-      "amount": 150000,
-      "remarks": "Paid in full",
+      "remarks": "Adjusted after adding items",
       "payment_method": "cash",
-      "payment_status": "cash"
+      "payment_status": "partial",
+      "items": [
+        {
+          "item_id": 1,
+          "quantity": 2
+        },
+        {
+          "item_id": 3,
+          "quantity": 1
+        }
+      ]
     }
