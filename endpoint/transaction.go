@@ -36,10 +36,9 @@ func (e *transactionUserError) Error() string {
 
 func isValidTransactionPaymentStatus(status string) bool {
 	validStatuses := map[string]bool{
-		"unpaid":   true,
-		"partial":  true,
-		"cash":     true,
-		"transfer": true,
+		"unpaid":  true,
+		"partial": true,
+		"paid":    true,
 	}
 
 	return validStatuses[status]
