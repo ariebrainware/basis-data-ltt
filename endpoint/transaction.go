@@ -413,7 +413,7 @@ func UpdateTransaction(c *gin.Context) {
 
 		if req.PaymentStatus != nil {
 			if !isValidTransactionPaymentStatus(*req.PaymentStatus) {
-				return &transactionUserError{msg: "Invalid request body: payment_status must be 'cash', 'transfer', 'partial', or 'unpaid'"}
+				return &transactionUserError{msg: "Invalid request body: payment_status must be 'paid', 'partial', or 'unpaid'"}
 			}
 			updates["payment_status"] = *req.PaymentStatus
 		}

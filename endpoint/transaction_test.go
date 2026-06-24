@@ -54,7 +54,7 @@ func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
 		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
 		handler:      UpdateTransaction,
 		body: map[string]interface{}{
-			"payment_status": "transfer",
+			"payment_status": "paid",
 		},
 	})
 	assert.NoError(t, err)
@@ -62,7 +62,7 @@ func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
 	assert.True(t, response["success"].(bool))
 
 	updated := response["data"].(map[string]interface{})
-	assert.Equal(t, "transfer", updated["payment_status"])
+	assert.Equal(t, "paid", updated["payment_status"])
 }
 
 func TestUpdateTransaction_RecalculatesAmountAndDeductsItemStock(t *testing.T) {
