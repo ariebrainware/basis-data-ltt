@@ -54,7 +54,7 @@ func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
 		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
 		handler:      UpdateTransaction,
 		body: map[string]interface{}{
-			"payment_status": "transfer",
+			"payment_status": "paid",
 		},
 	})
 	assert.NoError(t, err)
@@ -62,7 +62,208 @@ func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
 	assert.True(t, response["success"].(bool))
 
 	updated := response["data"].(map[string]interface{})
-	assert.Equal(t, "transfer", updated["payment_status"])
+	assert.Equal(t, "paid", updated["payment_status"])
+}
+
+func TestUpdateTransaction_ValidatesPaymentFields(t *testing.T) {
+	r, db := setupEndpointTest(t)
+	r.PATCH("/transaction/:id", UpdateTransaction)
+
+	patient := model.Patient{
+		FullName:    "Patient Update Validation",
+		PatientCode: "TP007V",
+		Email:       "transaction-patient-update-validation@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Update Validation",
+		NIK:      "NIK-TRX-007V",
+		Email:    "transaction-therapist-update-validation@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	treatment := model.Treatment{
+		TreatmentDate: "2026-04-16",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Validation issue",
+		Treatment:     "Validation therapy",
+		Remarks:       "Validation session",
+		NextVisit:     "2026-04-23",
+	}
+	assert.NoError(t, db.Create(&treatment).Error)
+
+	transaction := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   therapist.ID,
+		Amount:        180000,
+		Remarks:       "Initial status",
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}
+	assert.NoError(t, db.Create(&transaction).Error)
+
+	// 1. Verify valid payment methods are accepted
+	for _, validMethod := range []string{"cash", "transfer_or_qris", "debit"} {
+		w, response, err := performRequest(r, requestSpec{
+			method:       http.MethodPatch,
+			registerPath: "/transaction/:id",
+			requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+			body: map[string]interface{}{
+				"payment_method": validMethod,
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, response["success"].(bool))
+		updated := response["data"].(map[string]interface{})
+		assert.Equal(t, validMethod, updated["payment_method"])
+	}
+
+	// 2. Verify invalid payment method is rejected
+	w, _, err := performRequest(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		body: map[string]interface{}{
+			"payment_method": "credit_card",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// 3. Verify invalid payment status is rejected
+	w, _, err = performRequest(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		body: map[string]interface{}{
+			"payment_status": "partially_paid",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateTransaction_RecalculatesAmountAndDeductsItemStock(t *testing.T) {
+	r, db := setupEndpointTest(t)
+
+	patient := model.Patient{
+		FullName:    "Patient Item Update",
+		PatientCode: "TP008",
+		Email:       "transaction-patient-item-update@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Item Update",
+		NIK:      "NIK-TRX-008",
+		Email:    "transaction-therapist-item-update@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	assert.NoError(t, db.Create(&model.Pricing{TherapistID: therapist.ID, Price: 175000}).Error)
+
+	itemOne := model.Item{Name: "Bandage", Quantity: 10, Price: 15000}
+	assert.NoError(t, db.Create(&itemOne).Error)
+
+	itemTwo := model.Item{Name: "Saline", Quantity: 8, Price: 25000}
+	assert.NoError(t, db.Create(&itemTwo).Error)
+
+	treatment := model.Treatment{
+		TreatmentDate: "2026-04-18",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Item update issue",
+		Treatment:     "Item update therapy",
+		Remarks:       "Item update session",
+		NextVisit:     "2026-04-25",
+	}
+	assert.NoError(t, db.Create(&treatment).Error)
+
+	transaction := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   therapist.ID,
+		Amount:        175000,
+		Remarks:       "Initial amount",
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}
+	assert.NoError(t, db.Create(&transaction).Error)
+
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		handler:      UpdateTransaction,
+		body: map[string]interface{}{
+			"items": []map[string]interface{}{
+				{"item_id": itemOne.ID, "quantity": 2},
+				{"item_id": itemTwo.ID, "quantity": 3},
+			},
+		},
+	})
+	assert.NoError(t, err)
+	if w.Code != http.StatusOK {
+		t.Logf("Response: %+v", response)
+	}
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	updated := response["data"].(map[string]interface{})
+	assert.Equal(t, float64(280000), updated["amount"])
+
+	// Verify items are returned in the response
+	itemsResp, ok := updated["items"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, itemsResp, 2)
+
+	var refreshedItemOne model.Item
+	assert.NoError(t, db.First(&refreshedItemOne, itemOne.ID).Error)
+	assert.Equal(t, 8, refreshedItemOne.Quantity)
+
+	var refreshedItemTwo model.Item
+	assert.NoError(t, db.First(&refreshedItemTwo, itemTwo.ID).Error)
+	assert.Equal(t, 5, refreshedItemTwo.Quantity)
+
+	// Verify items are stored in the database
+	var dbTransaction model.Transaction
+	assert.NoError(t, db.First(&dbTransaction, transaction.ID).Error)
+	assert.Len(t, dbTransaction.Items, 2)
+	assert.Equal(t, itemOne.ID, dbTransaction.Items[0].ItemID)
+	assert.Equal(t, 2, dbTransaction.Items[0].Quantity)
+	assert.Equal(t, itemTwo.ID, dbTransaction.Items[1].ItemID)
+	assert.Equal(t, 3, dbTransaction.Items[1].Quantity)
+
+	// Update transaction items AGAIN (should refund old item stock and deduct new items)
+	w2, response2, err := performRequest(r, requestSpec{
+		method:      http.MethodPatch,
+		requestPath: "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		body: map[string]interface{}{
+			"items": []map[string]interface{}{
+				{"item_id": itemOne.ID, "quantity": 1}, // was 2, so 1 should be refunded (stock goes from 8 to 9)
+				// itemTwo is removed, so its stock should be fully refunded (from 5 to 8)
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w2.Code)
+	assert.True(t, response2["success"].(bool))
+
+	updated2 := response2["data"].(map[string]interface{})
+	assert.Equal(t, float64(175000+15000), updated2["amount"]) // base price (175000) + 1 * 15000 = 190000
+
+	assert.NoError(t, db.First(&refreshedItemOne, itemOne.ID).Error)
+	assert.Equal(t, 9, refreshedItemOne.Quantity)
+
+	assert.NoError(t, db.First(&refreshedItemTwo, itemTwo.ID).Error)
+	assert.Equal(t, 8, refreshedItemTwo.Quantity)
+
+	assert.NoError(t, db.First(&dbTransaction, transaction.ID).Error)
+	assert.Len(t, dbTransaction.Items, 1)
+	assert.Equal(t, itemOne.ID, dbTransaction.Items[0].ItemID)
+	assert.Equal(t, 1, dbTransaction.Items[0].Quantity)
 }
 
 func TestListTransactions_ReturnsPatientName(t *testing.T) {

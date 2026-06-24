@@ -1,0 +1,21 @@
+name: Local Ollama
+
+models:
+  - name: Chat
+    provider: ollama
+    model: qwen3:8b
+
+  - name: Edit
+    provider: ollama
+    model: qwen2.5-coder:7b
+
+tabAutocompleteModel:
+  title: qwen2.5-coder:7b
+  provider: ollama
+  model: qwen2.5-coder:7b
+
+context:
+  - provider: code
+  - provider: docs
+  - provider: diff
+  - provider: terminal
