@@ -45,6 +45,17 @@ func isValidTransactionPaymentStatus(status string) bool {
 	return validStatuses[status]
 }
 
+func isValidTransactionPaymentMethod(method string) bool {
+	validMethods := map[string]bool{
+		"cash":             true,
+		"transfer_or_qris": true,
+		"debit":            true,
+	}
+
+	return validMethods[method]
+}
+
+
 func getTransactionIDParam(c *gin.Context) (string, bool) {
 	id := c.Param("id")
 	if id == "" {
@@ -437,6 +448,9 @@ func UpdateTransaction(c *gin.Context) {
 		}
 
 		if req.PaymentMethod != nil {
+			if !isValidTransactionPaymentMethod(*req.PaymentMethod) {
+				return &transactionUserError{msg: "Invalid request body: payment_method must be 'cash', 'transfer_or_qris', or 'debit'"}
+			}
 			updates["payment_method"] = *req.PaymentMethod
 		}
 

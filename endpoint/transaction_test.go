@@ -65,6 +65,87 @@ func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
 	assert.Equal(t, "paid", updated["payment_status"])
 }
 
+func TestUpdateTransaction_ValidatesPaymentFields(t *testing.T) {
+	r, db := setupEndpointTest(t)
+	r.PATCH("/transaction/:id", UpdateTransaction)
+
+	patient := model.Patient{
+		FullName:    "Patient Update Validation",
+		PatientCode: "TP007V",
+		Email:       "transaction-patient-update-validation@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Update Validation",
+		NIK:      "NIK-TRX-007V",
+		Email:    "transaction-therapist-update-validation@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	treatment := model.Treatment{
+		TreatmentDate: "2026-04-16",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Validation issue",
+		Treatment:     "Validation therapy",
+		Remarks:       "Validation session",
+		NextVisit:     "2026-04-23",
+	}
+	assert.NoError(t, db.Create(&treatment).Error)
+
+	transaction := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   therapist.ID,
+		Amount:        180000,
+		Remarks:       "Initial status",
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}
+	assert.NoError(t, db.Create(&transaction).Error)
+
+	// 1. Verify valid payment methods are accepted
+	for _, validMethod := range []string{"cash", "transfer_or_qris", "debit"} {
+		w, response, err := performRequest(r, requestSpec{
+			method:       http.MethodPatch,
+			registerPath: "/transaction/:id",
+			requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+			body: map[string]interface{}{
+				"payment_method": validMethod,
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.True(t, response["success"].(bool))
+		updated := response["data"].(map[string]interface{})
+		assert.Equal(t, validMethod, updated["payment_method"])
+	}
+
+	// 2. Verify invalid payment method is rejected
+	w, _, err := performRequest(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		body: map[string]interface{}{
+			"payment_method": "credit_card",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	// 3. Verify invalid payment status is rejected
+	w, _, err = performRequest(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		body: map[string]interface{}{
+			"payment_status": "partially_paid",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestUpdateTransaction_RecalculatesAmountAndDeductsItemStock(t *testing.T) {
 	r, db := setupEndpointTest(t)
 
