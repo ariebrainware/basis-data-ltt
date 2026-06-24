@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -396,11 +397,39 @@ func UpdateTransaction(c *gin.Context) {
 		}
 
 		if len(req.Items) > 0 {
+			// Refund stock of currently associated items first
+			for _, existingItem := range transaction.Items {
+				var item model.Item
+				if err := tx.Where("id = ? AND deleted_at IS NULL", existingItem.ItemID).First(&item).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						continue
+					}
+					return err
+				}
+				newQuantity := item.Quantity + existingItem.Quantity
+				if err := tx.Model(&item).Update("quantity", newQuantity).Error; err != nil {
+					return err
+				}
+			}
+
 			computedAmount, err := calculateTransactionAmountAndAdjustItems(tx, transaction.TherapistID, req.Items)
 			if err != nil {
 				return err
 			}
 			updates["amount"] = computedAmount
+
+			var modelItems []model.TransactionItem
+			for _, itemReq := range req.Items {
+				modelItems = append(modelItems, model.TransactionItem{
+					ItemID:   itemReq.ItemID,
+					Quantity: itemReq.Quantity,
+				})
+			}
+			itemsJSON, err := json.Marshal(modelItems)
+			if err != nil {
+				return err
+			}
+			updates["items"] = string(itemsJSON)
 		}
 
 		if req.Remarks != nil {

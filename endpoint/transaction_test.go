@@ -124,11 +124,19 @@ func TestUpdateTransaction_RecalculatesAmountAndDeductsItemStock(t *testing.T) {
 		},
 	})
 	assert.NoError(t, err)
+	if w.Code != http.StatusOK {
+		t.Logf("Response: %+v", response)
+	}
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.True(t, response["success"].(bool))
 
 	updated := response["data"].(map[string]interface{})
 	assert.Equal(t, float64(280000), updated["amount"])
+
+	// Verify items are returned in the response
+	itemsResp, ok := updated["items"].([]interface{})
+	assert.True(t, ok)
+	assert.Len(t, itemsResp, 2)
 
 	var refreshedItemOne model.Item
 	assert.NoError(t, db.First(&refreshedItemOne, itemOne.ID).Error)
@@ -137,6 +145,44 @@ func TestUpdateTransaction_RecalculatesAmountAndDeductsItemStock(t *testing.T) {
 	var refreshedItemTwo model.Item
 	assert.NoError(t, db.First(&refreshedItemTwo, itemTwo.ID).Error)
 	assert.Equal(t, 5, refreshedItemTwo.Quantity)
+
+	// Verify items are stored in the database
+	var dbTransaction model.Transaction
+	assert.NoError(t, db.First(&dbTransaction, transaction.ID).Error)
+	assert.Len(t, dbTransaction.Items, 2)
+	assert.Equal(t, itemOne.ID, dbTransaction.Items[0].ItemID)
+	assert.Equal(t, 2, dbTransaction.Items[0].Quantity)
+	assert.Equal(t, itemTwo.ID, dbTransaction.Items[1].ItemID)
+	assert.Equal(t, 3, dbTransaction.Items[1].Quantity)
+
+	// Update transaction items AGAIN (should refund old item stock and deduct new items)
+	w2, response2, err := performRequest(r, requestSpec{
+		method:      http.MethodPatch,
+		requestPath: "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		body: map[string]interface{}{
+			"items": []map[string]interface{}{
+				{"item_id": itemOne.ID, "quantity": 1}, // was 2, so 1 should be refunded (stock goes from 8 to 9)
+				// itemTwo is removed, so its stock should be fully refunded (from 5 to 8)
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w2.Code)
+	assert.True(t, response2["success"].(bool))
+
+	updated2 := response2["data"].(map[string]interface{})
+	assert.Equal(t, float64(175000+15000), updated2["amount"]) // base price (175000) + 1 * 15000 = 190000
+
+	assert.NoError(t, db.First(&refreshedItemOne, itemOne.ID).Error)
+	assert.Equal(t, 9, refreshedItemOne.Quantity)
+
+	assert.NoError(t, db.First(&refreshedItemTwo, itemTwo.ID).Error)
+	assert.Equal(t, 8, refreshedItemTwo.Quantity)
+
+	assert.NoError(t, db.First(&dbTransaction, transaction.ID).Error)
+	assert.Len(t, dbTransaction.Items, 1)
+	assert.Equal(t, itemOne.ID, dbTransaction.Items[0].ItemID)
+	assert.Equal(t, 1, dbTransaction.Items[0].Quantity)
 }
 
 func TestListTransactions_ReturnsPatientName(t *testing.T) {
