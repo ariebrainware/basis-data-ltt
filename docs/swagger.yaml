@@ -8,6 +8,9 @@ definitions:
       password:
         example: password123
         type: string
+    required:
+    - email
+    - password
     type: object
   endpoint.LoginResponse:
     properties:
@@ -31,7 +34,31 @@ definitions:
         type: string
       password:
         example: password123
+        minLength: 8
         type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  endpoint.UpdateUserRequest:
+    properties:
+      email:
+        example: john@example.com
+        type: string
+      name:
+        example: John Doe
+        type: string
+      password:
+        example: newpassword123
+        type: string
+    type: object
+  endpoint.VerifyPasswordRequest:
+    properties:
+      password:
+        type: string
+    required:
+    - password
     type: object
   endpoint.createDiseaseRequest:
     properties:
@@ -44,6 +71,18 @@ definitions:
       name:
         example: Diabetes
         type: string
+    type: object
+  endpoint.createItemRequest:
+    properties:
+      name:
+        example: Bandage
+        type: string
+      price:
+        example: 25000
+        type: integer
+      quantity:
+        example: 100
+        type: integer
     type: object
   endpoint.createPatientRequest:
     properties:
@@ -89,6 +128,13 @@ definitions:
         example: Appendectomy 2020
         type: string
     type: object
+  endpoint.createPricingRequest:
+    properties:
+      price:
+        type: integer
+      therapist_id:
+        type: integer
+    type: object
   endpoint.createTherapistRequest:
     properties:
       address:
@@ -125,6 +171,71 @@ definitions:
         example: 70
         type: integer
     type: object
+  endpoint.pricingWithTherapist:
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      description:
+        example: ""
+        type: string
+      id:
+        type: integer
+      price:
+        example: 250000
+        type: integer
+      therapist_id:
+        example: 1
+        type: integer
+      therapist_name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  endpoint.transactionItemRequest:
+    properties:
+      item_id:
+        type: integer
+      quantity:
+        type: integer
+    type: object
+  endpoint.updateItemRequest:
+    properties:
+      name:
+        example: Bandage
+        type: string
+      price:
+        example: 25000
+        type: integer
+      quantity:
+        example: 100
+        type: integer
+    type: object
+  endpoint.updatePricingRequest:
+    properties:
+      description:
+        type: string
+      price:
+        type: integer
+      therapist_id:
+        type: integer
+    type: object
+  endpoint.updateTransactionRequest:
+    properties:
+      amount:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/endpoint.transactionItemRequest'
+        type: array
+      payment_method:
+        type: string
+      payment_status:
+        type: string
+      remarks:
+        type: string
+    type: object
   gorm.DeletedAt:
     properties:
       time:
@@ -153,6 +264,79 @@ definitions:
         type: string
       updatedAt:
         type: string
+    type: object
+  model.Item:
+    description: Item information
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: integer
+      name:
+        example: Bandage
+        type: string
+      price:
+        example: 25000
+        type: integer
+      quantity:
+        example: 100
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  model.ListTransactionResponse:
+    description: Transaction list response information
+    properties:
+      amount:
+        example: 50000
+        type: integer
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/model.TransactionItem'
+        type: array
+      patient_name:
+        example: John Doe
+        type: string
+      payment_method:
+        example: cash
+        type: string
+      payment_status:
+        example: unpaid
+        type: string
+      remarks:
+        example: Urgent handling fee
+        type: string
+      therapist_id:
+        example: 1
+        type: integer
+      therapist_name:
+        example: Dr. John Smith
+        type: string
+      treatment_date:
+        example: "2025-01-15"
+        type: string
+      treatment_id:
+        example: 1
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  model.ListTransactionsResponseData:
+    properties:
+      summary:
+        $ref: '#/definitions/model.TransactionSummary'
+      transactions:
+        items:
+          $ref: '#/definitions/model.ListTransactionResponse'
+        type: array
     type: object
   model.Patient:
     description: Patient information
@@ -196,6 +380,39 @@ definitions:
       surgery_history:
         example: Appendectomy 2020
         type: string
+      updatedAt:
+        type: string
+    type: object
+  model.PaymentStatusSummary:
+    properties:
+      paid:
+        example: 5
+        type: integer
+      partial:
+        example: 2
+        type: integer
+      unpaid:
+        example: 3
+        type: integer
+    type: object
+  model.Pricing:
+    description: Pricing information for a treatment
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      description:
+        example: ""
+        type: string
+      id:
+        type: integer
+      price:
+        example: 250000
+        type: integer
+      therapist_id:
+        example: 1
+        type: integer
       updatedAt:
         type: string
     type: object
@@ -244,6 +461,84 @@ definitions:
         example: 70
         type: integer
     type: object
+  model.TherapistPatientCount:
+    properties:
+      patient_count:
+        example: 10
+        type: integer
+      therapist_name:
+        example: Dr. John Smith
+        type: string
+    type: object
+  model.Transaction:
+    description: Transaction information for a treatment
+    properties:
+      amount:
+        example: 50000
+        type: integer
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/model.TransactionItem'
+        type: array
+      payment_method:
+        example: cash
+        type: string
+      payment_status:
+        example: unpaid
+        type: string
+      remarks:
+        example: Urgent handling fee
+        type: string
+      therapist_id:
+        example: 1
+        type: integer
+      treatment_id:
+        example: 1
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  model.TransactionItem:
+    description: Transaction item detail information
+    properties:
+      item_id:
+        example: 1
+        type: integer
+      quantity:
+        example: 2
+        type: integer
+    type: object
+  model.TransactionRequest:
+    description: Transaction information for treatment creation
+    properties:
+      payment_method:
+        example: cash
+        type: string
+      payment_status:
+        example: unpaid
+        type: string
+      remarks:
+        example: Urgent handling fee
+        type: string
+    type: object
+  model.TransactionSummary:
+    properties:
+      payment_status_counts:
+        $ref: '#/definitions/model.PaymentStatusSummary'
+      therapist_patient_counts:
+        items:
+          $ref: '#/definitions/model.TherapistPatientCount'
+        type: array
+      total_amount:
+        example: 1250000
+        type: integer
+    type: object
   model.TreatementRequest:
     description: Treatment request information
     properties:
@@ -262,6 +557,8 @@ definitions:
       therapist_id:
         example: 1
         type: integer
+      transaction:
+        $ref: '#/definitions/model.TransactionRequest'
       treatment:
         example:
         - Massage therapy
@@ -306,6 +603,46 @@ definitions:
       updatedAt:
         type: string
     type: object
+  model.UpdatePatientRequest:
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      age:
+        example: 30
+        type: integer
+      email:
+        example: john@example.com
+        type: string
+      full_name:
+        example: John Doe
+        type: string
+      gender:
+        example: Male
+        type: string
+      health_history:
+        example: Diabetes,Hypertension
+        type: string
+      job:
+        example: Engineer
+        type: string
+      password:
+        example: hashed_password
+        type: string
+      patient_code:
+        example: J001
+        type: string
+      phone_number:
+        example:
+        - '["081234567890"'
+        - '"081234567891"]'
+        items:
+          type: string
+        type: array
+      surgery_history:
+        example: Appendectomy 2020
+        type: string
+    type: object
   util.APIResponse:
     properties:
       data: {}
@@ -328,7 +665,7 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
   title: LTT Backend API
-  version: "1.0"
+  version: v1.7.2
 paths:
   /disease:
     get:
@@ -537,6 +874,213 @@ paths:
       summary: Update disease information
       tags:
       - Disease
+  /item:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of items
+      parameters:
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Items retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Item'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all items
+      tags:
+      - Item
+    post:
+      consumes:
+      - application/json
+      description: Add a new item record
+      parameters:
+      - description: Item information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.createItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item created
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Item'
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new item
+      tags:
+      - Item
+  /item/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete an item by ID
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Item not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete an item
+      tags:
+      - Item
+    get:
+      consumes:
+      - application/json
+      description: Retrieve an item record by ID
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Item'
+              type: object
+        "400":
+          description: Invalid ID or item not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get item information
+      tags:
+      - Item
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing item record
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated item information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.updateItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Item updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Item'
+              type: object
+        "400":
+          description: Invalid request or item not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update item information
+      tags:
+      - Item
   /login:
     post:
       consumes:
@@ -625,6 +1169,14 @@ paths:
       - description: Filter by date range (last_2_days, last_3_months, last_6_months)
         in: query
         name: group_by_date
+        type: string
+      - description: 'Optional sort field: full_name|patient_code'
+        in: query
+        name: sort
+        type: string
+      - description: 'Optional sort direction: asc|desc'
+        in: query
+        name: sort_dir
         type: string
       produces:
       - application/json
@@ -772,7 +1324,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/model.Patient'
+          $ref: '#/definitions/model.UpdatePatientRequest'
       produces:
       - application/json
       responses:
@@ -803,6 +1355,213 @@ paths:
       summary: Update patient information
       tags:
       - Patient
+  /pricing:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of pricing records
+      parameters:
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricings retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/endpoint.pricingWithTherapist'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all pricings
+      tags:
+      - Pricing
+    post:
+      consumes:
+      - application/json
+      description: Add a new pricing record for a treatment
+      parameters:
+      - description: Pricing information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.createPricingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing created
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Pricing'
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new pricing
+      tags:
+      - Pricing
+  /pricing/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a pricing by ID
+      parameters:
+      - description: Pricing ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Pricing not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete a pricing
+      tags:
+      - Pricing
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a pricing record by ID
+      parameters:
+      - description: Pricing ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/endpoint.pricingWithTherapist'
+              type: object
+        "400":
+          description: Invalid ID or pricing not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get pricing information
+      tags:
+      - Pricing
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing pricing record
+      parameters:
+      - description: Pricing ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated pricing information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.updatePricingRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pricing updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Pricing'
+              type: object
+        "400":
+          description: Invalid request or pricing not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update pricing information
+      tags:
+      - Pricing
   /signup:
     post:
       consumes:
@@ -1109,6 +1868,148 @@ paths:
       summary: Validate session token
       tags:
       - Authentication
+  /transaction:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of transaction records
+      parameters:
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Filter by treatment date (YYYY-MM-DD). Also accepts RFC3339 datetime.
+        in: query
+        name: treatment_date
+        type: string
+      - description: Start date for a date range filter (YYYY-MM-DD).
+        in: query
+        name: start_date
+        type: string
+      - description: End date for a date range filter (YYYY-MM-DD).
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transactions retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListTransactionsResponseData'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all transactions
+      tags:
+      - Transaction
+  /transaction/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a transaction record by ID
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transaction retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Transaction'
+              type: object
+        "400":
+          description: Invalid ID or transaction not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get transaction information
+      tags:
+      - Transaction
+    patch:
+      consumes:
+      - application/json
+      description: Update transaction information by ID. Only provided fields will
+        be updated.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated transaction information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.updateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transaction updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Transaction'
+              type: object
+        "400":
+          description: Invalid request or transaction not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update a transaction
+      tags:
+      - Transaction
   /treatment:
     get:
       consumes:
@@ -1288,6 +2189,248 @@ paths:
       summary: Update treatment information
       tags:
       - Treatment
+  /user:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of users using cursor-based pagination. Admin-only
+        access.
+      parameters:
+      - description: Limit number of results (default 10, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Cursor for pagination (User ID)
+        in: query
+        name: cursor
+        type: integer
+      - description: Search keyword for name or email
+        in: query
+        name: keyword
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Users retrieved with cursor pagination
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all users (admin only)
+      tags:
+      - Authentication
+    patch:
+      consumes:
+      - application/json
+      description: Update authenticated user's name, email, and/or password
+      parameters:
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Update successful
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or email already exists
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update current user profile
+      tags:
+      - Authentication
+  /user/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft-delete a user by ID. Admin-only access.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid user id
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete user (admin only)
+      tags:
+      - Authentication
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a user's information by ID. Admin-only access.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User retrieved
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid user id
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get user info (admin only)
+      tags:
+      - Authentication
+    patch:
+      consumes:
+      - application/json
+      description: Admins can update another user's name, email, and password
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Update successful
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or email already exists
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update other user's profile (admin only)
+      tags:
+      - Authentication
+  /verify-password:
+    post:
+      consumes:
+      - application/json
+      description: Validate the provided current password for the authenticated user
+      parameters:
+      - description: Password to verify
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/endpoint.VerifyPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Password verified
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Invalid password or unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Verify current user's password
+      tags:
+      - Authentication
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.

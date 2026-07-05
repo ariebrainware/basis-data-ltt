@@ -243,9 +243,10 @@ func ListTransactions(c *gin.Context) {
 
 	var transactions []model.ListTransactionResponse
 	txQuery := db.Model(&model.Transaction{}).
-		Select("transactions.*, patients.full_name as patient_name, treatments.treatment_date").
+		Select("transactions.*, patients.full_name as patient_name, treatments.treatment_date, therapists.full_name as therapist_name").
 		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id").
-		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code")
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
+		Joins("LEFT JOIN therapists ON therapists.id = transactions.therapist_id")
 
 	txQuery = applyTransactionDateScope(txQuery, dateScope)
 
