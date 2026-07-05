@@ -28,6 +28,7 @@ type ListTransactionResponse struct {
 	Transaction
 	PatientName   string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
 	TreatmentDate string `json:"treatment_date" gorm:"column:treatment_date" example:"2025-01-15"`
+	TherapistName string `json:"therapist_name" gorm:"column:therapist_name" example:"Dr. John Smith"`
 }
 
 // PaymentStatusSummary represents counts of transactions by payment status.

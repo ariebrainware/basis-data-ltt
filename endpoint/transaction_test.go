@@ -322,6 +322,7 @@ func TestListTransactions_ReturnsPatientName(t *testing.T) {
 	first := transactions[0].(map[string]interface{})
 	assert.Equal(t, "Patient Alpha", first["patient_name"])
 	assert.Equal(t, now.Format("2006-01-02"), first["treatment_date"])
+	assert.Equal(t, "Therapist Alpha", first["therapist_name"])
 
 	// Verify summary is present
 	summary := data["summary"].(map[string]interface{})
