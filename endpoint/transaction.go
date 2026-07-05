@@ -55,7 +55,6 @@ func isValidTransactionPaymentMethod(method string) bool {
 	return validMethods[method]
 }
 
-
 func getTransactionIDParam(c *gin.Context) (string, bool) {
 	id := c.Param("id")
 	if id == "" {
