@@ -38,15 +38,15 @@ type CreateEmployeeRequest struct {
 // UpdateEmployeeRequest represents the employee update request body
 // @Description Employee update request payload
 type UpdateEmployeeRequest struct {
-	NIK         *int64  `json:"nik" example:"1234567890123456"`
-	FullName    string  `json:"fullname" example:"John Doe"`
-	Gender      string  `json:"gender" example:"Male"`
-	Address     string  `json:"address" example:"123 Main St"`
-	Religion    string  `json:"religion" example:"Islam"`
-	PhoneNumber string  `json:"phone_number" example:"081234567890"`
-	Email       string  `json:"email" binding:"omitempty,email" example:"john.doe@example.com"`
-	JoinedDate  string  `json:"joined_date" example:"2025-01-15"`
-	Position    string  `json:"position" example:"Manager"`
-	BaseSalary  *int    `json:"base_salary" example:"5000000"`
-	LunchMoney  *int    `json:"lunch_money" example:"50000"`
+	NIK         *int64 `json:"nik" example:"1234567890123456"`
+	FullName    string `json:"fullname" example:"John Doe"`
+	Gender      string `json:"gender" example:"Male"`
+	Address     string `json:"address" example:"123 Main St"`
+	Religion    string `json:"religion" example:"Islam"`
+	PhoneNumber string `json:"phone_number" example:"081234567890"`
+	Email       string `json:"email" binding:"omitempty,email" example:"john.doe@example.com"`
+	JoinedDate  string `json:"joined_date" example:"2025-01-15"`
+	Position    string `json:"position" example:"Manager"`
+	BaseSalary  *int   `json:"base_salary" example:"5000000"`
+	LunchMoney  *int   `json:"lunch_money" example:"50000"`
 }
