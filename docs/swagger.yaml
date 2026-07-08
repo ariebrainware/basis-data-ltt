@@ -244,6 +244,55 @@ definitions:
         description: Valid is true if Time is not NULL
         type: boolean
     type: object
+  model.CreateEmployeeRequest:
+    description: Employee creation request payload
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      base_salary:
+        example: 5000000
+        type: integer
+      email:
+        example: john.doe@example.com
+        type: string
+      fullname:
+        example: John Doe
+        type: string
+      gender:
+        example: Male
+        type: string
+      joined_date:
+        example: "2025-01-15"
+        type: string
+      lunch_money:
+        example: 50000
+        type: integer
+      nik:
+        example: 1234567890123456
+        type: integer
+      phone_number:
+        example: "081234567890"
+        type: string
+      position:
+        example: Manager
+        type: string
+      religion:
+        example: Islam
+        type: string
+    required:
+    - address
+    - base_salary
+    - email
+    - fullname
+    - gender
+    - joined_date
+    - lunch_money
+    - nik
+    - phone_number
+    - position
+    - religion
+    type: object
   model.Disease:
     description: Disease information
     properties:
@@ -261,6 +310,51 @@ definitions:
         type: integer
       name:
         example: Diabetes
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  model.Employee:
+    description: Employee information
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      base_salary:
+        example: 5000000
+        type: integer
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      email:
+        example: john.doe@example.com
+        type: string
+      fullname:
+        example: John Doe
+        type: string
+      gender:
+        example: Male
+        type: string
+      id:
+        type: integer
+      joined_date:
+        example: "2025-01-15"
+        type: string
+      lunch_money:
+        example: 50000
+        type: integer
+      nik:
+        example: 1234567890123456
+        type: integer
+      phone_number:
+        example: "081234567890"
+        type: string
+      position:
+        example: Manager
+        type: string
+      religion:
+        example: Islam
         type: string
       updatedAt:
         type: string
@@ -603,6 +697,43 @@ definitions:
       updatedAt:
         type: string
     type: object
+  model.UpdateEmployeeRequest:
+    description: Employee update request payload
+    properties:
+      address:
+        example: 123 Main St
+        type: string
+      base_salary:
+        example: 5000000
+        type: integer
+      email:
+        example: john.doe@example.com
+        type: string
+      fullname:
+        example: John Doe
+        type: string
+      gender:
+        example: Male
+        type: string
+      joined_date:
+        example: "2025-01-15"
+        type: string
+      lunch_money:
+        example: 50000
+        type: integer
+      nik:
+        example: 1234567890123456
+        type: integer
+      phone_number:
+        example: "081234567890"
+        type: string
+      position:
+        example: Manager
+        type: string
+      religion:
+        example: Islam
+        type: string
+    type: object
   model.UpdatePatientRequest:
     properties:
       address:
@@ -874,6 +1005,217 @@ paths:
       summary: Update disease information
       tags:
       - Disease
+  /employee:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of employees with optional keyword filtering
+      parameters:
+      - default: 10
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Search keyword for employee fullname, NIK, email, or phone number
+        in: query
+        name: keyword
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Employees retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.Employee'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List all employees
+      tags:
+      - Employee
+    post:
+      consumes:
+      - application/json
+      description: Add a new employee to the system
+      parameters:
+      - description: Employee information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Employee created
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Employee'
+              type: object
+        "400":
+          description: Invalid request body or validation failure
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new employee
+      tags:
+      - Employee
+  /employee/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete an employee by ID
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Employee deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Employee not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete an employee
+      tags:
+      - Employee
+    get:
+      consumes:
+      - application/json
+      description: Retrieve details of a specific employee by ID
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Employee details retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Employee'
+              type: object
+        "400":
+          description: Employee not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get employee details
+      tags:
+      - Employee
+    patch:
+      consumes:
+      - application/json
+      description: Update details of an existing employee by ID
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated employee information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Employee updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Employee'
+              type: object
+        "400":
+          description: Invalid request body or validation failure
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update employee details
+      tags:
+      - Employee
   /item:
     get:
       consumes:

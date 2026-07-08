@@ -109,7 +109,7 @@ func initDB() (*gorm.DB, error) {
 func migrateAndSeed(db *gorm.DB) error {
 	applyDiseaseCodenameMigrationFix(db)
 
-	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}, &model.Item{}); err != nil {
+	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}, &model.Item{}, &model.Employee{}); err != nil {
 		return err
 	}
 
@@ -204,6 +204,7 @@ func registerAuthenticatedRoutes(r *gin.Engine, cfg *config.Config) {
 	registerItemRoutes(auth)
 	registerTransactionRoutes(auth)
 	registerTherapistRoutes(auth)
+	registerEmployeeRoutes(auth)
 
 	if cfg.AppEnv != "production" {
 		auth.GET("/debug/dbinfo", middleware.RequireRole(model.RoleAdmin), endpoint.DebugDBInfo)
@@ -284,6 +285,16 @@ func registerTherapistRoutes(auth *gin.RouterGroup) {
 	therapist.PATCH("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateTherapist)
 	therapist.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTherapist)
 	therapist.PUT("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.TherapistApproval)
+}
+
+func registerEmployeeRoutes(auth *gin.RouterGroup) {
+	employee := auth.Group("/employee")
+	employee.Use(middleware.RequireRole(model.RoleAdmin))
+	employee.GET("", endpoint.ListEmployees)
+	employee.POST("", endpoint.CreateEmployee)
+	employee.GET("/:id", endpoint.GetEmployeeInfo)
+	employee.PATCH("/:id", endpoint.UpdateEmployee)
+	employee.DELETE("/:id", endpoint.DeleteEmployee)
 }
 
 func createServer(cfg *config.Config, handler http.Handler) *http.Server {
