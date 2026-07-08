@@ -1,0 +1,22 @@
+$kind: http-request
+url: "{{baseUrl}}/patient"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "full_name": "John Doe",
+      "gender": "Male",
+      "age": 30,
+      "job": "Engineer",
+      "address": "123 Main St",
+      "phone_number": ["081234567890"],
+      "health_history": ["Diabetes"],
+      "surgery_history": "Appendectomy 2020",
+      "patient_code": "",
+      "email": "john@example.com",
+      "password": "password123"
+    }
+order: 1000

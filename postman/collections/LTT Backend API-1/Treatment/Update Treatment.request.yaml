@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/treatment/{{treatmentId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "issues": "Neck pain",
+      "treatment": "Massage,Acupuncture",
+      "remarks": "Improved significantly",
+      "next_visit": "2024-01-29"
+    }
+order: 3000

@@ -1,14 +1,13 @@
 $kind: http-request
-name: List Items
-method: GET
 url: "{{baseUrl}}/item?limit={{limit}}"
-order: 1000
+method: GET
 headers:
-  - key: session-token
-    value: "{{sessionToken}}"
+  session-token: "{{sessionToken}}"
 queryParams:
   - key: limit
     value: "{{limit}}"
+    disabled: false
   - key: offset
     value: "{{offset}}"
     disabled: true
+order: 1000

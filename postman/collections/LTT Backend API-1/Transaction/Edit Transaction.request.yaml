@@ -1,0 +1,25 @@
+$kind: http-request
+url: "{{baseUrl}}/transaction/{{transactionId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "remarks": "Adjusted after adding items",
+      "payment_method": "cash",
+      "payment_status": "partial",
+      "items": [
+        {
+          "item_id": 1,
+          "quantity": 2
+        },
+        {
+          "item_id": 3,
+          "quantity": 1
+        }
+      ]
+    }
+order: 3000

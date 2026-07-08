@@ -1,0 +1,8 @@
+$kind: http-request
+name: 'Get Employee Info (Admin)'
+method: GET
+url: '{{baseUrl}}/employee/{{employeeId}}'
+order: 3000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

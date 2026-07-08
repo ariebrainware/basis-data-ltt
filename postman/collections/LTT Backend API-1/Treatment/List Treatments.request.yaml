@@ -1,0 +1,25 @@
+$kind: http-request
+url: "{{baseUrl}}/treatment"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+queryParams:
+  - key: limit
+    value: "10"
+    disabled: true
+  - key: offset
+    value: "0"
+    disabled: true
+  - key: therapist_id
+    value: "1"
+    disabled: true
+  - key: keyword
+    value: ""
+    disabled: true
+  - key: group_by_date
+    value: 2024-01-15
+    disabled: true
+  - key: filter_by_therapist
+    value: "true"
+    disabled: true
+order: 1000

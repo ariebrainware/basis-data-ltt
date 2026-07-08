@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/employee"
+method: POST
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "nik": 1234567890123456,
+      "fullname": "John Doe",
+      "gender": "Male",
+      "address": "123 Main St",
+      "religion": "Islam",
+      "phone_number": "081234567890",
+      "email": "john.doe@example.com",
+      "joined_date": "2025-01-15",
+      "position": "Manager",
+      "base_salary": 5000000,
+      "lunch_money": 50000
+    }
+order: 1000

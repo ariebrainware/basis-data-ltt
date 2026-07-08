@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{baseUrl}}/user"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+queryParams:
+  - key: limit
+    value: "10"
+    disabled: true
+  - key: cursor
+    value: "0"
+    disabled: true
+  - key: keyword
+    value: ""
+    disabled: true
+order: 7000
