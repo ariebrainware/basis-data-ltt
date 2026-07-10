@@ -1,0 +1,1476 @@
+{
+  "info": {
+    "name": "LTT Backend API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "login"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "signup"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logout"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Validate Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/token/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "token",
+                "validate"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Verify Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/verify-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "verify-password"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Current User",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"email\": \"updated@example.com\",\n  \"password\": \"newpassword123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "keyword",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get User Info (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "{{userId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update User by ID (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "{{userId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"email\": \"updated@example.com\",\n  \"password\": \"newpassword123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/user/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "user",
+                "{{userId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Disease",
+      "item": [
+        {
+          "name": "List Diseases",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disease",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disease"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Disease",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disease",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disease"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Diabetes\",\n  \"codename\": \"diabetes\",\n  \"description\": \"A metabolic disease\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Disease Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disease/{{diseaseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disease",
+                "{{diseaseId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update Disease",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disease/{{diseaseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disease",
+                "{{diseaseId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Type 2 Diabetes\",\n  \"codename\": \"type2-diabetes\",\n  \"description\": \"A chronic metabolic disease\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Disease",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/disease/{{diseaseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "disease",
+                "{{diseaseId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employee",
+      "item": [
+        {
+          "name": "Create Employee (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employee",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employee"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nik\": 1234567890123456,\n  \"fullname\": \"John Doe\",\n  \"gender\": \"Male\",\n  \"address\": \"123 Main St\",\n  \"religion\": \"Islam\",\n  \"phone_number\": \"081234567890\",\n  \"email\": \"john.doe@example.com\",\n  \"joined_date\": \"2025-01-15\",\n  \"position\": \"Manager\",\n  \"base_salary\": 5000000,\n  \"lunch_money\": 50000\n}"
+            }
+          }
+        },
+        {
+          "name": "List Employees (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employee",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employee"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "keyword",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Employee Info (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employee/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employee",
+                "{{employeeId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update Employee (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employee/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employee",
+                "{{employeeId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullname\": \"John Doe Updated\",\n  \"position\": \"Senior Manager\",\n  \"base_salary\": 6000000\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Employee (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/employee/{{employeeId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "employee",
+                "{{employeeId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Item",
+      "item": [
+        {
+          "name": "List Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/item?limit={{limit}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "item?limit={{limit}}"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "{{limit}}",
+                  "disabled": false
+                },
+                {
+                  "key": "offset",
+                  "value": "{{offset}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Item",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/item",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "item"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bandage\",\n  \"quantity\": 100,\n  \"price\": 25000\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Item",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/item/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "item",
+                "{{id}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update Item",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/item/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "item",
+                "{{id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bandage\",\n  \"quantity\": 150\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Item",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/item/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "item",
+                "{{id}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Patient",
+      "item": [
+        {
+          "name": "Create Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patient"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"John Doe\",\n  \"gender\": \"Male\",\n  \"age\": 30,\n  \"job\": \"Engineer\",\n  \"address\": \"123 Main St\",\n  \"phone_number\": [\"081234567890\"],\n  \"health_history\": [\"Diabetes\"],\n  \"surgery_history\": \"Appendectomy 2020\",\n  \"patient_code\": \"\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Patients (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patient"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "keyword",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "group_by_date",
+                  "value": "last_2_days",
+                  "disabled": true
+                },
+                {
+                  "key": "sort",
+                  "value": "full_name",
+                  "disabled": true
+                },
+                {
+                  "key": "sort_dir",
+                  "value": "asc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Patient Info (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patient/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patient",
+                "{{patientId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update Patient (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patient/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patient",
+                "{{patientId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Jane Doe\",\n  \"gender\": \"Female\",\n  \"age\": 28,\n  \"job\": \"Doctor\",\n  \"address\": \"456 Oak Ave\",\n  \"phone_number\": [\"081234567891\"],\n  \"health_history\": \"Hypertension\",\n  \"surgery_history\": \"\",\n  \"patient_code\": \"\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Patient (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/patient/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "patient",
+                "{{patientId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pricing",
+      "item": [
+        {
+          "name": "List Pricings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pricing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pricing"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Pricing",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pricing",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pricing"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"therapist_id\": 1,\n  \"price\": 150000\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Pricing Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pricing/{{pricingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pricing",
+                "{{pricingId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Update Pricing",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pricing/{{pricingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pricing",
+                "{{pricingId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"therapist_id\": 1,\n  \"price\": 175000,\n  \"description\": \"Updated pricing for senior therapist\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Pricing",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pricing/{{pricingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pricing",
+                "{{pricingId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Therapist",
+      "item": [
+        {
+          "name": "List Therapists",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/therapist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "therapist"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "keyword",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "group_by_date",
+                  "value": "last_2_days",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Therapist Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/therapist/{{therapistId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "therapist",
+                "{{therapistId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Therapist (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/therapist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "therapist"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Dr. John Smith\",\n  \"email\": \"dr.john@example.com\",\n  \"password\": \"password123\",\n  \"phone_number\": \"081234567890\",\n  \"address\": \"123 Main St\",\n  \"date_of_birth\": \"1980-01-01\",\n  \"nik\": \"1234567890123456\",\n  \"weight\": 70,\n  \"height\": 175,\n  \"role\": \"Physical Therapist\",\n  \"is_approved\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Therapist (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/therapist/{{therapistId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "therapist",
+                "{{therapistId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Dr. Jane Smith\",\n  \"phone_number\": \"081234567891\",\n  \"address\": \"456 Oak Ave\",\n  \"weight\": 65,\n  \"height\": 170\n}"
+            }
+          }
+        },
+        {
+          "name": "Approve Therapist (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/therapist/{{therapistId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "therapist",
+                "{{therapistId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_approved\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Therapist (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/therapist/{{therapistId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "therapist",
+                "{{therapistId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction",
+      "item": [
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transaction",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transaction"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "treatment_date",
+                  "value": "2024-01-15",
+                  "disabled": true
+                },
+                {
+                  "key": "start_date",
+                  "value": "2024-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "end_date",
+                  "value": "2024-01-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Get Transaction Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transaction/{{transactionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transaction",
+                "{{transactionId}}"
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Edit Transaction",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/transaction/{{transactionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "transaction",
+                "{{transactionId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remarks\": \"Adjusted after adding items\",\n  \"payment_method\": \"cash\",\n  \"payment_status\": \"partial\",\n  \"items\": [\n    {\n      \"item_id\": 1,\n      \"quantity\": 2\n    },\n    {\n      \"item_id\": 3,\n      \"quantity\": 1\n    }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Treatment",
+      "item": [
+        {
+          "name": "List Treatments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/treatment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "treatment"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": true
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "disabled": true
+                },
+                {
+                  "key": "therapist_id",
+                  "value": "1",
+                  "disabled": true
+                },
+                {
+                  "key": "keyword",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "group_by_date",
+                  "value": "2024-01-15",
+                  "disabled": true
+                },
+                {
+                  "key": "filter_by_therapist",
+                  "value": "true",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": ""
+          }
+        },
+        {
+          "name": "Create Treatment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/treatment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "treatment"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"treatment_date\": \"2024-01-15\",\n  \"patient_code\": \"J001\",\n  \"therapist_id\": 1,\n  \"issues\": \"Back pain\",\n  \"treatment\": [\"Massage\", \"Stretching\"],\n  \"remarks\": \"Patient responded well\",\n  \"next_visit\": \"2024-01-22\",\n  \"transaction\": {\n    \"payment_status\": \"unpaid\",\n    \"payment_method\": \"cash\",\n    \"remarks\": \"\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Treatment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/treatment/{{treatmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "treatment",
+                "{{treatmentId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"issues\": \"Neck pain\",\n  \"treatment\": \"Massage,Acupuncture\",\n  \"remarks\": \"Improved significantly\",\n  \"next_visit\": \"2024-01-29\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Treatment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "session-token",
+                "value": "{{sessionToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/treatment/{{treatmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "treatment",
+                "{{treatmentId}}"
+              ]
+            },
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}

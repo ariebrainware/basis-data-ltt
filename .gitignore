@@ -15,3 +15,4 @@ coverage.out
 *.out
 data/
 .DS_Store
+certs/
