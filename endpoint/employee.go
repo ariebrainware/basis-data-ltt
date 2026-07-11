@@ -133,9 +133,9 @@ func CreateEmployee(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Security     SessionToken
-// @Param        limit query int false "Limit number of results" default(10)
+// @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
-// @Param        keyword query string false "Search keyword for employee fullname, NIK, email, or phone number"
+// @Param        keyword query string false "Search keyword for employee fullname, NIK, email, phone number, or position"
 // @Success      200 {object} util.APIResponse{data=[]model.Employee} "Employees retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
