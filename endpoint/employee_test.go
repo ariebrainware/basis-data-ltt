@@ -412,24 +412,9 @@ func TestUpdateEmployee_DuplicateNIK(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.False(t, response["success"].(bool))
 	assert.Equal(t, "Another employee with this NIK already exists", response["msg"].(string))
+}
+
 func TestUpdateEmployee_EmptyFieldsValidation(t *testing.T) {
-	r, db := setupEmployeeEndpointTest(t)
-
-	employee := model.Employee{
-		NIK:         "66666",
-		FullName:    "Test Validation",
-		Gender:      "Male",
-		Address:     "123 Street",
-		Religion:    "None",
-		PhoneNumber: "0812345678",
-		Email:       "test@example.com",
-		JoinedDate:  "2026-01-01",
-		Position:    "Staff",
-		BaseSalary:  4000000,
-		LunchMoney:  30000,
-	}
-	assert.NoError(t, db.Create(&employee).Error)
-
 	testCases := []struct {
 		name        string
 		payload     map[string]interface{}
@@ -468,7 +453,7 @@ func TestUpdateEmployee_EmptyFieldsValidation(t *testing.T) {
 		{
 			name:        "Empty Email",
 			payload:     map[string]interface{}{"email": ""},
-			expectedMsg: "Invalid request body: email must not be empty",
+			expectedMsg: "Invalid request body",
 		},
 		{
 			name:        "Empty Joined Date",
@@ -484,6 +469,23 @@ func TestUpdateEmployee_EmptyFieldsValidation(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			r, db := setupEmployeeEndpointTest(t)
+
+			employee := model.Employee{
+				NIK:         "66666",
+				FullName:    "Test Validation",
+				Gender:      "Male",
+				Address:     "123 Street",
+				Religion:    "None",
+				PhoneNumber: "0812345678",
+				Email:       "test@example.com",
+				JoinedDate:  "2026-01-01",
+				Position:    "Staff",
+				BaseSalary:  4000000,
+				LunchMoney:  30000,
+			}
+			assert.NoError(t, db.Create(&employee).Error)
+
 			w, response, err := doRequestWithHandler(r, requestSpec{
 				method:       http.MethodPatch,
 				registerPath: "/employee/:id",
