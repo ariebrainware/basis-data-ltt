@@ -406,9 +406,17 @@ func UpdateEmployee(c *gin.Context) {
 		employee.Position = strings.TrimSpace(req.Position)
 	}
 	if req.BaseSalary != nil {
+		if *req.BaseSalary < 0 {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: base_salary must be >= 0", Err: fmt.Errorf("invalid base_salary")})
+			return
+		}
 		employee.BaseSalary = *req.BaseSalary
 	}
 	if req.LunchMoney != nil {
+		if *req.LunchMoney < 0 {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: lunch_money must be >= 0", Err: fmt.Errorf("invalid lunch_money")})
+			return
+		}
 		employee.LunchMoney = *req.LunchMoney
 	}
 
