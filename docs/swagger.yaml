@@ -1113,12 +1113,12 @@ paths:
           description: Employee deleted
           schema:
             $ref: '#/definitions/util.APIResponse'
-        "400":
-          description: Employee not found
-          schema:
-            $ref: '#/definitions/util.APIResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Employee not found
           schema:
             $ref: '#/definitions/util.APIResponse'
         "500":
@@ -1153,12 +1153,12 @@ paths:
                 data:
                   $ref: '#/definitions/model.Employee'
               type: object
-        "400":
-          description: Employee not found
-          schema:
-            $ref: '#/definitions/util.APIResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Employee not found
           schema:
             $ref: '#/definitions/util.APIResponse'
         "500":
@@ -1205,6 +1205,10 @@ paths:
             $ref: '#/definitions/util.APIResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Employee not found
           schema:
             $ref: '#/definitions/util.APIResponse'
         "500":

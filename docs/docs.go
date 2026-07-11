@@ -568,14 +568,14 @@ const docTemplate = `{
                             ]
                         }
                     },
-                    "400": {
-                        "description": "Employee not found",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "404": {
+                        "description": "Employee not found",
                         "schema": {
                             "$ref": "#/definitions/util.APIResponse"
                         }
@@ -624,14 +624,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     },
-                    "400": {
-                        "description": "Employee not found",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "404": {
+                        "description": "Employee not found",
                         "schema": {
                             "$ref": "#/definitions/util.APIResponse"
                         }
@@ -709,6 +709,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Employee not found",
                         "schema": {
                             "$ref": "#/definitions/util.APIResponse"
                         }

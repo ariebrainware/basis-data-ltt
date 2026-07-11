@@ -137,15 +137,6 @@ func CreateEmployee(c *gin.Context) {
 		BaseSalary:  req.BaseSalary,
 		LunchMoney:  req.LunchMoney,
 	}
-		Address:     strings.TrimSpace(req.Address),
-		Religion:    strings.TrimSpace(req.Religion),
-		PhoneNumber: strings.TrimSpace(req.PhoneNumber),
-		Email:       strings.TrimSpace(req.Email),
-		JoinedDate:  normalizedJoinedDate,
-		Position:    strings.TrimSpace(req.Position),
-		BaseSalary:  req.BaseSalary,
-		LunchMoney:  req.LunchMoney,
-	}
 
 	if err := db.Create(&employee).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
@@ -221,7 +212,7 @@ func ListEmployees(c *gin.Context) {
 // @Security     SessionToken
 // @Param        id path string true "Employee ID"
 // @Success      200 {object} util.APIResponse{data=model.Employee} "Employee details retrieved"
-// @Failure      400 {object} util.APIResponse "Employee not found"
+// @Failure      404 {object} util.APIResponse "Employee not found"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /employee/{id} [get]
@@ -279,6 +270,7 @@ func GetEmployeeInfo(c *gin.Context) {
 // @Success      200 {object} util.APIResponse{data=model.Employee} "Employee updated"
 // @Failure      400 {object} util.APIResponse "Invalid request body or validation failure"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
+// @Failure      404 {object} util.APIResponse "Employee not found"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /employee/{id} [patch]
 func UpdateEmployee(c *gin.Context) {
@@ -352,19 +344,6 @@ func UpdateEmployee(c *gin.Context) {
 			return
 		}
 		employee.NIK = nik
-	}
-				Msg: "Another employee with this NIK already exists",
-				Err: fmt.Errorf("duplicate NIK: %s", *req.NIK),
-			})
-			return
-		} else if err != gorm.ErrRecordNotFound {
-			util.CallServerError(c, util.APIErrorParams{
-				Msg: "Failed to check existing NIK",
-				Err: err,
-			})
-			return
-		}
-		employee.NIK = *req.NIK
 	}
 
 	// Update fields if provided
@@ -444,7 +423,7 @@ func UpdateEmployee(c *gin.Context) {
 // @Security     SessionToken
 // @Param        id path string true "Employee ID"
 // @Success      200 {object} util.APIResponse "Employee deleted"
-// @Failure      400 {object} util.APIResponse "Employee not found"
+// @Failure      404 {object} util.APIResponse "Employee not found"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /employee/{id} [delete]
