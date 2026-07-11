@@ -350,7 +350,12 @@ func UpdateEmployee(c *gin.Context) {
 
 	// Update fields if provided
 	if req.FullName != "" {
-		employee.FullName = util.NormalizeName(req.FullName)
+		fullName := util.NormalizeName(req.FullName)
+		if fullName == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: full_name must not be empty", Err: fmt.Errorf("full_name must not be empty")})
+			return
+		}
+		employee.FullName = fullName
 	}
 	if req.Gender != "" {
 		employee.Gender = req.Gender
