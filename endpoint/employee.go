@@ -331,9 +331,28 @@ func UpdateEmployee(c *gin.Context) {
 
 	// Validate NIK uniqueness if updated
 	if req.NIK != nil {
+		nik := strings.TrimSpace(*req.NIK)
+		if nik == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: nik must not be empty", Err: fmt.Errorf("nik must not be empty")})
+			return
+		}
+
 		var existing model.Employee
-		if err := db.Unscoped().Where("nik = ? AND id != ?", *req.NIK, employee.ID).First(&existing).Error; err == nil {
+		if err := db.Unscoped().Where("nik = ? AND id != ?", nik, employee.ID).First(&existing).Error; err == nil {
 			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Another employee with this NIK already exists",
+				Err: fmt.Errorf("duplicate NIK: %s", nik),
+			})
+			return
+		} else if err != gorm.ErrRecordNotFound {
+			util.CallServerError(c, util.APIErrorParams{
+				Msg: "Failed to check existing NIK",
+				Err: err,
+			})
+			return
+		}
+		employee.NIK = nik
+	}
 				Msg: "Another employee with this NIK already exists",
 				Err: fmt.Errorf("duplicate NIK: %s", *req.NIK),
 			})
