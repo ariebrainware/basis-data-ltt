@@ -291,7 +291,7 @@ func UpdateEmployee(c *gin.Context) {
 		})
 		return
 	}
-	if req.NIK == nil && req.FullName == "" && req.Gender == "" && req.Address == "" && req.Religion == "" && req.PhoneNumber == "" && req.Email == "" && req.JoinedDate == "" && req.Position == "" && req.BaseSalary == nil && req.LunchMoney == nil {
+	if req.NIK == nil && req.FullName == nil && req.Gender == nil && req.Address == nil && req.Religion == nil && req.PhoneNumber == nil && req.Email == nil && req.JoinedDate == nil && req.Position == nil && req.BaseSalary == nil && req.LunchMoney == nil {
 		util.CallUserError(c, util.APIErrorParams{Msg: "No fields to update", Err: fmt.Errorf("empty update payload")})
 		return
 	}
@@ -347,31 +347,61 @@ func UpdateEmployee(c *gin.Context) {
 	}
 
 	// Update fields if provided
-	if req.FullName != "" {
-		fullName := util.NormalizeName(req.FullName)
+	if req.FullName != nil {
+		fullName := util.NormalizeName(*req.FullName)
 		if fullName == "" {
 			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: full_name must not be empty", Err: fmt.Errorf("full_name must not be empty")})
 			return
 		}
 		employee.FullName = fullName
 	}
-	if req.Gender != "" {
-		employee.Gender = req.Gender
+	if req.Gender != nil {
+		gender := strings.TrimSpace(*req.Gender)
+		if gender == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: gender must not be empty", Err: fmt.Errorf("gender must not be empty")})
+			return
+		}
+		employee.Gender = gender
 	}
-	if req.Address != "" {
-		employee.Address = strings.TrimSpace(req.Address)
+	if req.Address != nil {
+		address := strings.TrimSpace(*req.Address)
+		if address == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: address must not be empty", Err: fmt.Errorf("address must not be empty")})
+			return
+		}
+		employee.Address = address
 	}
-	if req.Religion != "" {
-		employee.Religion = strings.TrimSpace(req.Religion)
+	if req.Religion != nil {
+		religion := strings.TrimSpace(*req.Religion)
+		if religion == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: religion must not be empty", Err: fmt.Errorf("religion must not be empty")})
+			return
+		}
+		employee.Religion = religion
 	}
-	if req.PhoneNumber != "" {
-		employee.PhoneNumber = strings.TrimSpace(req.PhoneNumber)
+	if req.PhoneNumber != nil {
+		phoneNumber := strings.TrimSpace(*req.PhoneNumber)
+		if phoneNumber == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: phone_number must not be empty", Err: fmt.Errorf("phone_number must not be empty")})
+			return
+		}
+		employee.PhoneNumber = phoneNumber
 	}
-	if req.Email != "" {
-		employee.Email = strings.TrimSpace(req.Email)
+	if req.Email != nil {
+		email := strings.TrimSpace(*req.Email)
+		if email == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: email must not be empty", Err: fmt.Errorf("email must not be empty")})
+			return
+		}
+		employee.Email = email
 	}
-	if req.JoinedDate != "" {
-		normalizedJoinedDate, err := normalizeEmployeeDate(req.JoinedDate)
+	if req.JoinedDate != nil {
+		joinedDate := strings.TrimSpace(*req.JoinedDate)
+		if joinedDate == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: joined_date must not be empty", Err: fmt.Errorf("joined_date must not be empty")})
+			return
+		}
+		normalizedJoinedDate, err := normalizeEmployeeDate(joinedDate)
 		if err != nil {
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Invalid joined_date format. Use YYYY-MM-DD or RFC3339",
@@ -381,8 +411,13 @@ func UpdateEmployee(c *gin.Context) {
 		}
 		employee.JoinedDate = normalizedJoinedDate
 	}
-	if req.Position != "" {
-		employee.Position = strings.TrimSpace(req.Position)
+	if req.Position != nil {
+		position := strings.TrimSpace(*req.Position)
+		if position == "" {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: position must not be empty", Err: fmt.Errorf("position must not be empty")})
+			return
+		}
+		employee.Position = position
 	}
 	if req.BaseSalary != nil {
 		if *req.BaseSalary < 0 {

@@ -412,6 +412,92 @@ func TestUpdateEmployee_DuplicateNIK(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.False(t, response["success"].(bool))
 	assert.Equal(t, "Another employee with this NIK already exists", response["msg"].(string))
+func TestUpdateEmployee_EmptyFieldsValidation(t *testing.T) {
+	r, db := setupEmployeeEndpointTest(t)
+
+	employee := model.Employee{
+		NIK:         "66666",
+		FullName:    "Test Validation",
+		Gender:      "Male",
+		Address:     "123 Street",
+		Religion:    "None",
+		PhoneNumber: "0812345678",
+		Email:       "test@example.com",
+		JoinedDate:  "2026-01-01",
+		Position:    "Staff",
+		BaseSalary:  4000000,
+		LunchMoney:  30000,
+	}
+	assert.NoError(t, db.Create(&employee).Error)
+
+	testCases := []struct {
+		name        string
+		payload     map[string]interface{}
+		expectedMsg string
+	}{
+		{
+			name:        "Empty NIK",
+			payload:     map[string]interface{}{"nik": ""},
+			expectedMsg: "Invalid request body: nik must not be empty",
+		},
+		{
+			name:        "Empty Full Name",
+			payload:     map[string]interface{}{"full_name": ""},
+			expectedMsg: "Invalid request body: full_name must not be empty",
+		},
+		{
+			name:        "Empty Gender",
+			payload:     map[string]interface{}{"gender": ""},
+			expectedMsg: "Invalid request body: gender must not be empty",
+		},
+		{
+			name:        "Empty Address",
+			payload:     map[string]interface{}{"address": ""},
+			expectedMsg: "Invalid request body: address must not be empty",
+		},
+		{
+			name:        "Empty Religion",
+			payload:     map[string]interface{}{"religion": ""},
+			expectedMsg: "Invalid request body: religion must not be empty",
+		},
+		{
+			name:        "Empty Phone Number",
+			payload:     map[string]interface{}{"phone_number": ""},
+			expectedMsg: "Invalid request body: phone_number must not be empty",
+		},
+		{
+			name:        "Empty Email",
+			payload:     map[string]interface{}{"email": ""},
+			expectedMsg: "Invalid request body: email must not be empty",
+		},
+		{
+			name:        "Empty Joined Date",
+			payload:     map[string]interface{}{"joined_date": ""},
+			expectedMsg: "Invalid request body: joined_date must not be empty",
+		},
+		{
+			name:        "Empty Position",
+			payload:     map[string]interface{}{"position": ""},
+			expectedMsg: "Invalid request body: position must not be empty",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, response, err := doRequestWithHandler(r, requestSpec{
+				method:       http.MethodPatch,
+				registerPath: "/employee/:id",
+				requestPath:  fmt.Sprintf("/employee/%d", employee.ID),
+				handler:      UpdateEmployee,
+				body:         tc.payload,
+			})
+
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.False(t, response["success"].(bool))
+			assert.Equal(t, tc.expectedMsg, response["msg"].(string))
+		})
+	}
 }
 
 func TestDeleteEmployee(t *testing.T) {
