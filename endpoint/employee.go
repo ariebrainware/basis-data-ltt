@@ -80,6 +80,16 @@ func CreateEmployee(c *gin.Context) {
 		return
 	}
 
+	// Trim and validate NIK before using it for duplicate checks / persistence.
+	req.NIK = strings.TrimSpace(req.NIK)
+	if req.NIK == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body",
+			Err: fmt.Errorf("nik is required"),
+		})
+		return
+	}
+
 	// Check if NIK already exists
 	var existing model.Employee
 	if err := db.Unscoped().Where("nik = ?", req.NIK).First(&existing).Error; err == nil {
