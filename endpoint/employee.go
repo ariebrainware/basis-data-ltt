@@ -82,7 +82,7 @@ func CreateEmployee(c *gin.Context) {
 
 	// Check if NIK already exists
 	var existing model.Employee
-	if err := db.Where("nik = ?", req.NIK).First(&existing).Error; err == nil {
+	if err := db.Unscoped().Where("nik = ?", req.NIK).First(&existing).Error; err == nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Employee with this NIK already exists",
 			Err: fmt.Errorf("duplicate NIK: %d", req.NIK),
