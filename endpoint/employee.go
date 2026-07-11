@@ -299,6 +299,10 @@ func UpdateEmployee(c *gin.Context) {
 		})
 		return
 	}
+	if req.NIK == nil && req.FullName == "" && req.Gender == "" && req.Address == "" && req.Religion == "" && req.PhoneNumber == "" && req.Email == "" && req.JoinedDate == "" && req.Position == "" && req.BaseSalary == nil && req.LunchMoney == nil {
+		util.CallUserError(c, util.APIErrorParams{Msg: "No fields to update", Err: fmt.Errorf("empty update payload")})
+		return
+	}
 
 	db := middleware.GetDB(c)
 	if db == nil {
