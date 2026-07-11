@@ -297,7 +297,7 @@ func UpdateEmployee(c *gin.Context) {
 	// Validate NIK uniqueness if updated
 	if req.NIK != nil {
 		var existing model.Employee
-		if err := db.Where("nik = ? AND id != ?", *req.NIK, employee.ID).First(&existing).Error; err == nil {
+		if err := db.Unscoped().Where("nik = ? AND id != ?", *req.NIK, employee.ID).First(&existing).Error; err == nil {
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Another employee with this NIK already exists",
 				Err: fmt.Errorf("duplicate NIK: %d", *req.NIK),
