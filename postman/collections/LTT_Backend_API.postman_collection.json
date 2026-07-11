@@ -458,7 +458,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"nik\": \"1234567890123456\",\n  \"fullname\": \"John Doe\",\n  \"gender\": \"Male\",\n  \"address\": \"123 Main St\",\n  \"religion\": \"Islam\",\n  \"phone_number\": \"081234567890\",\n  \"email\": \"john.doe@example.com\",\n  \"joined_date\": \"2025-01-15\",\n  \"position\": \"Manager\",\n  \"base_salary\": 5000000,\n  \"lunch_money\": 50000\n}"
+              "raw": "{\n  \"nik\": \"1234567890123456\",\n  \"full_name\": \"John Doe\",\n  \"gender\": \"Male\",\n  \"address\": \"123 Main St\",\n  \"religion\": \"Islam\",\n  \"phone_number\": \"081234567890\",\n  \"email\": \"john.doe@example.com\",\n  \"joined_date\": \"2025-01-15\",\n  \"position\": \"Manager\",\n  \"base_salary\": 5000000,\n  \"lunch_money\": 50000\n}"
             }
           }
         },
@@ -551,7 +551,7 @@
             "description": "",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullname\": \"John Doe Updated\",\n  \"position\": \"Senior Manager\",\n  \"base_salary\": 6000000\n}"
+              "raw": "{\n  \"full_name\": \"John Doe Updated\",\n  \"position\": \"Senior Manager\",\n  \"base_salary\": 6000000\n}"
             }
           }
         },

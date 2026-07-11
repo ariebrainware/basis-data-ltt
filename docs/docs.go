@@ -393,7 +393,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "default": 10,
+                        "default": 100,
                         "description": "Limit number of results",
                         "name": "limit",
                         "in": "query"
@@ -407,7 +407,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Search keyword for employee fullname, NIK, email, or phone number",
+                        "description": "Search keyword for employee full_name, NIK, email, phone number, or position",
                         "name": "keyword",
                         "in": "query"
                     }
@@ -3645,7 +3645,7 @@ const docTemplate = `{
                 "address",
                 "base_salary",
                 "email",
-                "fullname",
+                "full_name",
                 "gender",
                 "joined_date",
                 "lunch_money",
@@ -3667,7 +3667,7 @@ const docTemplate = `{
                     "type": "string",
                     "example": "john.doe@example.com"
                 },
-                "fullname": {
+                "full_name": {
                     "type": "string",
                     "example": "John Doe"
                 },
@@ -3753,7 +3753,7 @@ const docTemplate = `{
                     "type": "string",
                     "example": "john.doe@example.com"
                 },
-                "fullname": {
+                "full_name": {
                     "type": "string",
                     "example": "John Doe"
                 },
@@ -4284,7 +4284,7 @@ const docTemplate = `{
                     "type": "string",
                     "example": "john.doe@example.com"
                 },
-                "fullname": {
+                "full_name": {
                     "type": "string",
                     "example": "John Doe"
                 },

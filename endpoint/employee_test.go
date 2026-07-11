@@ -27,7 +27,7 @@ func TestCreateEmployee_Success(t *testing.T) {
 		handler:      CreateEmployee,
 		body: map[string]interface{}{
 			"nik":          "1234567890123456",
-			"fullname":     "Jane Doe",
+			"full_name":    "Jane Doe",
 			"gender":       "Female",
 			"address":      "456 Maple Rd",
 			"religion":     "Christianity",
@@ -60,7 +60,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 		{
 			name: "missing NIK",
 			body: map[string]interface{}{
-				"fullname":     "Jane Doe",
+				"full_name":    "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
 				"religion":     "Christianity",
@@ -77,7 +77,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 			name: "invalid email format",
 			body: map[string]interface{}{
 				"nik":          "1234567890123456",
-				"fullname":     "Jane Doe",
+				"full_name":    "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
 				"religion":     "Christianity",
@@ -94,7 +94,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 			name: "invalid joined_date format",
 			body: map[string]interface{}{
 				"nik":          "1234567890123456",
-				"fullname":     "Jane Doe",
+				"full_name":    "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
 				"religion":     "Christianity",
@@ -111,7 +111,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 			name: "missing position",
 			body: map[string]interface{}{
 				"nik":          "1234567890123456",
-				"fullname":     "Jane Doe",
+				"full_name":    "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
 				"religion":     "Christianity",
@@ -168,7 +168,7 @@ func TestCreateEmployee_DuplicateNIK(t *testing.T) {
 		handler:      CreateEmployee,
 		body: map[string]interface{}{
 			"nik":          "1234567890123456", // Duplicate NIK
-			"fullname":     "Another Jane",
+			"full_name":    "Another Jane",
 			"gender":       "Female",
 			"address":      "789 Pine Ave",
 			"religion":     "Islam",
@@ -248,7 +248,7 @@ func TestListEmployees(t *testing.T) {
 		data := response["data"].([]interface{})
 		assert.Len(t, data, 1)
 		first := data[0].(map[string]interface{})
-		assert.Equal(t, "Alice Green", first["fullname"])
+		assert.Equal(t, "Alice Green", first["full_name"])
 	})
 
 	t.Run("search by NIK", func(t *testing.T) {
@@ -265,7 +265,7 @@ func TestListEmployees(t *testing.T) {
 		data := response["data"].([]interface{})
 		assert.Len(t, data, 1)
 		first := data[0].(map[string]interface{})
-		assert.Equal(t, "Bob Blue", first["fullname"])
+		assert.Equal(t, "Bob Blue", first["full_name"])
 	})
 
 	t.Run("search by position", func(t *testing.T) {
@@ -282,7 +282,7 @@ func TestListEmployees(t *testing.T) {
 		data := response["data"].([]interface{})
 		assert.Len(t, data, 1)
 		first := data[0].(map[string]interface{})
-		assert.Equal(t, "Bob Blue", first["fullname"])
+		assert.Equal(t, "Bob Blue", first["full_name"])
 		assert.Equal(t, "Manager", first["position"])
 	})
 
@@ -324,7 +324,7 @@ func TestGetEmployeeInfo_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, w.Code)
 	data := response["data"].(map[string]interface{})
-	assert.Equal(t, "Test Employee", data["fullname"])
+	assert.Equal(t, "Test Employee", data["full_name"])
 	assert.Equal(t, "Staff", data["position"])
 }
 
@@ -361,7 +361,7 @@ func TestUpdateEmployee_Success(t *testing.T) {
 		requestPath:  fmt.Sprintf("/employee/%d", employee.ID),
 		handler:      UpdateEmployee,
 		body: map[string]interface{}{
-			"fullname":    "New Name",
+			"full_name":   "New Name",
 			"position":    "Manager",
 			"base_salary": 5500000,
 			"joined_date": "2026-05-12",

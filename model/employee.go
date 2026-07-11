@@ -7,7 +7,7 @@ import "gorm.io/gorm"
 type Employee struct {
 	gorm.Model
 	NIK         string `json:"nik" gorm:"column:nik;uniqueIndex;not null" example:"1234567890123456"`
-	FullName    string `json:"fullname" gorm:"column:fullname;not null" example:"John Doe"`
+	FullName    string `json:"full_name" gorm:"column:full_name;not null" example:"John Doe"`
 	Gender      string `json:"gender" gorm:"column:gender;not null" example:"Male"`
 	Address     string `json:"address" gorm:"column:address;not null" example:"123 Main St"`
 	Religion    string `json:"religion" gorm:"column:religion;not null" example:"Islam"`
@@ -23,7 +23,7 @@ type Employee struct {
 // @Description Employee creation request payload
 type CreateEmployeeRequest struct {
 	NIK         string `json:"nik" binding:"required" example:"1234567890123456"`
-	FullName    string `json:"fullname" binding:"required" example:"John Doe"`
+	FullName    string `json:"full_name" binding:"required" example:"John Doe"`
 	Gender      string `json:"gender" binding:"required" example:"Male"`
 	Address     string `json:"address" binding:"required" example:"123 Main St"`
 	Religion    string `json:"religion" binding:"required" example:"Islam"`
@@ -39,7 +39,7 @@ type CreateEmployeeRequest struct {
 // @Description Employee update request payload
 type UpdateEmployeeRequest struct {
 	NIK         *string `json:"nik" example:"1234567890123456"`
-	FullName    string `json:"fullname" example:"John Doe"`
+	FullName    string `json:"full_name" example:"John Doe"`
 	Gender      string `json:"gender" example:"Male"`
 	Address     string `json:"address" example:"123 Main St"`
 	Religion    string `json:"religion" example:"Islam"`

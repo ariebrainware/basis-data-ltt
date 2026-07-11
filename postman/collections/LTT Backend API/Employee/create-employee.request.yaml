@@ -13,7 +13,7 @@ body:
   content: |-
     {
       "nik": "1234567890123456",
-      "fullname": "John Doe",
+      "full_name": "John Doe",
       "gender": "Male",
       "address": "123 Main St",
       "religion": "Islam",

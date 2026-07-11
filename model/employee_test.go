@@ -41,7 +41,7 @@ func TestEmployeeModel_CreateReadUpdateDelete(t *testing.T) {
 	assert.Equal(t, 5000000, found.BaseSalary)
 
 	// Update
-	assert.NoError(t, db.Model(&found).Update("fullname", "John Doe Updated").Error)
+	assert.NoError(t, db.Model(&found).Update("full_name", "John Doe Updated").Error)
 	assert.NoError(t, db.First(&found, employee.ID).Error)
 	assert.Equal(t, "John Doe Updated", found.FullName)
 

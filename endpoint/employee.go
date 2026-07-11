@@ -135,7 +135,7 @@ func CreateEmployee(c *gin.Context) {
 // @Security     SessionToken
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
-// @Param        keyword query string false "Search keyword for employee fullname, NIK, email, phone number, or position"
+// @Param        keyword query string false "Search keyword for employee full_name, NIK, email, phone number, or position"
 // @Success      200 {object} util.APIResponse{data=[]model.Employee} "Employees retrieved"
 // @Failure      401 {object} util.APIResponse "Unauthorized"
 // @Failure      500 {object} util.APIResponse "Server error"
@@ -157,7 +157,7 @@ func ListEmployees(c *gin.Context) {
 	query := db.Model(&model.Employee{})
 	if keyword != "" {
 		kw := "%" + keyword + "%"
-		query = query.Where("fullname LIKE ? OR nik LIKE ? OR email LIKE ? OR phone_number LIKE ? OR position LIKE ?", kw, kw, kw, kw, kw)
+		query = query.Where("full_name LIKE ? OR nik LIKE ? OR email LIKE ? OR phone_number LIKE ? OR position LIKE ?", kw, kw, kw, kw, kw)
 	}
 
 	var employees []model.Employee

@@ -256,7 +256,7 @@ definitions:
       email:
         example: john.doe@example.com
         type: string
-      fullname:
+      full_name:
         example: John Doe
         type: string
       gender:
@@ -284,7 +284,7 @@ definitions:
     - address
     - base_salary
     - email
-    - fullname
+    - full_name
     - gender
     - joined_date
     - lunch_money
@@ -330,7 +330,7 @@ definitions:
       email:
         example: john.doe@example.com
         type: string
-      fullname:
+      full_name:
         example: John Doe
         type: string
       gender:
@@ -709,7 +709,7 @@ definitions:
       email:
         example: john.doe@example.com
         type: string
-      fullname:
+      full_name:
         example: John Doe
         type: string
       gender:
@@ -1011,7 +1011,7 @@ paths:
       - application/json
       description: Get a paginated list of employees with optional keyword filtering
       parameters:
-      - default: 10
+      - default: 100
         description: Limit number of results
         in: query
         name: limit
@@ -1021,7 +1021,8 @@ paths:
         in: query
         name: offset
         type: integer
-      - description: Search keyword for employee fullname, NIK, email, or phone number
+      - description: Search keyword for employee full_name, NIK, email, phone number,
+          or position
         in: query
         name: keyword
         type: string
