@@ -24,6 +24,14 @@ const docTemplate = `{
     "paths": {
         "/disease": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
                 "description": "Get a paginated list of diseases",
                 "consumes": [
                     "application/json"
@@ -85,7 +93,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -93,9 +103,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Add a new disease to the system",
                 "consumes": [
                     "application/json"
@@ -155,7 +163,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/disease/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -163,11 +175,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/disease/{id}": {
-            "get": {
+                ],
                 "description": "Get detailed information about a specific disease",
                 "consumes": [
                     "application/json"
@@ -225,7 +233,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -233,9 +243,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft delete a disease by ID",
                 "consumes": [
                     "application/json"
@@ -281,7 +289,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -289,9 +299,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update an existing disease's information",
                 "consumes": [
                     "application/json"
@@ -358,7 +366,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/employee": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -366,11 +378,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/employee": {
-            "get": {
+                ],
                 "description": "Get a paginated list of employees with optional keyword filtering",
                 "consumes": [
                     "application/json"
@@ -438,7 +446,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -446,9 +456,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Add a new employee to the system",
                 "consumes": [
                     "application/json"
@@ -508,7 +516,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/employee/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -516,11 +528,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/employee/{id}": {
-            "get": {
+                ],
                 "description": "Retrieve details of a specific employee by ID",
                 "consumes": [
                     "application/json"
@@ -578,7 +586,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -586,9 +596,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft delete an employee by ID",
                 "consumes": [
                     "application/json"
@@ -634,7 +642,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -642,9 +652,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update details of an existing employee by ID",
                 "consumes": [
                     "application/json"
@@ -711,7 +719,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/item": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -719,11 +731,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/item": {
-            "get": {
+                ],
                 "description": "Get a paginated list of items",
                 "consumes": [
                     "application/json"
@@ -785,7 +793,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -793,9 +803,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Add a new item record",
                 "consumes": [
                     "application/json"
@@ -855,7 +863,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/item/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -863,11 +875,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/item/{id}": {
-            "get": {
+                ],
                 "description": "Retrieve an item record by ID",
                 "consumes": [
                     "application/json"
@@ -925,7 +933,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -933,9 +943,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft delete an item by ID",
                 "consumes": [
                     "application/json"
@@ -981,7 +989,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -989,9 +999,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update an existing item record",
                 "consumes": [
                     "application/json"
@@ -1058,19 +1066,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    },
-                    {
-                        "SessionToken": []
-                    }
-                ]
+                }
             }
         },
         "/login": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Authenticate user with email and password",
                 "consumes": [
                     "application/json"
@@ -1124,16 +1129,19 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/logout": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
                 "description": "Invalidate the user session token",
                 "consumes": [
                     "application/json"
@@ -1170,7 +1178,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/patient": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1178,11 +1190,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/patient": {
-            "get": {
+                ],
                 "description": "Get a paginated list of patients with optional filtering",
                 "consumes": [
                     "application/json"
@@ -1263,15 +1271,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    },
-                    {
-                        "SessionToken": []
-                    }
-                ]
+                }
             },
             "post": {
                 "description": "Register a new patient (public endpoint - no authentication required)",
@@ -1320,6 +1320,14 @@ const docTemplate = `{
         },
         "/patient/{id}": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
                 "description": "Get detailed information about a specific patient",
                 "consumes": [
                     "application/json"
@@ -1377,7 +1385,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1385,9 +1395,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft delete a patient by ID",
                 "consumes": [
                     "application/json"
@@ -1433,7 +1441,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1441,9 +1451,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update an existing patient's information",
                 "consumes": [
                     "application/json"
@@ -1510,7 +1518,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/pricing": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1518,11 +1530,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/pricing": {
-            "get": {
+                ],
                 "description": "Get a paginated list of pricing records",
                 "consumes": [
                     "application/json"
@@ -1584,7 +1592,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1592,9 +1602,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Add a new pricing record for a treatment",
                 "consumes": [
                     "application/json"
@@ -1654,7 +1662,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/pricing/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1662,11 +1674,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/pricing/{id}": {
-            "get": {
+                ],
                 "description": "Retrieve a pricing record by ID",
                 "consumes": [
                     "application/json"
@@ -1724,7 +1732,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1732,9 +1742,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft delete a pricing by ID",
                 "consumes": [
                     "application/json"
@@ -1780,7 +1788,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -1788,9 +1798,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update an existing pricing record",
                 "consumes": [
                     "application/json"
@@ -1857,19 +1865,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    },
-                    {
-                        "SessionToken": []
-                    }
-                ]
+                }
             }
         },
         "/signup": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Register a new user account",
                 "consumes": [
                     "application/json"
@@ -1923,16 +1928,19 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/therapist": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
                 "description": "Get a paginated list of therapists with optional filtering",
                 "consumes": [
                     "application/json"
@@ -2001,7 +2009,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2009,9 +2019,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Register a new therapist in the system",
                 "consumes": [
                     "application/json"
@@ -2059,7 +2067,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/therapist/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2067,11 +2079,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/therapist/{id}": {
-            "get": {
+                ],
                 "description": "Get detailed information about a specific therapist",
                 "consumes": [
                     "application/json"
@@ -2129,7 +2137,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "put": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2137,9 +2147,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "put": {
+                ],
                 "description": "Approve a therapist account for system access",
                 "consumes": [
                     "application/json"
@@ -2194,7 +2202,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2202,9 +2212,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft delete a therapist by ID",
                 "consumes": [
                     "application/json"
@@ -2250,7 +2258,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2258,9 +2268,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update an existing therapist's information (excluding approval status)",
                 "consumes": [
                     "application/json"
@@ -2315,7 +2323,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/token/validate": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2323,11 +2335,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/token/validate": {
-            "get": {
+                ],
                 "description": "Validate if the session token is valid and not expired",
                 "consumes": [
                     "application/json"
@@ -2358,7 +2366,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/transaction": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2366,11 +2378,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/transaction": {
-            "get": {
+                ],
                 "description": "Get a paginated list of transaction records",
                 "consumes": [
                     "application/json"
@@ -2447,7 +2455,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/transaction/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2455,11 +2467,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/transaction/{id}": {
-            "get": {
+                ],
                 "description": "Retrieve a transaction record by ID",
                 "consumes": [
                     "application/json"
@@ -2517,7 +2525,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2525,9 +2535,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update transaction information by ID. Only provided fields will be updated.",
                 "consumes": [
                     "application/json"
@@ -2594,7 +2602,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/treatment": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2602,11 +2614,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/treatment": {
-            "get": {
+                ],
                 "description": "Get a paginated list of treatments with optional filtering by therapist, keyword, and date",
                 "consumes": [
                     "application/json"
@@ -2693,7 +2701,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2701,9 +2711,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "post": {
+                ],
                 "description": "Add a new treatment record",
                 "consumes": [
                     "application/json"
@@ -2751,7 +2759,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/treatment/{id}": {
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2759,11 +2771,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/treatment/{id}": {
-            "delete": {
+                ],
                 "description": "Soft delete a treatment record by ID",
                 "consumes": [
                     "application/json"
@@ -2809,7 +2817,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2817,9 +2827,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update an existing treatment record",
                 "consumes": [
                     "application/json"
@@ -2886,7 +2894,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/user": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2894,11 +2906,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/user": {
-            "get": {
+                ],
                 "description": "Get a paginated list of users using cursor-based pagination. Admin-only access.",
                 "consumes": [
                     "application/json"
@@ -2961,7 +2969,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -2969,9 +2979,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Update authenticated user's name, email, and/or password",
                 "consumes": [
                     "application/json"
@@ -3019,7 +3027,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/user/{id}": {
+            "get": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -3027,11 +3039,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/user/{id}": {
-            "get": {
+                ],
                 "description": "Retrieve a user's information by ID. Admin-only access.",
                 "consumes": [
                     "application/json"
@@ -3083,7 +3091,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "delete": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -3091,9 +3101,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "delete": {
+                ],
                 "description": "Soft-delete a user by ID. Admin-only access.",
                 "consumes": [
                     "application/json"
@@ -3145,7 +3153,9 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            },
+            "patch": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -3153,9 +3163,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            },
-            "patch": {
+                ],
                 "description": "Admins can update another user's name, email, and password",
                 "consumes": [
                     "application/json"
@@ -3210,7 +3218,11 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
+                }
+            }
+        },
+        "/verify-password": {
+            "post": {
                 "security": [
                     {
                         "BearerAuth": []
@@ -3218,11 +3230,7 @@ const docTemplate = `{
                     {
                         "SessionToken": []
                     }
-                ]
-            }
-        },
-        "/verify-password": {
-            "post": {
+                ],
                 "description": "Validate the provided current password for the authenticated user",
                 "consumes": [
                     "application/json"
@@ -3276,15 +3284,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/util.APIResponse"
                         }
                     }
-                },
-                "security": [
-                    {
-                        "BearerAuth": []
-                    },
-                    {
-                        "SessionToken": []
-                    }
-                ]
+                }
             }
         }
     },
@@ -3684,8 +3684,8 @@ const docTemplate = `{
                     "example": 50000
                 },
                 "nik": {
-                    "type": "integer",
-                    "example": 1234567890123456
+                    "type": "string",
+                    "example": "1234567890123456"
                 },
                 "phone_number": {
                     "type": "string",
@@ -3773,8 +3773,8 @@ const docTemplate = `{
                     "example": 50000
                 },
                 "nik": {
-                    "type": "integer",
-                    "example": 1234567890123456
+                    "type": "string",
+                    "example": "1234567890123456"
                 },
                 "phone_number": {
                     "type": "string",
@@ -4301,8 +4301,8 @@ const docTemplate = `{
                     "example": 50000
                 },
                 "nik": {
-                    "type": "integer",
-                    "example": 1234567890123456
+                    "type": "string",
+                    "example": "1234567890123456"
                 },
                 "phone_number": {
                     "type": "string",

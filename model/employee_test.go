@@ -15,7 +15,7 @@ func TestEmployeeModel_CreateReadUpdateDelete(t *testing.T) {
 	db := setupEmployeeTestDB(t)
 
 	employee := Employee{
-		NIK:         1234567890123456,
+		NIK:         "1234567890123456",
 		FullName:    "John Doe",
 		Gender:      "Male",
 		Address:     "123 Main St",
@@ -35,7 +35,7 @@ func TestEmployeeModel_CreateReadUpdateDelete(t *testing.T) {
 	// Read
 	var found Employee
 	assert.NoError(t, db.First(&found, employee.ID).Error)
-	assert.Equal(t, int64(1234567890123456), found.NIK)
+	assert.Equal(t, "1234567890123456", found.NIK)
 	assert.Equal(t, "John Doe", found.FullName)
 	assert.Equal(t, "Staff", found.Position)
 	assert.Equal(t, 5000000, found.BaseSalary)
@@ -57,7 +57,7 @@ func TestEmployeeModel_UniqueNIK(t *testing.T) {
 	db := setupEmployeeTestDB(t)
 
 	e1 := Employee{
-		NIK:         1111222233334444,
+		NIK:         "1111222233334444",
 		FullName:    "Alice Smith",
 		Gender:      "Female",
 		Address:     "456 Oak Ave",
@@ -72,7 +72,7 @@ func TestEmployeeModel_UniqueNIK(t *testing.T) {
 	assert.NoError(t, db.Create(&e1).Error)
 
 	e2 := Employee{
-		NIK:         1111222233334444, // Same NIK
+		NIK:         "1111222233334444", // Same NIK
 		FullName:    "Bob Jones",
 		Gender:      "Male",
 		Address:     "789 Pine Rd",

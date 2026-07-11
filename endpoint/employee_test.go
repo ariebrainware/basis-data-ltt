@@ -26,7 +26,7 @@ func TestCreateEmployee_Success(t *testing.T) {
 		requestPath:  "/employee",
 		handler:      CreateEmployee,
 		body: map[string]interface{}{
-			"nik":          int64(1234567890123456),
+			"nik":          "1234567890123456",
 			"fullname":     "Jane Doe",
 			"gender":       "Female",
 			"address":      "456 Maple Rd",
@@ -45,7 +45,7 @@ func TestCreateEmployee_Success(t *testing.T) {
 	assert.True(t, response["success"].(bool))
 
 	var employee model.Employee
-	assert.NoError(t, db.Where("nik = ?", 1234567890123456).First(&employee).Error)
+	assert.NoError(t, db.Where("nik = ?", "1234567890123456").First(&employee).Error)
 	assert.Equal(t, "Jane Doe", employee.FullName)
 	assert.Equal(t, "Staff", employee.Position)
 	assert.Equal(t, 6500000, employee.BaseSalary)
@@ -76,7 +76,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 		{
 			name: "invalid email format",
 			body: map[string]interface{}{
-				"nik":          int64(1234567890123456),
+				"nik":          "1234567890123456",
 				"fullname":     "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
@@ -93,7 +93,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 		{
 			name: "invalid joined_date format",
 			body: map[string]interface{}{
-				"nik":          int64(1234567890123456),
+				"nik":          "1234567890123456",
 				"fullname":     "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
@@ -110,7 +110,7 @@ func TestCreateEmployee_ValidationFailures(t *testing.T) {
 		{
 			name: "missing position",
 			body: map[string]interface{}{
-				"nik":          int64(1234567890123456),
+				"nik":          "1234567890123456",
 				"fullname":     "Jane Doe",
 				"gender":       "Female",
 				"address":      "456 Maple Rd",
@@ -147,7 +147,7 @@ func TestCreateEmployee_DuplicateNIK(t *testing.T) {
 	r, db := setupEmployeeEndpointTest(t)
 
 	e1 := model.Employee{
-		NIK:         1234567890123456,
+		NIK:         "1234567890123456",
 		FullName:    "Jane Doe",
 		Gender:      "Female",
 		Address:     "456 Maple Rd",
@@ -167,7 +167,7 @@ func TestCreateEmployee_DuplicateNIK(t *testing.T) {
 		requestPath:  "/employee",
 		handler:      CreateEmployee,
 		body: map[string]interface{}{
-			"nik":          int64(1234567890123456), // Duplicate NIK
+			"nik":          "1234567890123456", // Duplicate NIK
 			"fullname":     "Another Jane",
 			"gender":       "Female",
 			"address":      "789 Pine Ave",
@@ -190,7 +190,7 @@ func TestCreateEmployee_DuplicateNIK(t *testing.T) {
 func TestListEmployees(t *testing.T) {
 	createTestEmployees := func(t *testing.T, db *gorm.DB) {
 		e1 := model.Employee{
-			NIK:         1111000011110000,
+			NIK:         "1111000011110000",
 			FullName:    "Alice Green",
 			Gender:      "Female",
 			Address:     "Green Valley",
@@ -203,7 +203,7 @@ func TestListEmployees(t *testing.T) {
 			LunchMoney:  50000,
 		}
 		e2 := model.Employee{
-			NIK:         2222000022220000,
+			NIK:         "2222000022220000",
 			FullName:    "Bob Blue",
 			Gender:      "Male",
 			Address:     "Blue Ocean",
@@ -306,7 +306,7 @@ func TestGetEmployeeInfo_Success(t *testing.T) {
 	r, db := setupEmployeeEndpointTest(t)
 
 	employee := model.Employee{
-		NIK:        123456,
+		NIK:        "123456",
 		FullName:   "Test Employee",
 		JoinedDate: "2026-01-01",
 		Position:   "Staff",
@@ -346,7 +346,7 @@ func TestUpdateEmployee_Success(t *testing.T) {
 	r, db := setupEmployeeEndpointTest(t)
 
 	employee := model.Employee{
-		NIK:        55555,
+		NIK:        "55555",
 		FullName:   "Old Name",
 		JoinedDate: "2026-01-01",
 		Position:   "Staff",
@@ -384,13 +384,13 @@ func TestUpdateEmployee_DuplicateNIK(t *testing.T) {
 	r, db := setupEmployeeEndpointTest(t)
 
 	e1 := model.Employee{
-		NIK:        11111,
+		NIK:        "11111",
 		FullName:   "Emp One",
 		JoinedDate: "2026-01-01",
 		Position:   "Staff",
 	}
 	e2 := model.Employee{
-		NIK:        22222,
+		NIK:        "22222",
 		FullName:   "Emp Two",
 		JoinedDate: "2026-01-02",
 		Position:   "Staff",
@@ -404,7 +404,7 @@ func TestUpdateEmployee_DuplicateNIK(t *testing.T) {
 		requestPath:  fmt.Sprintf("/employee/%d", e2.ID),
 		handler:      UpdateEmployee,
 		body: map[string]interface{}{
-			"nik": 11111, // Try to update e2's NIK to e1's NIK
+			"nik": "11111", // Try to update e2's NIK to e1's NIK
 		},
 	})
 
@@ -418,7 +418,7 @@ func TestDeleteEmployee(t *testing.T) {
 	r, db := setupEmployeeEndpointTest(t)
 
 	employee := model.Employee{
-		NIK:        999,
+		NIK:        "999",
 		FullName:   "Emp Delete",
 		JoinedDate: "2026-01-01",
 		Position:   "Staff",

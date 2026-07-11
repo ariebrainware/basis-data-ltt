@@ -6,7 +6,7 @@ import "gorm.io/gorm"
 // @Description Employee information
 type Employee struct {
 	gorm.Model
-	NIK         int64  `json:"nik" gorm:"column:nik;uniqueIndex;not null" example:"1234567890123456"`
+	NIK         string `json:"nik" gorm:"column:nik;uniqueIndex;not null" example:"1234567890123456"`
 	FullName    string `json:"fullname" gorm:"column:fullname;not null" example:"John Doe"`
 	Gender      string `json:"gender" gorm:"column:gender;not null" example:"Male"`
 	Address     string `json:"address" gorm:"column:address;not null" example:"123 Main St"`
@@ -22,7 +22,7 @@ type Employee struct {
 // CreateEmployeeRequest represents the employee creation request body
 // @Description Employee creation request payload
 type CreateEmployeeRequest struct {
-	NIK         int64  `json:"nik" binding:"required" example:"1234567890123456"`
+	NIK         string `json:"nik" binding:"required" example:"1234567890123456"`
 	FullName    string `json:"fullname" binding:"required" example:"John Doe"`
 	Gender      string `json:"gender" binding:"required" example:"Male"`
 	Address     string `json:"address" binding:"required" example:"123 Main St"`
@@ -38,7 +38,7 @@ type CreateEmployeeRequest struct {
 // UpdateEmployeeRequest represents the employee update request body
 // @Description Employee update request payload
 type UpdateEmployeeRequest struct {
-	NIK         *int64 `json:"nik" example:"1234567890123456"`
+	NIK         *string `json:"nik" example:"1234567890123456"`
 	FullName    string `json:"fullname" example:"John Doe"`
 	Gender      string `json:"gender" example:"Male"`
 	Address     string `json:"address" example:"123 Main St"`

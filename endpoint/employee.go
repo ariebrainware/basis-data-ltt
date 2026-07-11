@@ -85,7 +85,7 @@ func CreateEmployee(c *gin.Context) {
 	if err := db.Unscoped().Where("nik = ?", req.NIK).First(&existing).Error; err == nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Employee with this NIK already exists",
-			Err: fmt.Errorf("duplicate NIK: %d", req.NIK),
+			Err: fmt.Errorf("duplicate NIK: %s", req.NIK),
 		})
 		return
 	} else if err != gorm.ErrRecordNotFound {
@@ -157,12 +157,7 @@ func ListEmployees(c *gin.Context) {
 	query := db.Model(&model.Employee{})
 	if keyword != "" {
 		kw := "%" + keyword + "%"
-		nikVal, err := strconv.ParseInt(keyword, 10, 64)
-		if err == nil {
-			query = query.Where("fullname LIKE ? OR nik = ? OR email LIKE ? OR phone_number LIKE ? OR position LIKE ?", kw, nikVal, kw, kw, kw)
-		} else {
-			query = query.Where("fullname LIKE ? OR email LIKE ? OR phone_number LIKE ? OR position LIKE ?", kw, kw, kw, kw)
-		}
+		query = query.Where("fullname LIKE ? OR nik LIKE ? OR email LIKE ? OR phone_number LIKE ? OR position LIKE ?", kw, kw, kw, kw, kw)
 	}
 
 	var employees []model.Employee
@@ -300,7 +295,7 @@ func UpdateEmployee(c *gin.Context) {
 		if err := db.Unscoped().Where("nik = ? AND id != ?", *req.NIK, employee.ID).First(&existing).Error; err == nil {
 			util.CallUserError(c, util.APIErrorParams{
 				Msg: "Another employee with this NIK already exists",
-				Err: fmt.Errorf("duplicate NIK: %d", *req.NIK),
+				Err: fmt.Errorf("duplicate NIK: %s", *req.NIK),
 			})
 			return
 		} else if err != gorm.ErrRecordNotFound {

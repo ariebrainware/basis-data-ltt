@@ -269,8 +269,8 @@ definitions:
         example: 50000
         type: integer
       nik:
-        example: 1234567890123456
-        type: integer
+        example: "1234567890123456"
+        type: string
       phone_number:
         example: "081234567890"
         type: string
@@ -345,8 +345,8 @@ definitions:
         example: 50000
         type: integer
       nik:
-        example: 1234567890123456
-        type: integer
+        example: "1234567890123456"
+        type: string
       phone_number:
         example: "081234567890"
         type: string
@@ -722,8 +722,8 @@ definitions:
         example: 50000
         type: integer
       nik:
-        example: 1234567890123456
-        type: integer
+        example: "1234567890123456"
+        type: string
       phone_number:
         example: "081234567890"
         type: string
