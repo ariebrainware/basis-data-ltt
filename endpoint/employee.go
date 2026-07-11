@@ -107,10 +107,36 @@ func CreateEmployee(c *gin.Context) {
 	}
 
 	// Create employee record
+	fullName := util.NormalizeName(req.FullName)
+	gender := strings.TrimSpace(req.Gender)
+	address := strings.TrimSpace(req.Address)
+	religion := strings.TrimSpace(req.Religion)
+	phoneNumber := strings.TrimSpace(req.PhoneNumber)
+	email := strings.TrimSpace(req.Email)
+	position := strings.TrimSpace(req.Position)
+
+	if fullName == "" || gender == "" || address == "" || religion == "" || phoneNumber == "" || email == "" || position == "" {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body", Err: fmt.Errorf("missing required fields")})
+		return
+	}
+	if req.BaseSalary < 0 || req.LunchMoney < 0 {
+		util.CallUserError(c, util.APIErrorParams{Msg: "Invalid request body: base_salary and lunch_money must be >= 0", Err: fmt.Errorf("salary must be >= 0")})
+		return
+	}
+
 	employee := model.Employee{
 		NIK:         req.NIK,
-		FullName:    util.NormalizeName(req.FullName),
-		Gender:      req.Gender,
+		FullName:    fullName,
+		Gender:      gender,
+		Address:     address,
+		Religion:    religion,
+		PhoneNumber: phoneNumber,
+		Email:       email,
+		JoinedDate:  normalizedJoinedDate,
+		Position:    position,
+		BaseSalary:  req.BaseSalary,
+		LunchMoney:  req.LunchMoney,
+	}
 		Address:     strings.TrimSpace(req.Address),
 		Religion:    strings.TrimSpace(req.Religion),
 		PhoneNumber: strings.TrimSpace(req.PhoneNumber),
