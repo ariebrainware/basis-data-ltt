@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/user/{{userId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "name": "Updated Name",
+      "email": "updated@example.com",
+      "password": "newpassword123"
+    }
+order: 9000

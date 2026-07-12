@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/item"
+method: POST
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "name": "Bandage",
+      "quantity": 100,
+      "price": 25000
+    }
+order: 2000
