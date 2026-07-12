@@ -1,0 +1,8 @@
+$kind: http-request
+name: 'Delete Employee (Admin)'
+method: DELETE
+url: '{{baseUrl}}/employee/{{employeeId}}'
+order: 5000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'

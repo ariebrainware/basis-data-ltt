@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/logout"
+method: DELETE
+headers:
+  session-token: "{{sessionToken}}"
+order: 3000

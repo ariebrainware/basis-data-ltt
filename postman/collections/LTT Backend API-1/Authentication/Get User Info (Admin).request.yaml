@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/user/{{userId}}"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+order: 8000
