@@ -199,7 +199,7 @@ func TestCORSMiddleware_OptionsPreflight(t *testing.T) {
 	defer os.Unsetenv("CORSALLOWORIGIN")
 
 	gin.SetMode(gin.ReleaseMode)
-	
+
 	// Test 1: OPTIONS request status and headers
 	w := httptest.NewRecorder()
 	_, r := gin.CreateTestContext(w)
