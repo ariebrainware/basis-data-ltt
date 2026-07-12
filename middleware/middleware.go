@@ -129,18 +129,36 @@ func tryParseRedisSession(val string) (uint, uint32, bool) {
 }
 
 func setCorsHeaders(c *gin.Context) {
-	configs := []HeaderSpec{
-		{Name: "Access-Control-Allow-Origin", EnvKey: "CORSALLOWORIGIN", Default: "http://localhost:3000"},
-		{Name: "Access-Control-Allow-Methods", EnvKey: "CORSALLOWMETHODS", Default: "POST, PUT, GET, OPTIONS, DELETE, PATCH"},
-		{Name: "Access-Control-Allow-Headers", EnvKey: "CORSALLOWHEADERS", Default: "X-Requested-With, Content-Type, Authorization, session-token"},
-		{Name: "Access-Control-Max-Age", EnvKey: "CORSMAXAGE", Default: "86400"},
-		{Name: "Access-Control-Allow-Credentials", EnvKey: "CORSALLOWCREDENTIALS", Default: "true"},
-		{Name: "Content-Type", EnvKey: "CORSCONTENTTYPE", Default: "application/json"},
+	origin := c.Request.Header.Get("Origin")
+	allowedOriginSetting := getenvOrDefault("CORSALLOWORIGIN", "http://localhost:3000")
+	var allowedOrigin string
+
+	if allowedOriginSetting == "*" {
+		if getenvOrDefault("CORSALLOWCREDENTIALS", "true") == "true" {
+			allowedOrigin = origin
+		} else {
+			allowedOrigin = "*"
+		}
+	} else {
+		allowedOrigins := strings.Split(allowedOriginSetting, ",")
+		for _, o := range allowedOrigins {
+			o = strings.TrimSpace(o)
+			if o == origin {
+				allowedOrigin = origin
+				break
+			}
+		}
+		if allowedOrigin == "" && len(allowedOrigins) > 0 {
+			allowedOrigin = strings.TrimSpace(allowedOrigins[0])
+		}
 	}
 
-	for _, cfg := range configs {
-		setHeaderFromSpec(c, cfg)
-	}
+	c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+	c.Writer.Header().Set("Access-Control-Allow-Methods", getenvOrDefault("CORSALLOWMETHODS", "POST, PUT, GET, OPTIONS, DELETE, PATCH"))
+	c.Writer.Header().Set("Access-Control-Allow-Headers", getenvOrDefault("CORSALLOWHEADERS", "X-Requested-With, Content-Type, Authorization, session-token, Origin, Accept, Access-Control-Request-Method, Access-Control-Request-Headers"))
+	c.Writer.Header().Set("Access-Control-Max-Age", getenvOrDefault("CORSMAXAGE", "86400"))
+	c.Writer.Header().Set("Access-Control-Allow-Credentials", getenvOrDefault("CORSALLOWCREDENTIALS", "true"))
+	c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
 
 	// Add HSTS header for HTTPS security. Only set when TLS is present or explicitly enabled
 	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {
@@ -156,7 +174,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		// For preflight requests, simply return after setting CORS headers.
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
+			c.AbortWithStatus(http.StatusOK)
 			return
 		}
 

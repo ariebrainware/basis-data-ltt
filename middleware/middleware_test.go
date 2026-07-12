@@ -194,6 +194,96 @@ func TestSetCorsHeadersDefaults(t *testing.T) {
 	}
 }
 
+func TestCORSMiddleware_OptionsPreflight(t *testing.T) {
+	os.Setenv("CORSALLOWORIGIN", "https://internal.leetittar.com")
+	defer os.Unsetenv("CORSALLOWORIGIN")
+
+	gin.SetMode(gin.ReleaseMode)
+	
+	// Test 1: OPTIONS request status and headers
+	w := httptest.NewRecorder()
+	_, r := gin.CreateTestContext(w)
+	r.Use(CORSMiddleware())
+	r.GET("/test", func(c *gin.Context) {
+		c.Status(200)
+	})
+
+	req := httptest.NewRequest("OPTIONS", "/test", nil)
+	req.Header.Set("Origin", "https://internal.leetittar.com")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected preflight response code 200, got %d", w.Code)
+	}
+
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://internal.leetittar.com" {
+		t.Errorf("expected allowed origin to fallback/match configuration, got %q", got)
+	}
+}
+
+func TestCORSMiddleware_MultipleOrigins(t *testing.T) {
+	// Temporarily set CORSALLOWORIGIN
+	os.Setenv("CORSALLOWORIGIN", "https://internal.leetittar.com,http://localhost:3000,http://localhost:8080")
+	defer os.Unsetenv("CORSALLOWORIGIN")
+
+	gin.SetMode(gin.ReleaseMode)
+
+	tests := []struct {
+		requestOrigin  string
+		expectedOrigin string
+	}{
+		{"https://internal.leetittar.com", "https://internal.leetittar.com"},
+		{"http://localhost:3000", "http://localhost:3000"},
+		{"http://localhost:8080", "http://localhost:8080"},
+		{"https://malicious.com", "https://internal.leetittar.com"}, // Fallback to first allowed origin if not matched
+		{"", "https://internal.leetittar.com"},                      // Fallback when no Origin header is sent
+	}
+
+	for _, tt := range tests {
+		w := httptest.NewRecorder()
+		_, r := gin.CreateTestContext(w)
+		r.Use(CORSMiddleware())
+		r.GET("/test", func(c *gin.Context) {
+			c.Status(200)
+		})
+
+		req := httptest.NewRequest("GET", "/test", nil)
+		if tt.requestOrigin != "" {
+			req.Header.Set("Origin", tt.requestOrigin)
+		}
+		r.ServeHTTP(w, req)
+
+		if got := w.Header().Get("Access-Control-Allow-Origin"); got != tt.expectedOrigin {
+			t.Errorf("for origin %q: expected Access-Control-Allow-Origin %q, got %q", tt.requestOrigin, tt.expectedOrigin, got)
+		}
+	}
+}
+
+func TestCORSMiddleware_WildcardOrigin(t *testing.T) {
+	os.Setenv("CORSALLOWORIGIN", "*")
+	os.Setenv("CORSALLOWCREDENTIALS", "true")
+	defer os.Unsetenv("CORSALLOWORIGIN")
+	defer os.Unsetenv("CORSALLOWCREDENTIALS")
+
+	gin.SetMode(gin.ReleaseMode)
+
+	w := httptest.NewRecorder()
+	_, r := gin.CreateTestContext(w)
+	r.Use(CORSMiddleware())
+	r.GET("/test", func(c *gin.Context) {
+		c.Status(200)
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Origin", "https://internal.leetittar.com")
+	r.ServeHTTP(w, req)
+
+	// Since CORSALLOWCREDENTIALS is true, wildcard "*" should echo the incoming Origin
+	if got := w.Header().Get("Access-Control-Allow-Origin"); got != "https://internal.leetittar.com" {
+		t.Errorf("expected matched Origin for wildcard with credentials, got %q", got)
+	}
+}
+
 func TestDatabaseMiddlewareAndGetDB(t *testing.T) {
 	r := gin.New()
 	// Use a zero-value gorm.DB pointer as a placeholder
