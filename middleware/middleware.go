@@ -48,12 +48,6 @@ func setHSTSHeader(c *gin.Context) {
 	c.Writer.Header().Set("Strict-Transport-Security", hstsValue)
 }
 
-// setHeaderFromSpec sets a response header from an environment variable or default
-// using a structured spec to avoid passing many primitive string arguments.
-func setHeaderFromSpec(c *gin.Context, spec HeaderSpec) {
-	c.Writer.Header().Set(spec.Name, getenvOrDefault(spec.EnvKey, spec.Default))
-}
-
 // unauthorizedSession logs and returns a standardized unauthorized session response.
 func unauthorizedSession(c *gin.Context, msg, logMsg string, err error) {
 	util.LogUnauthorizedAccess(util.UnauthorizedAccessParams{
