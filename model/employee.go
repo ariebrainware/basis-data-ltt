@@ -6,7 +6,7 @@ import "gorm.io/gorm"
 // @Description Employee information
 type Employee struct {
 	gorm.Model
-	NIK         string `json:"nik" gorm:"column:nik;uniqueIndex;not null" example:"1234567890123456"`
+	NIK         string `json:"nik" gorm:"column:nik;type:varchar(50);uniqueIndex;not null" example:"1234567890123456"`
 	FullName    string `json:"full_name" gorm:"column:full_name;not null" example:"John Doe"`
 	Gender      string `json:"gender" gorm:"column:gender;not null" example:"Male"`
 	Address     string `json:"address" gorm:"column:address;not null" example:"123 Main St"`
