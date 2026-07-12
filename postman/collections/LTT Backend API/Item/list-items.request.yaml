@@ -4,7 +4,8 @@ method: GET
 url: "{{baseUrl}}/item?limit={{limit}}"
 order: 1000
 headers:
-  session-token: "{{sessionToken}}"
+  - key: session-token
+    value: "{{sessionToken}}"
 queryParams:
   - key: limit
     value: "{{limit}}"

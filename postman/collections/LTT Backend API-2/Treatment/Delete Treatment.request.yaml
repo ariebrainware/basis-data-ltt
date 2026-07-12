@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/treatment/{{treatmentId}}"
+method: DELETE
+headers:
+  session-token: "{{sessionToken}}"
+order: 4000

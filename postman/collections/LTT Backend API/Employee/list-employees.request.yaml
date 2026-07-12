@@ -1,0 +1,18 @@
+$kind: http-request
+name: 'List Employees (Admin)'
+method: GET
+url: '{{baseUrl}}/employee'
+order: 2000
+headers:
+  - key: session-token
+    value: '{{sessionToken}}'
+queryParams:
+  - key: limit
+    value: '10'
+    disabled: true
+  - key: offset
+    value: '0'
+    disabled: true
+  - key: keyword
+    value: ''
+    disabled: true

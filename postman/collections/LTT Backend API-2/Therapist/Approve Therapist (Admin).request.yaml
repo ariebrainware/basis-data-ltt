@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/therapist/{{therapistId}}"
+method: PUT
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "is_approved": true
+    }
+order: 5000

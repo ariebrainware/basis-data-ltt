@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/disease"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+queryParams:
+  - key: limit
+    value: "100"
+    disabled: true
+  - key: offset
+    value: "0"
+    disabled: true
+order: 1000

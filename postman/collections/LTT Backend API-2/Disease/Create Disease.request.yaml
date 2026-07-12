@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/disease"
+method: POST
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "name": "Diabetes",
+      "codename": "diabetes",
+      "description": "A metabolic disease"
+    }
+order: 2000

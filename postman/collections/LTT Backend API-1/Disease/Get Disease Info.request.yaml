@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/disease/{{diseaseId}}"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+order: 3000

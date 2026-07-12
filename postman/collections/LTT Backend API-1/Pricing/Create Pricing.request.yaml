@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/pricing"
+method: POST
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "therapist_id": 1,
+      "price": 150000
+    }
+order: 2000

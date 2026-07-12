@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{baseUrl}}/item?limit={{limit}}"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+queryParams:
+  - key: limit
+    value: "{{limit}}"
+    disabled: false
+  - key: offset
+    value: "{{offset}}"
+    disabled: true
+order: 1000

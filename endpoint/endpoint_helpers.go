@@ -27,6 +27,7 @@ var EndpointTestModels = []interface{}{
 	&model.Item{},
 	&model.Transaction{},
 	&model.PatientCode{},
+	&model.Employee{},
 }
 
 // setupEndpointTestDB initializes a test database with all standard models migrated.

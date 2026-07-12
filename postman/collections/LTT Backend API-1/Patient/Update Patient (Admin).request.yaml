@@ -1,0 +1,23 @@
+$kind: http-request
+url: "{{baseUrl}}/patient/{{patientId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "full_name": "Jane Doe",
+      "gender": "Female",
+      "age": 28,
+      "job": "Doctor",
+      "address": "456 Oak Ave",
+      "phone_number": ["081234567891"],
+      "health_history": "Hypertension",
+      "surgery_history": "",
+      "patient_code": "",
+      "email": "jane@example.com",
+      "password": ""
+    }
+order: 4000

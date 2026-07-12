@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{baseUrl}}/transaction/{{transactionId}}"
+method: GET
+headers:
+  session-token: "{{sessionToken}}"
+order: 2000

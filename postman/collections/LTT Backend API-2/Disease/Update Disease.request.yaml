@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/disease/{{diseaseId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "name": "Type 2 Diabetes",
+      "codename": "type2-diabetes",
+      "description": "A chronic metabolic disease"
+    }
+order: 4000

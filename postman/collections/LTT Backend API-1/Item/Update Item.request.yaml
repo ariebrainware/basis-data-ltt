@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{baseUrl}}/item/{{id}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "name": "Bandage",
+      "quantity": 150
+    }
+order: 4000

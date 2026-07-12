@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{baseUrl}}/pricing/{{pricingId}}"
+method: PATCH
+headers:
+  Content-Type: application/json
+  session-token: "{{sessionToken}}"
+body:
+  type: text
+  content: |-
+    {
+      "therapist_id": 1,
+      "price": 175000,
+      "description": "Updated pricing for senior therapist"
+    }
+order: 4000

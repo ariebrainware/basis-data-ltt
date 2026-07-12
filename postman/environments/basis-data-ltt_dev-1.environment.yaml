@@ -1,0 +1,6 @@
+name: basis-data-ltt_dev
+values:
+  - key: baseUrl
+    value: 'https://localhost:19091'
+  - key: sessionToken
+    value: ''

@@ -1,0 +1,18 @@
+$kind: http-request
+name: 'Update Employee (Admin)'
+method: PATCH
+url: '{{baseUrl}}/employee/{{employeeId}}'
+order: 4000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: session-token
+    value: '{{sessionToken}}'
+body:
+  type: json
+  content: |-
+    {
+      "full_name": "John Doe Updated",
+      "position": "Senior Manager",
+      "base_salary": 6000000
+    }
