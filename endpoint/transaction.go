@@ -15,8 +15,9 @@ import (
 )
 
 type transactionItemRequest struct {
-	ItemID   uint `json:"item_id"`
-	Quantity int  `json:"quantity"`
+	ItemID   uint   `json:"item_id"`
+	Quantity int    `json:"quantity"`
+	Price    *int64 `json:"price,omitempty"`
 }
 
 type updateTransactionRequest struct {
@@ -168,6 +169,7 @@ func calculateTransactionAmountAndAdjustItems(tx *gorm.DB, therapistID uint, ite
 	}
 
 	aggregatedQuantities := make(map[uint]int)
+	itemPrices := make(map[uint]int64)
 	for _, itemRequest := range items {
 		if itemRequest.ItemID == 0 {
 			return 0, &transactionUserError{msg: "item_id is required for each item"}
@@ -176,6 +178,9 @@ func calculateTransactionAmountAndAdjustItems(tx *gorm.DB, therapistID uint, ite
 			return 0, &transactionUserError{msg: "item quantity must be greater than 0"}
 		}
 		aggregatedQuantities[itemRequest.ItemID] += itemRequest.Quantity
+		if itemRequest.Price != nil {
+			itemPrices[itemRequest.ItemID] = *itemRequest.Price
+		}
 	}
 
 	itemIDs := make([]uint, 0, len(aggregatedQuantities))
@@ -204,7 +209,11 @@ func calculateTransactionAmountAndAdjustItems(tx *gorm.DB, therapistID uint, ite
 			return 0, err
 		}
 
-		totalAmount += int64(quantity) * item.Price
+		price := item.Price
+		if customPrice, exists := itemPrices[itemID]; exists {
+			price = customPrice
+		}
+		totalAmount += int64(quantity) * price
 	}
 
 	return totalAmount, nil
@@ -431,9 +440,19 @@ func UpdateTransaction(c *gin.Context) {
 
 			var modelItems []model.TransactionItem
 			for _, itemReq := range req.Items {
+				price := int64(0)
+				if itemReq.Price != nil {
+					price = *itemReq.Price
+				} else {
+					var item model.Item
+					if err := tx.Where("id = ? AND deleted_at IS NULL", itemReq.ItemID).First(&item).Error; err == nil {
+						price = item.Price
+					}
+				}
 				modelItems = append(modelItems, model.TransactionItem{
 					ItemID:   itemReq.ItemID,
 					Quantity: itemReq.Quantity,
+					Price:    price,
 				})
 			}
 			itemsJSON, err := json.Marshal(modelItems)
