@@ -5,8 +5,9 @@ import "gorm.io/gorm"
 // TransactionItem represents an item consumed by a transaction.
 // @Description Transaction item detail information
 type TransactionItem struct {
-	ItemID   uint `json:"item_id" example:"1"`
-	Quantity int  `json:"quantity" example:"2"`
+	ItemID   uint  `json:"item_id" example:"1"`
+	Quantity int   `json:"quantity" example:"2"`
+	Price    int64 `json:"price" example:"10000"`
 }
 
 // Transaction represents a payment transaction for a treatment.
