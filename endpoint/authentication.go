@@ -21,9 +21,10 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token  string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	Role   string `json:"role" example:"Admin"`
-	UserID uint   `json:"user_id" example:"1"`
+	Token       string `json:"token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	Role        string `json:"role" example:"Admin"`
+	UserID      uint   `json:"user_id" example:"1"`
+	TherapistID uint   `json:"therapist_id,omitempty" example:"1"`
 }
 
 // Login godoc
@@ -223,8 +224,18 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 		_ = util.AddSessionToUserSet(session.UserID, tokenString, exp)
 	}
 
+	var therapistID uint
+	if uint32(role.ID) == model.RoleTherapist {
+		ctx.DB.Table("therapists").Select("id").Where("email = ? AND deleted_at IS NULL", user.Email).Scan(&therapistID)
+	}
+
 	util.LogLoginSuccess(util.LoginParams{UserID: user.ID, Email: user.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent})
-	util.CallSuccessOK(ctx.C, util.APISuccessParams{Msg: "Login successful", Data: LoginResponse{Token: tokenString, Role: role.Name, UserID: user.ID}})
+	util.CallSuccessOK(ctx.C, util.APISuccessParams{Msg: "Login successful", Data: LoginResponse{
+		Token:       tokenString,
+		Role:        role.Name,
+		UserID:      user.ID,
+		TherapistID: therapistID,
+	}})
 	return true
 }
 

@@ -233,9 +233,9 @@ func registerPatientRoutes(auth *gin.RouterGroup) {
 func registerTreatmentRoutes(auth *gin.RouterGroup) {
 	treatment := auth.Group("/treatment")
 	treatment.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist, model.RoleUser), endpoint.ListTreatments)
-	treatment.POST("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.CreateTreatment)
+	treatment.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateTreatment)
 	treatment.PATCH("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.UpdateTreatment)
-	treatment.DELETE("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DeleteTreatment)
+	treatment.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTreatment)
 }
 
 func registerDiseaseRoutes(auth *gin.RouterGroup) {
