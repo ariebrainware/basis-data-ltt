@@ -226,7 +226,15 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 
 	var therapistID uint
 	if uint32(role.ID) == model.RoleTherapist {
-		ctx.DB.Table("therapists").Select("id").Where("email = ? AND deleted_at IS NULL", user.Email).Scan(&therapistID)
+		tx := ctx.DB.Table("therapists").Select("id").Where("email = ? AND deleted_at IS NULL", user.Email).Scan(&therapistID)
+		if tx.Error != nil {
+			util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Failed to load therapist info", Err: tx.Error})
+			return false
+		}
+		if tx.RowsAffected == 0 {
+			util.CallServerError(ctx.C, util.APIErrorParams{Msg: "Therapist record not found for user", Err: fmt.Errorf("therapist not found for email %s", user.Email)})
+			return false
+		}
 	}
 
 	util.LogLoginSuccess(util.LoginParams{UserID: user.ID, Email: user.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent})
