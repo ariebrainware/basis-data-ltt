@@ -110,7 +110,6 @@ func CallUserForbidden(c *gin.Context, params APIErrorParams) {
 	c.JSON(http.StatusForbidden, response)
 }
 
-
 // NormalizeName normalizes a name by trimming leading/trailing whitespace
 // and collapsing multiple internal spaces into single spaces.
 // This ensures consistent name formatting and helps prevent duplicate detection bypass.
