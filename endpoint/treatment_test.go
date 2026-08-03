@@ -714,7 +714,7 @@ func TestUpdateTreatment_TherapistReassign_Forbidden(t *testing.T) {
 		headers:      map[string]string{"session-token": session.SessionToken},
 	})
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Equal(t, http.StatusForbidden, w.Code)
 	assert.NoError(t, err)
 }
 

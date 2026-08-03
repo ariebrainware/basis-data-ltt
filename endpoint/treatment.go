@@ -513,7 +513,7 @@ func UpdateTreatment(c *gin.Context) {
 				return
 			}
 			if updates.TherapistID != 0 && updates.TherapistID != uint(therapistID) {
-				util.CallUserError(c, util.APIErrorParams{
+				util.CallUserForbidden(c, util.APIErrorParams{
 					Msg: "You cannot change the therapist assigned to this treatment",
 					Err: fmt.Errorf("therapist cannot reassign treatment to therapist %d", updates.TherapistID),
 				})
