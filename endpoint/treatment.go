@@ -497,6 +497,31 @@ func UpdateTreatment(c *gin.Context) {
 		return
 	}
 
+	roleIDVal, exists := c.Get("role_id")
+	if exists {
+		if roleID, ok := roleIDVal.(uint32); ok && roleID == model.RoleTherapist {
+			therapistID, err := resolveTherapistIDFromSession(c, db)
+			if err != nil {
+				handleSessionError(c, err)
+				return
+			}
+			if existingTreatment.TherapistID != uint(therapistID) {
+				util.CallUserNotAuthorized(c, util.APIErrorParams{
+					Msg: "You can only edit treatments assigned to you",
+					Err: fmt.Errorf("therapist ID mismatch: treatment has therapist %d, but session has therapist %d", existingTreatment.TherapistID, therapistID),
+				})
+				return
+			}
+			if updates.TherapistID != 0 && updates.TherapistID != uint(therapistID) {
+				util.CallUserForbidden(c, util.APIErrorParams{
+					Msg: "You cannot change the therapist assigned to this treatment",
+					Err: fmt.Errorf("therapist cannot reassign treatment to therapist %d", updates.TherapistID),
+				})
+				return
+			}
+		}
+	}
+
 	if err := db.Model(existingTreatment).Updates(updates).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update treatment",

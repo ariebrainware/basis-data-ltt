@@ -427,7 +427,30 @@ func GetUserInfo(c *gin.Context) {
 		return
 	}
 
-	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User retrieved", Data: user})
+	var therapistID uint
+	if user.RoleID == model.RoleTherapist {
+		tx := db.Table("therapists").Select("id").Where("email = ? AND deleted_at IS NULL", user.Email).Scan(&therapistID)
+		if tx.Error != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to load therapist info", Err: tx.Error})
+			return
+		}
+		if tx.RowsAffected == 0 {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Therapist record not found for user", Err: fmt.Errorf("therapist not found for email %s", user.Email)})
+			return
+		}
+	}
+
+	data := map[string]interface{}{
+		"id":           user.ID,
+		"name":         user.Name,
+		"email":        user.Email,
+		"role_id":      user.RoleID,
+		"therapist_id": therapistID,
+		"created_at":   user.CreatedAt,
+		"updated_at":   user.UpdatedAt,
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{Msg: "User retrieved", Data: data})
 }
 
 // UpdateUserByID is a compatibility wrapper that calls AdminUpdateUser

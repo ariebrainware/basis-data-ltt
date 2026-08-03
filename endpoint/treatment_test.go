@@ -604,6 +604,120 @@ func TestGetDBOrAbort_NoDatabase(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
+func TestUpdateTreatment_TherapistOwner_Success(t *testing.T) {
+	r, db := setupTreatmentTest(t)
+
+	// Create user, therapist and session
+	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{
+		RoleID:          model.RoleTherapist,
+		Email:           "therapist@owner.com",
+		Token:           "owner-token",
+		CreateTherapist: true,
+	})
+
+	treatment := createTestTreatment(db, t, "UPD001", therapist.ID)
+
+	reqBody := map[string]interface{}{
+		"remarks": "Updated by therapist",
+	}
+
+	handler := func(c *gin.Context) {
+		c.Set("role_id", model.RoleTherapist)
+		c.Request.Header.Set("session-token", session.SessionToken)
+		UpdateTreatment(c)
+	}
+
+	w, _, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/treatment/:id",
+		requestPath:  fmt.Sprintf("/treatment/%d", treatment.ID),
+		handler:      handler,
+		body:         reqBody,
+		headers:      map[string]string{"session-token": session.SessionToken},
+	})
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
+
+	// Verify update
+	var updated model.Treatment
+	db.First(&updated, treatment.ID)
+	assert.Equal(t, "Updated by therapist", updated.Remarks)
+}
+
+func TestUpdateTreatment_TherapistNonOwner_Unauthorized(t *testing.T) {
+	r, db := setupTreatmentTest(t)
+
+	// Create therapist user and session
+	_, _, session := createUserWithSession(db, t, CreateUserSessionOpts{
+		RoleID:          model.RoleTherapist,
+		Email:           "therapist@owner.com",
+		Token:           "owner-token",
+		CreateTherapist: true,
+	})
+
+	// Create treatment belonging to another therapist (ID 999)
+	treatment := createTestTreatment(db, t, "UPD002", 999)
+
+	reqBody := map[string]interface{}{
+		"remarks": "Updated by unauthorized therapist",
+	}
+
+	handler := func(c *gin.Context) {
+		c.Set("role_id", model.RoleTherapist)
+		c.Request.Header.Set("session-token", session.SessionToken)
+		UpdateTreatment(c)
+	}
+
+	w, _, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/treatment/:id",
+		requestPath:  fmt.Sprintf("/treatment/%d", treatment.ID),
+		handler:      handler,
+		body:         reqBody,
+		headers:      map[string]string{"session-token": session.SessionToken},
+	})
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.NoError(t, err)
+}
+
+func TestUpdateTreatment_TherapistReassign_Forbidden(t *testing.T) {
+	r, db := setupTreatmentTest(t)
+
+	// Create therapist user and session
+	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{
+		RoleID:          model.RoleTherapist,
+		Email:           "therapist@owner.com",
+		Token:           "owner-token",
+		CreateTherapist: true,
+	})
+
+	treatment := createTestTreatment(db, t, "UPD003", therapist.ID)
+
+	reqBody := map[string]interface{}{
+		"therapist_id": 999, // Attempt to reassign therapist
+	}
+
+	handler := func(c *gin.Context) {
+		c.Set("role_id", model.RoleTherapist)
+		c.Request.Header.Set("session-token", session.SessionToken)
+		UpdateTreatment(c)
+	}
+
+	w, _, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/treatment/:id",
+		requestPath:  fmt.Sprintf("/treatment/%d", treatment.ID),
+		handler:      handler,
+		body:         reqBody,
+		headers:      map[string]string{"session-token": session.SessionToken},
+	})
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+	assert.NoError(t, err)
+}
+
 // Test helper functions
 func parseQueryIntTest(c *gin.Context, key string, defaultValue int) int {
 	value := c.Query(key)

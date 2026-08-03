@@ -89,7 +89,7 @@ func CallUserFound(c *gin.Context, params APISuccessParams) {
 	c.JSON(http.StatusTemporaryRedirect, response)
 }
 
-// CallUserNotAuthorized is for return API response with status code 403, you need to specify msg, and data as function paramenter
+// CallUserNotAuthorized is for return API response with status code 401 Unauthorized
 func CallUserNotAuthorized(c *gin.Context, params APIErrorParams) {
 	response := APIResponse{
 		Success: false,
@@ -97,6 +97,17 @@ func CallUserNotAuthorized(c *gin.Context, params APIErrorParams) {
 		Msg:     params.Msg,
 	}
 	c.JSON(http.StatusUnauthorized, response)
+}
+
+// CallUserForbidden is for return API response with status code 403 Forbidden
+func CallUserForbidden(c *gin.Context, params APIErrorParams) {
+	response := APIResponse{
+		Success: false,
+		Error:   params.Err.Error(),
+		Msg:     params.Msg,
+		Data:    map[string]interface{}{},
+	}
+	c.JSON(http.StatusForbidden, response)
 }
 
 // NormalizeName normalizes a name by trimming leading/trailing whitespace
