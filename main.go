@@ -232,11 +232,10 @@ func registerPatientRoutes(auth *gin.RouterGroup) {
 
 func registerTreatmentRoutes(auth *gin.RouterGroup) {
 	treatment := auth.Group("/treatment")
-	treatment.Use(middleware.RequireRole(model.RoleAdmin, model.RoleTherapist))
-	treatment.GET("", endpoint.ListTreatments)
-	treatment.POST("", endpoint.CreateTreatment)
-	treatment.PATCH("/:id", endpoint.UpdateTreatment)
-	treatment.DELETE("/:id", endpoint.DeleteTreatment)
+	treatment.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist, model.RoleUser), endpoint.ListTreatments)
+	treatment.POST("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.CreateTreatment)
+	treatment.PATCH("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.UpdateTreatment)
+	treatment.DELETE("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DeleteTreatment)
 }
 
 func registerDiseaseRoutes(auth *gin.RouterGroup) {
