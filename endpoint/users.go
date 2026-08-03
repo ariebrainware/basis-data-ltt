@@ -429,7 +429,15 @@ func GetUserInfo(c *gin.Context) {
 
 	var therapistID uint
 	if user.RoleID == model.RoleTherapist {
-		db.Table("therapists").Select("id").Where("email = ? AND deleted_at IS NULL", user.Email).Scan(&therapistID)
+		tx := db.Table("therapists").Select("id").Where("email = ? AND deleted_at IS NULL", user.Email).Scan(&therapistID)
+		if tx.Error != nil {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Failed to load therapist info", Err: tx.Error})
+			return
+		}
+		if tx.RowsAffected == 0 {
+			util.CallServerError(c, util.APIErrorParams{Msg: "Therapist record not found for user", Err: fmt.Errorf("therapist not found for email %s", user.Email)})
+			return
+		}
 	}
 
 	data := map[string]interface{}{
