@@ -6,10 +6,14 @@ on:
   pull_request:
     branches: ["main", "master", "develop"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   security:
     name: Security and Quality Checks
-    runs-on: [evolto3-be-runner]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
 
