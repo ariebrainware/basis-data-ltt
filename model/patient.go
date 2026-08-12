@@ -17,6 +17,7 @@ type Patient struct {
 	HealthHistory  string `json:"health_history" gorm:"column:health_history" example:"Diabetes,Hypertension"`
 	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
 	PatientCode    string `json:"patient_code" gorm:"column:patient_code" example:"J001"`
+	SignaturePath  string `json:"signature_path" gorm:"column:signature_path" example:"uploads/signatures/xyz.png"`
 }
 
 type UpdatePatientRequest struct {
