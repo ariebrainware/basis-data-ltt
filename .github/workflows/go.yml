@@ -64,10 +64,8 @@ jobs:
           exit 1
         fi
 
-        # Ensure uploads folder exists on host and has correct permissions (safe for existing files)
-        sudo mkdir -p /www/wwwroot/basis-data-ltt/uploads
-        sudo chown -R 1000:1000 /www/wwwroot/basis-data-ltt/uploads
-        sudo chmod -R 755 /www/wwwroot/basis-data-ltt/uploads
+        # Ensure uploads folder exists on host and has correct permissions via docker helper (bypasses sudo)
+        docker run --rm -v /www/wwwroot:/host alpine sh -c "mkdir -p /host/basis-data-ltt/uploads && chown -R 1000:1000 /host/basis-data-ltt/uploads && chmod -R 755 /host/basis-data-ltt/uploads"
 
         docker run --name=basis-data-ltt -d -p 19091:19091 --network=baota_net \
           -v /www/wwwroot/basis-data-ltt/uploads:/app/uploads \
@@ -135,10 +133,8 @@ jobs:
           exit 1
         fi
 
-        # Ensure uploads folder exists on host and has correct permissions (safe for existing files)
-        sudo mkdir -p /www/wwwroot/basis-data-ltt/uploads
-        sudo chown -R 1000:1000 /www/wwwroot/basis-data-ltt/uploads
-        sudo chmod -R 755 /www/wwwroot/basis-data-ltt/uploads
+        # Ensure uploads folder exists on host and has correct permissions via docker helper (bypasses sudo)
+        docker run --rm -v /www/wwwroot:/host alpine sh -c "mkdir -p /host/basis-data-ltt/uploads && chown -R 1000:1000 /host/basis-data-ltt/uploads && chmod -R 755 /host/basis-data-ltt/uploads"
 
         docker run --name=basis-data-ltt -d -p 19091:19091 --restart=always --network=baota_net \
           -v /www/wwwroot/basis-data-ltt/uploads:/app/uploads \
