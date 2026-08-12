@@ -1,7 +1,11 @@
 package endpoint
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -170,6 +174,7 @@ type createPatientRequest struct {
 	PatientCode    string   `json:"patient_code" example:"J001"`
 	Password       string   `json:"password,omitempty" example:"password123"`
 	Email          string   `json:"email,omitempty" example:"john@example.com"`
+	Signature      string   `json:"signature" example:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."`
 }
 
 func normalizePhoneNumbers(numbers []string) []string {
@@ -286,7 +291,7 @@ func shouldCreateUser(req createPatientRequest) bool {
 	return true
 }
 
-func buildPatientModel(req createPatientRequest, patientCode string, phoneNumbers []string) model.Patient {
+func buildPatientModel(req createPatientRequest, patientCode string, phoneNumbers []string, signaturePath string) model.Patient {
 	return model.Patient{
 		FullName:       req.FullName,
 		Gender:         req.Gender,
@@ -299,7 +304,47 @@ func buildPatientModel(req createPatientRequest, patientCode string, phoneNumber
 		SurgeryHistory: req.SurgeryHistory,
 		Email:          req.Email,
 		Password:       util.HashPassword(req.Password),
+		SignaturePath:  signaturePath,
 	}
+}
+
+func saveSignatureFile(base64Data string) (string, error) {
+	if base64Data == "" {
+		return "", nil
+	}
+
+	// The base64Data can be a data-url: "data:image/png;base64,iVBORw0KGgoAAAANS..."
+	commaIdx := strings.Index(base64Data, ",")
+	rawBase64 := base64Data
+	if commaIdx != -1 {
+		rawBase64 = base64Data[commaIdx+1:]
+	}
+
+	// Decode the base64 data
+	decoded, err := base64.StdEncoding.DecodeString(rawBase64)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 signature: %w", err)
+	}
+
+	// Ensure the directory exists
+	dir := "uploads/signatures"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	// Generate a unique filename using timestamp and some random bytes
+	timestamp := time.Now().UnixNano()
+	randBytes := make([]byte, 4)
+	_, _ = rand.Read(randBytes)
+	filename := fmt.Sprintf("%d_%x.png", timestamp, randBytes)
+	filepathStr := filepath.Join(dir, filename)
+
+	// Save to file
+	if err := os.WriteFile(filepathStr, decoded, 0644); err != nil {
+		return "", fmt.Errorf("failed to write signature file: %w", err)
+	}
+
+	return filepath.ToSlash(filepathStr), nil
 }
 
 // CreatePatient godoc
@@ -360,10 +405,28 @@ func CreatePatient(c *gin.Context) {
 		return
 	}
 
+	// Save signature if provided
+	var signaturePath string
+	if patientRequest.Signature != "" {
+		var err error
+		signaturePath, err = saveSignatureFile(patientRequest.Signature)
+		if err != nil {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "Failed to save signature image",
+				Err: err,
+			})
+			return
+		}
+	}
+
 	// Perform creation inside a transaction (extracted)
 	if err := db.Transaction(func(tx *gorm.DB) error {
-		return createPatientInTx(tx, patientRequest, normalizedPhones)
+		return createPatientInTx(tx, patientRequest, normalizedPhones, signaturePath)
 	}); err != nil {
+		// Clean up the created signature file if database transaction fails
+		if signaturePath != "" {
+			_ = os.Remove(signaturePath)
+		}
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create patient",
 			Err: err,
@@ -389,7 +452,7 @@ func prepareCreatePatient(req *createPatientRequest) ([]string, error) {
 }
 
 // createPatientInTx performs the DB operations inside a transaction.
-func createPatientInTx(tx *gorm.DB, req createPatientRequest, normalizedPhones []string) error {
+func createPatientInTx(tx *gorm.DB, req createPatientRequest, normalizedPhones []string, signaturePath string) error {
 	// Re-check for duplicate patient inside the transaction to avoid race conditions.
 	duplicate, err := hasDuplicatePatientByNameAndPhone(tx, req.FullName, normalizedPhones)
 	if err != nil {
@@ -412,7 +475,7 @@ func createPatientInTx(tx *gorm.DB, req createPatientRequest, normalizedPhones [
 		return err
 	}
 
-	patient := buildPatientModel(req, patientCode, normalizedPhones)
+	patient := buildPatientModel(req, patientCode, normalizedPhones, signaturePath)
 	if err := tx.Create(&patient).Error; err != nil {
 		return err
 	}
