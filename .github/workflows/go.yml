@@ -65,9 +65,9 @@ jobs:
         fi
 
         # Ensure uploads folder exists on host and has correct permissions (safe for existing files)
-        mkdir -p /www/wwwroot/basis-data-ltt/uploads
-        chown -R 1000:1000 /www/wwwroot/basis-data-ltt/uploads || true
-        chmod -R 755 /www/wwwroot/basis-data-ltt/uploads || true
+        sudo mkdir -p /www/wwwroot/basis-data-ltt/uploads
+        sudo chown -R 1000:1000 /www/wwwroot/basis-data-ltt/uploads
+        sudo chmod -R 755 /www/wwwroot/basis-data-ltt/uploads
 
         docker run --name=basis-data-ltt -d -p 19091:19091 --network=baota_net \
           -v /www/wwwroot/basis-data-ltt/uploads:/app/uploads \
@@ -136,9 +136,9 @@ jobs:
         fi
 
         # Ensure uploads folder exists on host and has correct permissions (safe for existing files)
-        mkdir -p /www/wwwroot/basis-data-ltt/uploads
-        chown -R 1000:1000 /www/wwwroot/basis-data-ltt/uploads || true
-        chmod -R 755 /www/wwwroot/basis-data-ltt/uploads || true
+        sudo mkdir -p /www/wwwroot/basis-data-ltt/uploads
+        sudo chown -R 1000:1000 /www/wwwroot/basis-data-ltt/uploads
+        sudo chmod -R 755 /www/wwwroot/basis-data-ltt/uploads
 
         docker run --name=basis-data-ltt -d -p 19091:19091 --restart=always --network=baota_net \
           -v /www/wwwroot/basis-data-ltt/uploads:/app/uploads \
