@@ -532,6 +532,33 @@ func UpdatePatient(c *gin.Context) {
 
 	mergeUpdatePatient(&existingPatient, req)
 
+	// Save signature if provided in the update request
+	if req.Signature != nil {
+		sig := *req.Signature
+		if sig == "" {
+			// If empty string is sent, clear the signature path
+			if existingPatient.SignaturePath != "" {
+				_ = os.Remove(existingPatient.SignaturePath)
+				existingPatient.SignaturePath = ""
+			}
+		} else if strings.HasPrefix(sig, "data:") {
+			// If it's a new base64 signature, decode and save it
+			newPath, err := saveSignatureFile(sig)
+			if err != nil {
+				util.CallUserError(c, util.APIErrorParams{
+					Msg: "Failed to save new signature image",
+					Err: err,
+				})
+				return
+			}
+			// Clean up old signature file if it exists
+			if existingPatient.SignaturePath != "" {
+				_ = os.Remove(existingPatient.SignaturePath)
+			}
+			existingPatient.SignaturePath = newPath
+		}
+	}
+
 	if err := db.Save(&existingPatient).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to update patient",
