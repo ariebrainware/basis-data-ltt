@@ -210,7 +210,7 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 	}
 
 	// Record session
-	sessionInfo := SessionInfo{UserID: user.ID, Token: tokenString, Client: ctx.CI, Expires: time.Now().Add(time.Hour * 1)}
+	sessionInfo := SessionInfo{UserID: user.ID, Token: tokenString, Client: ctx.CI, Expires: time.Now().Add(time.Hour * 8)}
 	session, ok := recordSessionOrRespond(ctx, sessionInfo)
 	if !ok {
 		return false
@@ -361,7 +361,7 @@ func fetchRole(db *gorm.DB, roleID uint32) (model.Role, error) {
 }
 
 func createJWTToken(user model.User) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"email": user.Email, "exp": time.Now().Add(time.Hour * 1).Unix(), "role": user.RoleID})
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{"email": user.Email, "exp": time.Now().Add(time.Hour * 8).Unix(), "role": user.RoleID})
 	return token.SignedString(util.GetJWTSecretByte())
 }
 

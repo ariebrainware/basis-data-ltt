@@ -289,7 +289,7 @@ if len(req.Password) < 8 {
 - Generated using JWT with HMAC-SHA256 signing
 - Stored in database `sessions` table
 - Cached in Redis for performance (when available)
-- Automatically expire after 1 hour
+- Automatically expire after 8 hours
 - Invalidated on logout
 
 ### Token Validation
