@@ -253,7 +253,7 @@ func ListTransactions(c *gin.Context) {
 	var transactions []model.ListTransactionResponse
 	txQuery := db.Model(&model.Transaction{}).
 		Select("transactions.*, patients.full_name as patient_name, treatments.treatment_date, therapists.full_name as therapist_name").
-		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
+		Joins("INNER JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code AND patients.deleted_at IS NULL").
 		Joins("LEFT JOIN therapists ON therapists.id = transactions.therapist_id AND therapists.deleted_at IS NULL")
 
@@ -275,7 +275,7 @@ func ListTransactions(c *gin.Context) {
 	var totalAmount int64
 	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
 		Select("COALESCE(SUM(transactions.amount), 0) as total").
-		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
+		Joins("INNER JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
 		Row().Scan(&totalAmount); err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate total amount", Err: err})
 		return
@@ -289,7 +289,7 @@ func ListTransactions(c *gin.Context) {
 	var paymentCounts []PaymentCount
 	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
 		Select("payment_status as status, COUNT(*) as count").
-		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
+		Joins("INNER JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
 		Group("payment_status").
 		Scan(&paymentCounts).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate payment status counts", Err: err})

@@ -434,14 +434,29 @@ func TestDeleteTreatment_Success(t *testing.T) {
 
 	treatment := createTestTreatment(db, t, "DEL001", 1)
 
+	// Create a mock transaction linked to this treatment
+	tx := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   treatment.TherapistID,
+		Amount:        100000,
+		PaymentMethod: "cash",
+		PaymentStatus: "paid",
+	}
+	assert.NoError(t, db.Create(&tx).Error)
+
 	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodDelete, registerPath: "/treatment/:id", requestPath: fmt.Sprintf("/treatment/%d", treatment.ID), handler: DeleteTreatment})
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NoError(t, err)
 
-	// Verify soft delete
-	var deleted model.Treatment
-	err = db.First(&deleted, treatment.ID).Error
+	// Verify soft delete of treatment
+	var deletedTreatment model.Treatment
+	err = db.First(&deletedTreatment, treatment.ID).Error
+	assert.Error(t, err)
+
+	// Verify soft delete of transaction
+	var deletedTx model.Transaction
+	err = db.First(&deletedTx, tx.ID).Error
 	assert.Error(t, err)
 }
 

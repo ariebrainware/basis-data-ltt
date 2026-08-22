@@ -566,7 +566,16 @@ func DeleteTreatment(c *gin.Context) {
 		return
 	}
 
-	if err := db.Delete(existingTreatment).Error; err != nil {
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(existingTreatment).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("treatment_id = ?", existingTreatment.ID).Delete(&model.Transaction{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to delete treatment",
 			Err: err,
