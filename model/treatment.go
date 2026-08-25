@@ -46,4 +46,6 @@ type ListTreatementResponse struct {
 	PatientName   string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
 	Age           int    `json:"age" gorm:"column:age" example:"30"`
 	Price         int64  `json:"price" gorm:"column:price" example:"250000"`
+	HealthHistory  string `json:"health_history" gorm:"column:health_history" example:"Diabetes,Hypertension"`
+	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
 }

@@ -110,7 +110,7 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 				AND latest_pricings.max_id = p1.id
 			WHERE p1.deleted_at IS NULL
 		) AS pricings ON pricings.therapist_id = treatments.therapist_id`).
-		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, COALESCE(pricings.price, 0) as price").
+		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, patients.health_history as health_history, patients.surgery_history as surgery_history, COALESCE(pricings.price, 0) as price").
 		Where("patients.deleted_at IS NULL")
 }
 
@@ -478,14 +478,22 @@ func UpdateTreatment(c *gin.Context) {
 		return
 	}
 
-	var updates model.Treatment
-	if err := c.ShouldBindJSON(&updates); err != nil {
+	type updateTreatmentRequest struct {
+		model.Treatment
+		HealthHistory  *string `json:"health_history,omitempty"`
+		SurgeryHistory *string `json:"surgery_history,omitempty"`
+	}
+
+	var req updateTreatmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid input data",
 			Err: err,
 		})
 		return
 	}
+
+	updates := req.Treatment
 
 	db, ok := getDBOrAbort(c)
 	if !ok {
@@ -528,6 +536,22 @@ func UpdateTreatment(c *gin.Context) {
 			Err: err,
 		})
 		return
+	}
+
+	if req.HealthHistory != nil || req.SurgeryHistory != nil {
+		var patient model.Patient
+		if err := db.Where("patient_code = ? AND deleted_at IS NULL", existingTreatment.PatientCode).First(&patient).Error; err == nil {
+			patientUpdates := map[string]interface{}{}
+			if req.HealthHistory != nil {
+				patientUpdates["health_history"] = *req.HealthHistory
+			}
+			if req.SurgeryHistory != nil {
+				patientUpdates["surgery_history"] = *req.SurgeryHistory
+			}
+			if len(patientUpdates) > 0 {
+				db.Model(&patient).Updates(patientUpdates)
+			}
+		}
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
