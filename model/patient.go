@@ -18,6 +18,7 @@ type Patient struct {
 	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
 	PatientCode    string `json:"patient_code" gorm:"column:patient_code" example:"J001"`
 	SignaturePath  string `json:"signature_path" gorm:"column:signature_path" example:"uploads/signatures/xyz.png"`
+	AttachmentPath string `json:"attachment_path" gorm:"column:attachment_path" example:"uploads/attachments/172468112_file.pdf"`
 }
 
 type UpdatePatientRequest struct {
@@ -33,4 +34,5 @@ type UpdatePatientRequest struct {
 	SurgeryHistory string   `json:"surgery_history" example:"Appendectomy 2020"`
 	PatientCode    string   `json:"patient_code" example:"J001"`
 	Signature      *string  `json:"signature" example:"data:image/png;base64,..."`
+	AttachmentPath *[]string `json:"attachment_path,omitempty" example:"[\"uploads/attachments/172468112_file.pdf\"]"`
 }

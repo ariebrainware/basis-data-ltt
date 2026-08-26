@@ -97,6 +97,7 @@ func TestPatientModel_AllFields(t *testing.T) {
 		HealthHistory:  "Diabetes",
 		SurgeryHistory: "Appendectomy 2020",
 		PatientCode:    "P005",
+		AttachmentPath: "uploads/attachments/test.pdf",
 	})
 
 	var found Patient
@@ -106,6 +107,7 @@ func TestPatientModel_AllFields(t *testing.T) {
 	assert.Equal(t, 25, found.Age)
 	assert.Equal(t, "Engineer", found.Job)
 	assert.Equal(t, "081234567890", found.PhoneNumber)
+	assert.Equal(t, "uploads/attachments/test.pdf", found.AttachmentPath)
 }
 
 func TestPatientModel_UniquePatientCode(t *testing.T) {

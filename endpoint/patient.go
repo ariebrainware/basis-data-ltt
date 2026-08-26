@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -175,6 +176,7 @@ type createPatientRequest struct {
 	Password       string   `json:"password,omitempty" example:"password123"`
 	Email          string   `json:"email,omitempty" example:"john@example.com"`
 	Signature      string   `json:"signature" example:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."`
+	AttachmentPath []string `json:"attachment_path,omitempty" example:"[\"uploads/attachments/172468112_file.pdf\"]"`
 }
 
 func normalizePhoneNumbers(numbers []string) []string {
@@ -305,6 +307,7 @@ func buildPatientModel(req createPatientRequest, patientCode string, phoneNumber
 		Email:          req.Email,
 		Password:       util.HashPassword(req.Password),
 		SignaturePath:  signaturePath,
+		AttachmentPath: strings.Join(req.AttachmentPath, ","),
 	}
 }
 
@@ -630,6 +633,9 @@ func updatePatientDetails(existing *model.Patient, req model.UpdatePatientReques
 	if req.SurgeryHistory != "" {
 		existing.SurgeryHistory = req.SurgeryHistory
 	}
+	if req.AttachmentPath != nil {
+		existing.AttachmentPath = strings.Join(*req.AttachmentPath, ",")
+	}
 }
 
 // updatePatientPassword handles password hashing and update
@@ -745,5 +751,77 @@ func GetPatientInfo(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{
 		Msg:  "Patient retrieved",
 		Data: patient,
+	})
+}
+
+
+// UploadAttachment godoc
+// @Summary      Upload an attachment for a patient
+// @Description  Upload a doc/file attachment up to 10MB
+// @Tags         Patient
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        file formData file true "Attachment file"
+// @Success      200 {object} util.APIResponse "File uploaded successfully"
+// @Failure      400 {object} util.APIResponse "Invalid request or file size too large"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /patient/upload [post]
+func UploadAttachment(c *gin.Context) {
+	// Limit request size to slightly above 10MB to account for headers/multipart overhead
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10.5*1024*1024)
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		// Check if error is due to request body size limit
+		if err.Error() == "http: request body too large" || strings.Contains(err.Error(), "too large") {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "File size exceeds the 10MB limit",
+				Err: err,
+			})
+			return
+		}
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "No file was uploaded",
+			Err: err,
+		})
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 10*1024*1024 {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "File size exceeds the 10MB limit",
+			Err: fmt.Errorf("file size %d exceeds 10MB limit", header.Size),
+		})
+		return
+	}
+
+	dir := "uploads/attachments"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to create upload directory",
+			Err: err,
+		})
+		return
+	}
+
+	// Generate a unique filename using timestamp and sanitizing original name
+	cleanName := strings.ReplaceAll(header.Filename, " ", "_")
+	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), cleanName)
+	filePath := filepath.Join(dir, filename)
+
+	if err := c.SaveUploadedFile(header, filePath); err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to save file",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg: "File uploaded successfully",
+		Data: gin.H{
+			"file_path": filePath,
+		},
 	})
 }
