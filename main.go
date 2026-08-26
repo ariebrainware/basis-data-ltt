@@ -183,6 +183,7 @@ func registerPublicRoutes(r *gin.Engine, cfg *config.Config) {
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.POST("/patient", endpoint.CreatePatient)
+	r.POST("/patient/upload", endpoint.UploadAttachment)
 
 	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 5, Window: 15 * time.Minute})
 	r.POST("/login", authRateLimit, endpoint.Login)

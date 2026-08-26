@@ -152,7 +152,9 @@ func setCorsHeaders(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Headers", getenvOrDefault("CORSALLOWHEADERS", "X-Requested-With, Content-Type, Authorization, session-token, Origin, Accept, Access-Control-Request-Method, Access-Control-Request-Headers"))
 	c.Writer.Header().Set("Access-Control-Max-Age", getenvOrDefault("CORSMAXAGE", "86400"))
 	c.Writer.Header().Set("Access-Control-Allow-Credentials", getenvOrDefault("CORSALLOWCREDENTIALS", "true"))
-	c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
+	if !strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
+		c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
+	}
 
 	// Add HSTS header for HTTPS security. Only set when TLS is present or explicitly enabled
 	if c.Request.TLS != nil || os.Getenv("ENABLE_HSTS") == "true" {
