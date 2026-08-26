@@ -242,12 +242,11 @@ func registerTreatmentRoutes(auth *gin.RouterGroup) {
 
 func registerDiseaseRoutes(auth *gin.RouterGroup) {
 	disease := auth.Group("/disease")
-	disease.Use(middleware.RequireRole(model.RoleAdmin))
-	disease.GET("", endpoint.ListDiseases)
-	disease.POST("", endpoint.CreateDisease)
-	disease.GET("/:id", endpoint.GetDiseaseInfo)
-	disease.PATCH("/:id", endpoint.UpdateDisease)
-	disease.DELETE("/:id", endpoint.DeleteDisease)
+	disease.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.ListDiseases)
+	disease.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateDisease)
+	disease.GET("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.GetDiseaseInfo)
+	disease.PATCH("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.UpdateDisease)
+	disease.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteDisease)
 }
 
 func registerPricingRoutes(auth *gin.RouterGroup) {

@@ -42,8 +42,10 @@ type TreatementRequest struct {
 // @Description Treatment list response information
 type ListTreatementResponse struct {
 	Treatment
-	TherapistName string `json:"therapist_name" gorm:"column:therapist_name" example:"Dr. John Smith"`
-	PatientName   string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
-	Age           int    `json:"age" gorm:"column:age" example:"30"`
-	Price         int64  `json:"price" gorm:"column:price" example:"250000"`
+	TherapistName  string `json:"therapist_name" gorm:"column:therapist_name" example:"Dr. John Smith"`
+	PatientName    string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
+	Age            int    `json:"age" gorm:"column:age" example:"30"`
+	Price          int64  `json:"price" gorm:"column:price" example:"250000"`
+	HealthHistory  string `json:"health_history" gorm:"column:health_history" example:"Diabetes,Hypertension"`
+	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
 }
