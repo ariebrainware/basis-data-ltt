@@ -754,7 +754,6 @@ func GetPatientInfo(c *gin.Context) {
 	})
 }
 
-
 // UploadAttachment godoc
 // @Summary      Upload an attachment for a patient
 // @Description  Upload a doc/file attachment up to 10MB
