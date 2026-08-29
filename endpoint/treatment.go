@@ -95,8 +95,8 @@ func getTherapistIDFromSession(db *gorm.DB, sessionToken string) (uint, error) {
 
 func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("treatments").
-		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id").
-		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
+		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id AND therapists.deleted_at IS NULL").
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code AND patients.deleted_at IS NULL").
 		Joins(`LEFT JOIN (
 			SELECT p1.therapist_id, p1.price
 			FROM pricings p1
@@ -111,13 +111,13 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 			WHERE p1.deleted_at IS NULL
 		) AS pricings ON pricings.therapist_id = treatments.therapist_id`).
 		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, patients.health_history as health_history, patients.surgery_history as surgery_history, COALESCE(pricings.price, 0) as price").
-		Where("patients.deleted_at IS NULL")
+		Where("treatments.deleted_at IS NULL AND patients.deleted_at IS NULL")
 }
 
 func buildCountQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("treatments").
-		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code").
-		Where("patients.deleted_at IS NULL")
+		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code AND patients.deleted_at IS NULL").
+		Where("treatments.deleted_at IS NULL AND patients.deleted_at IS NULL")
 }
 
 func applyPagination(query *gorm.DB, limit, offset int) *gorm.DB {
