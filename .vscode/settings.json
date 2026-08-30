@@ -1,8 +1,1 @@
-{
-    "go.goroot": "C:\\Program Files\\Go",
-    "go.gopath": "C:\\Users\\arieb\\go",
-    "go.alternateTools": {
-        "go": "C:\\Program Files\\Go\\bin\\go.exe",
-        "dlv": "C:\\Users\\arieb\\go\\bin\\dlv.exe"
-    }
-}
+{}
