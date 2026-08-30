@@ -17,19 +17,23 @@ import (
 
 // Config holds the application's configuration values.
 type Config struct {
-	AppName         string `json:"appname"`
-	AppEnv          string `json:"appenv"`
-	AppPort         uint16 `json:"appport"`
-	GinMode         string `json:"ginmode"`
-	ShutdownTimeout int    `json:"shutdowntimeout"`
-	DBHost          string `json:"dbhost"`
-	DBPort          uint16 `json:"dbport"`
-	DBName          string `json:"dbname"`
-	DBUSER          string `json:"dbuser"`
-	DBPass          string `json:"dbpass"`
-	DBTimeout       string `json:"dbtimeout"`
-	DBReadTimeout   string `json:"dbreadtimeout"`
-	DBWriteTimeout  string `json:"dbwritetimeout"`
+	AppName           string        `json:"appname"`
+	AppEnv            string        `json:"appenv"`
+	AppPort           uint16        `json:"appport"`
+	GinMode           string        `json:"ginmode"`
+	ShutdownTimeout   int           `json:"shutdowntimeout"`
+	DBHost            string        `json:"dbhost"`
+	DBPort            uint16        `json:"dbport"`
+	DBName            string        `json:"dbname"`
+	DBUSER            string        `json:"dbuser"`
+	DBPass            string        `json:"dbpass"`
+	DBTimeout         string        `json:"dbtimeout"`
+	DBReadTimeout     string        `json:"dbreadtimeout"`
+	DBWriteTimeout    string        `json:"dbwritetimeout"`
+	DBMaxIdleConns    int           `json:"dbmaxidleconns"`
+	DBMaxOpenConns    int           `json:"dbmaxopenconns"`
+	DBConnMaxLifetime time.Duration `json:"dbconnmaxlifetime"`
+	DBConnMaxIdleTime time.Duration `json:"dbconnmaxidletime"`
 }
 
 var config *Config
@@ -117,21 +121,47 @@ func LoadConfig() *Config {
 			dbWriteTimeout = "30s"
 		}
 
+		dbMaxIdleConns, _ := strconv.Atoi(os.Getenv("DB_MAX_IDLE_CONNS"))
+		if dbMaxIdleConns <= 0 {
+			dbMaxIdleConns = 10
+		}
+
+		dbMaxOpenConns, _ := strconv.Atoi(os.Getenv("DB_MAX_OPEN_CONNS"))
+		if dbMaxOpenConns <= 0 {
+			dbMaxOpenConns = 100
+		}
+
+		dbConnMaxLifetimeStr := os.Getenv("DB_CONN_MAX_LIFETIME")
+		dbConnMaxLifetime, err := time.ParseDuration(dbConnMaxLifetimeStr)
+		if err != nil || dbConnMaxLifetime <= 0 {
+			dbConnMaxLifetime = 3 * time.Minute
+		}
+
+		dbConnMaxIdleTimeStr := os.Getenv("DB_CONN_MAX_IDLE_TIME")
+		dbConnMaxIdleTime, err := time.ParseDuration(dbConnMaxIdleTimeStr)
+		if err != nil || dbConnMaxIdleTime <= 0 {
+			dbConnMaxIdleTime = 30 * time.Second
+		}
+
 		// Initialize the Config struct with values from environment variables.
 		config = &Config{
-			AppName:         os.Getenv("APPNAME"),
-			AppEnv:          os.Getenv("APPENV"),
-			AppPort:         uint16(appPort),
-			GinMode:         os.Getenv("GINMODE"),
-			ShutdownTimeout: shutdownTimeout,
-			DBHost:          os.Getenv("DBHOST"),
-			DBPort:          uint16(dbPort),
-			DBName:          os.Getenv("DBNAME"),
-			DBUSER:          os.Getenv("DBUSER"),
-			DBPass:          os.Getenv("DBPASS"),
-			DBTimeout:       dbTimeout,
-			DBReadTimeout:   dbReadTimeout,
-			DBWriteTimeout:  dbWriteTimeout,
+			AppName:           os.Getenv("APPNAME"),
+			AppEnv:            os.Getenv("APPENV"),
+			AppPort:           uint16(appPort),
+			GinMode:           os.Getenv("GINMODE"),
+			ShutdownTimeout:   shutdownTimeout,
+			DBHost:            os.Getenv("DBHOST"),
+			DBPort:            uint16(dbPort),
+			DBName:            os.Getenv("DBNAME"),
+			DBUSER:            os.Getenv("DBUSER"),
+			DBPass:            os.Getenv("DBPASS"),
+			DBTimeout:         dbTimeout,
+			DBReadTimeout:     dbReadTimeout,
+			DBWriteTimeout:    dbWriteTimeout,
+			DBMaxIdleConns:    dbMaxIdleConns,
+			DBMaxOpenConns:    dbMaxOpenConns,
+			DBConnMaxLifetime: dbConnMaxLifetime,
+			DBConnMaxIdleTime: dbConnMaxIdleTime,
 		}
 	})
 	return config
@@ -167,9 +197,10 @@ func ConnectMySQL() (*gorm.DB, error) {
 			return nil, err
 		}
 
-		sqlDB.SetMaxIdleConns(10)
-		sqlDB.SetMaxOpenConns(100)
-		sqlDB.SetConnMaxLifetime(5 * time.Minute)
+		sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
+		sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
+		sqlDB.SetConnMaxLifetime(cfg.DBConnMaxLifetime)
+		sqlDB.SetConnMaxIdleTime(cfg.DBConnMaxIdleTime)
 
 		return db, nil
 	}
@@ -206,10 +237,11 @@ func ConnectMySQL() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	// Set connection pool limits to avoid too many connections.
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	// Set connection pool limits to avoid stale connections.
+	sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	sqlDB.SetConnMaxLifetime(cfg.DBConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(cfg.DBConnMaxIdleTime)
 
 	return db, nil
 }
