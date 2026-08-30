@@ -147,11 +147,16 @@ func applyTransactionDateScope(query *gorm.DB, scope transactionDateScope) *gorm
 		return query
 	}
 
-	if scope.startDate == scope.endDate {
-		return query.Where("DATE(treatments.treatment_date) = ?", scope.startDate)
+	endParsed, err := time.Parse("2006-01-02", scope.endDate)
+	if err != nil {
+		if scope.startDate == scope.endDate {
+			return query.Where("DATE(treatments.treatment_date) = ?", scope.startDate)
+		}
+		return query.Where("DATE(treatments.treatment_date) BETWEEN ? AND ?", scope.startDate, scope.endDate)
 	}
 
-	return query.Where("DATE(treatments.treatment_date) BETWEEN ? AND ?", scope.startDate, scope.endDate)
+	nextDay := endParsed.AddDate(0, 0, 1).Format("2006-01-02")
+	return query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", scope.startDate, nextDay)
 }
 
 func calculateTransactionAmountAndAdjustItems(tx *gorm.DB, therapistID uint, items []transactionItemRequest) (int64, error) {
@@ -271,42 +276,31 @@ func ListTransactions(c *gin.Context) {
 	// Calculate summary for the same filter scope as transaction list.
 	summaryScope := dateScope
 
-	// Total amount for the target date
-	var totalAmount int64
+	// Consolidated summary query for total amount and payment status counts
+	var summaryAgg struct {
+		TotalAmount int64 `gorm:"column:total_amount"`
+		Paid        int64 `gorm:"column:paid_count"`
+		Partial     int64 `gorm:"column:partial_count"`
+		Unpaid      int64 `gorm:"column:unpaid_count"`
+	}
+
 	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
-		Select("COALESCE(SUM(transactions.amount), 0) as total").
+		Select(`COALESCE(SUM(transactions.amount), 0) AS total_amount,
+			COALESCE(SUM(CASE WHEN transactions.payment_status = 'paid' THEN 1 ELSE 0 END), 0) AS paid_count,
+			COALESCE(SUM(CASE WHEN transactions.payment_status = 'partial' THEN 1 ELSE 0 END), 0) AS partial_count,
+			COALESCE(SUM(CASE WHEN transactions.payment_status = 'unpaid' THEN 1 ELSE 0 END), 0) AS unpaid_count`).
 		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
-		Row().Scan(&totalAmount); err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate total amount", Err: err})
+		Scan(&summaryAgg).Error; err != nil {
+		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate transaction summary", Err: err})
 		return
 	}
 
-	// Payment status counts
-	type PaymentCount struct {
-		Status string
-		Count  int64
+	statusSummary := model.PaymentStatusSummary{
+		Paid:    summaryAgg.Paid,
+		Partial: summaryAgg.Partial,
+		Unpaid:  summaryAgg.Unpaid,
 	}
-	var paymentCounts []PaymentCount
-	if err := applyTransactionDateScope(db.Model(&model.Transaction{}), summaryScope).
-		Select("payment_status as status, COUNT(*) as count").
-		Joins("LEFT JOIN treatments ON treatments.id = transactions.treatment_id AND treatments.deleted_at IS NULL").
-		Group("payment_status").
-		Scan(&paymentCounts).Error; err != nil {
-		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate payment status counts", Err: err})
-		return
-	}
-
-	statusSummary := model.PaymentStatusSummary{}
-	for _, pc := range paymentCounts {
-		switch pc.Status {
-		case "paid":
-			statusSummary.Paid = pc.Count
-		case "partial":
-			statusSummary.Partial = pc.Count
-		case "unpaid":
-			statusSummary.Unpaid = pc.Count
-		}
-	}
+	totalAmount := summaryAgg.TotalAmount
 
 	// Therapist patient counts
 	var therapistPatientCounts []model.TherapistPatientCount

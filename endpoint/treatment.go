@@ -97,27 +97,22 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 	return db.Table("treatments").
 		Joins("LEFT JOIN therapists ON therapists.id = treatments.therapist_id AND therapists.deleted_at IS NULL").
 		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code AND patients.deleted_at IS NULL").
-		Joins(`LEFT JOIN (
-			SELECT p1.therapist_id, p1.price
-			FROM pricings p1
-			INNER JOIN (
-				SELECT therapist_id, MAX(id) AS max_id
-				FROM pricings
-				WHERE deleted_at IS NULL
-				GROUP BY therapist_id
-			) latest_pricings
-				ON latest_pricings.therapist_id = p1.therapist_id
-				AND latest_pricings.max_id = p1.id
-			WHERE p1.deleted_at IS NULL
-		) AS pricings ON pricings.therapist_id = treatments.therapist_id`).
-		Select("treatments.*, therapists.full_name as therapist_name, patients.full_name as patient_name, patients.age as age, patients.health_history as health_history, patients.surgery_history as surgery_history, COALESCE(pricings.price, 0) as price").
+		Select(`treatments.*,
+			therapists.full_name as therapist_name,
+			patients.full_name as patient_name,
+			patients.age as age,
+			patients.health_history as health_history,
+			patients.surgery_history as surgery_history,
+			COALESCE((SELECT p.price FROM pricings p WHERE p.therapist_id = treatments.therapist_id AND p.deleted_at IS NULL ORDER BY p.id DESC LIMIT 1), 0) as price`).
 		Where("treatments.deleted_at IS NULL AND patients.deleted_at IS NULL")
 }
 
-func buildCountQuery(db *gorm.DB) *gorm.DB {
-	return db.Table("treatments").
-		Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code AND patients.deleted_at IS NULL").
-		Where("treatments.deleted_at IS NULL AND patients.deleted_at IS NULL")
+func buildCountQuery(db *gorm.DB, keyword string) *gorm.DB {
+	query := db.Table("treatments")
+	if keyword != "" {
+		query = query.Joins("LEFT JOIN patients ON patients.patient_code = treatments.patient_code AND patients.deleted_at IS NULL")
+	}
+	return query.Where("treatments.deleted_at IS NULL")
 }
 
 func applyPagination(query *gorm.DB, limit, offset int) *gorm.DB {
@@ -152,8 +147,9 @@ func applyDateFilter(query *gorm.DB, groupByDate string, jakartaLoc *time.Locati
 
 	// Try parsing as explicit date first
 	if start, err := time.ParseInLocation("2006-01-02", groupByDate, jakartaLoc); err == nil {
-		end := start.Add(24 * time.Hour)
-		return query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", start, end)
+		startStr := start.Format("2006-01-02")
+		endStr := start.AddDate(0, 0, 1).Format("2006-01-02")
+		return query.Where("treatments.treatment_date >= ? AND treatments.treatment_date < ?", startStr, endStr)
 	}
 
 	// Otherwise check predefined ranges
@@ -184,7 +180,7 @@ func fetchTreatments(db *gorm.DB, params treatmentQueryParams) ([]model.ListTrea
 	}
 
 	// Build and execute count query (same filters, no pagination)
-	countQuery := buildCountQuery(db)
+	countQuery := buildCountQuery(db, params.keyword)
 	countQuery = applyKeywordFilter(countQuery, params.keyword)
 	countQuery = applyTherapistFilter(countQuery, params.therapistID)
 	countQuery = applyDateFilter(countQuery, params.groupByDate, params.jakartaLoc)

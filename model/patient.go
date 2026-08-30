@@ -6,7 +6,7 @@ import "gorm.io/gorm"
 // @Description Patient information
 type Patient struct {
 	gorm.Model
-	FullName       string `json:"full_name" gorm:"column:full_name" example:"John Doe"`
+	FullName       string `json:"full_name" gorm:"column:full_name;size:191;index" example:"John Doe"`
 	Password       string `json:"password" gorm:"column:password" example:"hashed_password"`
 	Gender         string `json:"gender" gorm:"column:gender" example:"Male"`
 	Age            int    `json:"age" gorm:"column:age" example:"30"`
@@ -16,7 +16,7 @@ type Patient struct {
 	PhoneNumber    string `json:"phone_number" gorm:"column:phone_number" example:"081234567890"`
 	HealthHistory  string `json:"health_history" gorm:"column:health_history" example:"Diabetes,Hypertension"`
 	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
-	PatientCode    string `json:"patient_code" gorm:"column:patient_code" example:"J001"`
+	PatientCode    string `json:"patient_code" gorm:"column:patient_code;size:191;index" example:"J001"`
 	SignaturePath  string `json:"signature_path" gorm:"column:signature_path" example:"uploads/signatures/xyz.png"`
 	AttachmentPath string `json:"attachment_path" gorm:"column:attachment_path" example:"uploads/attachments/172468112_file.pdf"`
 }
