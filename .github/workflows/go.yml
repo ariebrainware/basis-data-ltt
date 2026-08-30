@@ -83,6 +83,13 @@ jobs:
           --env=DBNAME=${{ vars.DBNAME }} \
           --env=DBUSER=${{ secrets.DBUSER }} \
           --env=DBPASS=${{ secrets.DBPASS }} \
+          --env=DBTIMEOUT=${{ vars.DBTIMEOUT }} \
+          --env=DBREADTIMEOUT=${{ vars.DBREADTIMEOUT }} \
+          --env=DBWRITETIMEOUT=${{ vars.DBWRITETIMEOUT }} \
+          --env=DB_MAX_IDLE_CONNS=${{ vars.DB_MAX_IDLE_CONNS }} \
+          --env=DB_MAX_OPEN_CONNS=${{ vars.DB_MAX_OPEN_CONNS }} \
+          --env=DB_CONN_MAX_LIFETIME=${{ vars.DB_CONN_MAX_LIFETIME }} \
+          --env=DB_CONN_MAX_IDLE_TIME=${{ vars.DB_CONN_MAX_IDLE_TIME }} \
           --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} \
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
@@ -152,6 +159,13 @@ jobs:
           --env=DBNAME=${{ vars.DBNAME }} \
           --env=DBUSER=${{ secrets.DBUSER }} \
           --env=DBPASS=${{ secrets.DBPASS }} \
+          --env=DBTIMEOUT=${{ vars.DBTIMEOUT }} \
+          --env=DBREADTIMEOUT=${{ vars.DBREADTIMEOUT }} \
+          --env=DBWRITETIMEOUT=${{ vars.DBWRITETIMEOUT }} \
+          --env=DB_MAX_IDLE_CONNS=${{ vars.DB_MAX_IDLE_CONNS }} \
+          --env=DB_MAX_OPEN_CONNS=${{ vars.DB_MAX_OPEN_CONNS }} \
+          --env=DB_CONN_MAX_LIFETIME=${{ vars.DB_CONN_MAX_LIFETIME }} \
+          --env=DB_CONN_MAX_IDLE_TIME=${{ vars.DB_CONN_MAX_IDLE_TIME }} \
           --env=CORSALLOWORIGIN=${{ vars.CORSALLOWORIGIN }} \
           --env=CORSALLOWHEADERS=${{ vars.CORSALLOWHEADERS }} \
           --env=CORSMAXAGE=${{ vars.CORSMAXAGE }} \
