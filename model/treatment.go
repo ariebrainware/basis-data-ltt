@@ -8,9 +8,9 @@ import (
 // @Description Treatment information
 type Treatment struct {
 	gorm.Model
-	TreatmentDate string `json:"treatment_date" gorm:"not null" example:"2025-01-15"`
-	PatientCode   string `json:"patient_code" gorm:"not null" example:"J001"`
-	TherapistID   uint   `json:"therapist_id" gorm:"not null" example:"1"`
+	TreatmentDate string `json:"treatment_date" gorm:"size:191;not null;index" example:"2025-01-15"`
+	PatientCode   string `json:"patient_code" gorm:"size:191;not null;index" example:"J001"`
+	TherapistID   uint   `json:"therapist_id" gorm:"not null;index" example:"1"`
 	Issues        string `json:"issues" gorm:"not null" example:"Back pain"`
 	Treatment     string `json:"treatment" gorm:"not null" example:"Massage therapy,Exercise"`
 	Remarks       string `json:"remarks" example:"Patient showed improvement"`

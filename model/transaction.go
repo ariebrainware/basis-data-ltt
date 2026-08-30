@@ -19,7 +19,7 @@ type Transaction struct {
 	Amount        int64             `json:"amount" gorm:"not null" example:"50000"`
 	Remarks       string            `json:"remarks" example:"Urgent handling fee"`
 	PaymentMethod string            `json:"payment_method" example:"cash"`
-	PaymentStatus string            `json:"payment_status" gorm:"default:'unpaid'" example:"unpaid"`
+	PaymentStatus string            `json:"payment_status" gorm:"size:50;default:'unpaid';index" example:"unpaid"`
 	Items         []TransactionItem `json:"items,omitempty" gorm:"serializer:json;type:json"`
 }
 
