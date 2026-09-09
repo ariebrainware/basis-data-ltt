@@ -17,6 +17,9 @@ definitions:
       role:
         example: Admin
         type: string
+      therapist_id:
+        example: 1
+        type: integer
       token:
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         type: string
@@ -92,6 +95,12 @@ definitions:
       age:
         example: 30
         type: integer
+      attachment_path:
+        example:
+        - '["uploads/attachments/172468112_file.pdf"]'
+        items:
+          type: string
+        type: array
       email:
         example: john@example.com
         type: string
@@ -124,6 +133,9 @@ definitions:
         items:
           type: string
         type: array
+      signature:
+        example: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+        type: string
       surgery_history:
         example: Appendectomy 2020
         type: string
@@ -197,6 +209,8 @@ definitions:
     properties:
       item_id:
         type: integer
+      price:
+        type: integer
       quantity:
         type: integer
     type: object
@@ -243,6 +257,19 @@ definitions:
       valid:
         description: Valid is true if Time is not NULL
         type: boolean
+    type: object
+  model.CategoryExpenseBreakdown:
+    description: Expense category aggregation
+    properties:
+      category:
+        example: Operational
+        type: string
+      count:
+        example: 12
+        type: integer
+      total_amount:
+        example: 4500000
+        type: integer
     type: object
   model.CreateEmployeeRequest:
     description: Employee creation request payload
@@ -292,6 +319,37 @@ definitions:
     - phone_number
     - position
     - religion
+    type: object
+  model.CreateExpenseRequest:
+    description: Expense creation request payload
+    properties:
+      amount:
+        example: 150000
+        type: integer
+      category:
+        example: Operational
+        type: string
+      description:
+        example: Electricity bill for clinic
+        type: string
+      expense_date:
+        example: "2025-01-15"
+        type: string
+      notes:
+        example: Paid on time
+        type: string
+      payment_method:
+        example: bank_transfer
+        type: string
+      receipt_url:
+        example: https://example.com/receipts/rec-123.jpg
+        type: string
+    required:
+    - amount
+    - category
+    - description
+    - expense_date
+    - payment_method
     type: object
   model.Disease:
     description: Disease information
@@ -359,6 +417,53 @@ definitions:
       updatedAt:
         type: string
     type: object
+  model.Expense:
+    description: Expense entity information
+    properties:
+      amount:
+        example: 150000
+        type: integer
+      category:
+        example: Operational
+        type: string
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      description:
+        example: Electricity bill for clinic
+        type: string
+      expense_date:
+        example: "2025-01-15"
+        type: string
+      id:
+        type: integer
+      notes:
+        example: Paid on time
+        type: string
+      payment_method:
+        example: bank_transfer
+        type: string
+      receipt_url:
+        example: https://example.com/receipts/rec-123.jpg
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  model.ExpenseSummary:
+    description: Expense summary statistics
+    properties:
+      category_breakdown:
+        items:
+          $ref: '#/definitions/model.CategoryExpenseBreakdown'
+        type: array
+      total_amount:
+        example: 4500000
+        type: integer
+      total_count:
+        example: 12
+        type: integer
+    type: object
   model.Item:
     description: Item information
     properties:
@@ -379,6 +484,16 @@ definitions:
         type: integer
       updatedAt:
         type: string
+    type: object
+  model.ListExpensesResponseData:
+    description: Paginated expense list with summary
+    properties:
+      expenses:
+        items:
+          $ref: '#/definitions/model.Expense'
+        type: array
+      summary:
+        $ref: '#/definitions/model.ExpenseSummary'
     type: object
   model.ListTransactionResponse:
     description: Transaction list response information
@@ -441,6 +556,9 @@ definitions:
       age:
         example: 30
         type: integer
+      attachment_path:
+        example: uploads/attachments/172468112_file.pdf
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -470,6 +588,9 @@ definitions:
         type: string
       phone_number:
         example: "081234567890"
+        type: string
+      signature_path:
+        example: uploads/signatures/xyz.png
         type: string
       surgery_history:
         example: Appendectomy 2020
@@ -604,6 +725,9 @@ definitions:
       item_id:
         example: 1
         type: integer
+      price:
+        example: 10000
+        type: integer
       quantity:
         example: 2
         type: integer
@@ -734,6 +858,31 @@ definitions:
         example: Islam
         type: string
     type: object
+  model.UpdateExpenseRequest:
+    description: Expense update request payload
+    properties:
+      amount:
+        example: 150000
+        type: integer
+      category:
+        example: Operational
+        type: string
+      description:
+        example: Electricity bill for clinic
+        type: string
+      expense_date:
+        example: "2025-01-15"
+        type: string
+      notes:
+        example: Paid on time
+        type: string
+      payment_method:
+        example: bank_transfer
+        type: string
+      receipt_url:
+        example: https://example.com/receipts/rec-123.jpg
+        type: string
+    type: object
   model.UpdatePatientRequest:
     properties:
       address:
@@ -742,6 +891,12 @@ definitions:
       age:
         example: 30
         type: integer
+      attachment_path:
+        example:
+        - '["uploads/attachments/172468112_file.pdf"]'
+        items:
+          type: string
+        type: array
       email:
         example: john@example.com
         type: string
@@ -770,6 +925,9 @@ definitions:
         items:
           type: string
         type: array
+      signature:
+        example: data:image/png;base64,...
+        type: string
       surgery_history:
         example: Appendectomy 2020
         type: string
@@ -1221,6 +1379,285 @@ paths:
       summary: Update employee details
       tags:
       - Employee
+  /expense:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of expenses with summary analytics and optional
+        filtering
+      parameters:
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: Filter expenses from date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Filter expenses to date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by expense category
+        in: query
+        name: category
+        type: string
+      - description: Filter by payment method
+        in: query
+        name: payment_method
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Expenses retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ListExpensesResponseData'
+              type: object
+        "400":
+          description: Invalid query parameters
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List expenses
+      tags:
+      - Expense
+    post:
+      consumes:
+      - application/json
+      description: Add a new expense record
+      parameters:
+      - description: Expense information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateExpenseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Expense created
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Expense'
+              type: object
+        "400":
+          description: Invalid request body or validation failure
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Create a new expense
+      tags:
+      - Expense
+  /expense/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete an expense by ID
+      parameters:
+      - description: Expense ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Expense deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Expense not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete an expense
+      tags:
+      - Expense
+    get:
+      consumes:
+      - application/json
+      description: Retrieve an expense record by ID
+      parameters:
+      - description: Expense ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Expense retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Expense'
+              type: object
+        "400":
+          description: Invalid ID or expense not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get expense information
+      tags:
+      - Expense
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing expense record
+      parameters:
+      - description: Expense ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated expense information
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateExpenseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Expense updated
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Expense'
+              type: object
+        "400":
+          description: Invalid request or expense not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Update expense information
+      tags:
+      - Expense
+  /expense/summary:
+    get:
+      consumes:
+      - application/json
+      description: Get aggregated expense totals and category breakdowns for optional
+        date ranges and filters
+      parameters:
+      - description: Filter expenses from date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Filter expenses to date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by expense category
+        in: query
+        name: category
+        type: string
+      - description: Filter by payment method
+        in: query
+        name: payment_method
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Expense summary retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.ExpenseSummary'
+              type: object
+        "400":
+          description: Invalid query parameters
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Get expense summary statistics
+      tags:
+      - Expense
   /item:
     get:
       consumes:
@@ -1700,6 +2137,35 @@ paths:
       - BearerAuth: []
       - SessionToken: []
       summary: Update patient information
+      tags:
+      - Patient
+  /patient/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a doc/file attachment up to 10MB
+      parameters:
+      - description: Attachment file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File uploaded successfully
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request or file size too large
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      summary: Upload an attachment for a patient
       tags:
       - Patient
   /pricing:

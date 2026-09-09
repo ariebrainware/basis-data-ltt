@@ -65,6 +65,16 @@ The API uses two types of authentication:
 | PUT | `/therapist/{id}` | Approve therapist | Yes | Admin |
 | DELETE | `/therapist/{id}` | Delete therapist | Yes | Admin |
 
+### Expense Management
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|----------|-------------|---------------|------|
+| GET | `/expense` | List expenses (with pagination and filtering) | Yes | Admin |
+| GET | `/expense/summary` | Get aggregated expense summary & breakdown | Yes | Admin |
+| POST | `/expense` | Create expense record | Yes | Admin |
+| GET | `/expense/{id}` | Get expense details | Yes | Admin |
+| PATCH | `/expense/{id}` | Update expense record | Yes | Admin |
+| DELETE | `/expense/{id}` | Delete expense record | Yes | Admin |
+
 ## User Roles
 
 1. **Admin** (role_id: 1)
