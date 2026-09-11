@@ -29,10 +29,16 @@ func normalizeExpenseDate(raw string) (string, error) {
 }
 
 func getExpenseIDParam(c *gin.Context) (string, bool) {
-	id := c.Param("id")
+	id := strings.TrimSpace(c.Param("id"))
 	if id == "" {
 		util.CallUserError(c, util.APIErrorParams{Msg: "Missing expense ID", Err: fmt.Errorf("expense ID is required")})
 		return "", false
+	}
+	for _, r := range id {
+		if r < '0' || r > '9' {
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid expense ID", Err: fmt.Errorf("expense ID must be a positive integer")})
+			return "", false
+		}
 	}
 	return id, true
 }
