@@ -643,7 +643,7 @@ func UploadTransactionAttachment(c *gin.Context) {
 		return
 	}
 
-	dir := "private_uploads/transaction_attachments"
+	dir := "uploads/attachments"
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create upload directory",

@@ -890,7 +890,7 @@ func TestUploadTransactionAttachment_ValidFormats(t *testing.T) {
 			data := response["data"].(map[string]interface{})
 			filePath, ok := data["file_path"].(string)
 			assert.True(t, ok)
-			assert.True(t, strings.HasPrefix(filePath, "private_uploads/transaction_attachments/"))
+			assert.True(t, strings.HasPrefix(filePath, "uploads/attachments/"))
 			assert.True(t, strings.HasSuffix(filePath, tc.filename))
 
 			// Cleanup created test file
@@ -939,16 +939,17 @@ func TestUploadTransactionAttachment_InvalidFileType(t *testing.T) {
 		})
 	}
 
-	func TestUploadTransactionAttachment_RejectsEmptyFile(t *testing.T) {
-		r, _ := setupEndpointTest(t)
-		r.POST("/transaction/upload", UploadTransactionAttachment)
+}
 
-		w, response, err := performMultipartUpload(r, "file", "receipt.png", []byte{})
-		assert.NoError(t, err)
-		assert.Equal(t, http.StatusBadRequest, w.Code)
-		assert.False(t, response["success"].(bool))
-		assert.Contains(t, response["msg"].(string), "Empty files are not allowed")
-	}
+func TestUploadTransactionAttachment_RejectsEmptyFile(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.POST("/transaction/upload", UploadTransactionAttachment)
+
+	w, response, err := performMultipartUpload(r, "file", "receipt.png", []byte{})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.False(t, response["success"].(bool))
+	assert.Contains(t, response["msg"].(string), "Empty files are not allowed")
 }
 
 func TestUploadTransactionAttachment_NoFile(t *testing.T) {
