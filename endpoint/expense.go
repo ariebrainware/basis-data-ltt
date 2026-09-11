@@ -139,7 +139,7 @@ func ListExpenses(c *gin.Context) {
 	if startDate != "" {
 		normalized, err := normalizeExpenseDate(startDate)
 		if err != nil {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid start_date format. Use YYYY-MM-DD", Err: err})
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid start_date format. Use YYYY-MM-DD or RFC3339", Err: err})
 			return
 		}
 		startDate = normalized
@@ -148,7 +148,7 @@ func ListExpenses(c *gin.Context) {
 	if endDate != "" {
 		normalized, err := normalizeExpenseDate(endDate)
 		if err != nil {
-			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid end_date format. Use YYYY-MM-DD", Err: err})
+			util.CallUserError(c, util.APIErrorParams{Msg: "Invalid end_date format. Use YYYY-MM-DD or RFC3339", Err: err})
 			return
 		}
 		endDate = normalized
