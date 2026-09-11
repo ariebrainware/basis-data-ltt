@@ -11,29 +11,21 @@ import (
 	"gorm.io/gorm"
 )
 
-// normalizeExpenseDate parses and normalizes a date string to YYYY-MM-DD format
 func normalizeExpenseDate(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", fmt.Errorf("date is required")
 	}
 
-	if len(trimmed) >= 10 {
-		candidate := trimmed[:10]
-		if _, err := time.Parse("2006-01-02", candidate); err == nil {
-			return candidate, nil
-		}
-	}
-
-	if parsed, err := time.Parse(time.RFC3339, trimmed); err == nil {
+	if parsed, err := time.Parse("2006-01-02", trimmed); err == nil {
 		return parsed.Format("2006-01-02"), nil
 	}
 
-	if _, err := time.Parse("2006-01-02", trimmed); err != nil {
-		return "", fmt.Errorf("invalid date format %q: must be YYYY-MM-DD or RFC3339", raw)
+	if parsed, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+		return parsed.Format("2006-01-02"), nil
 	}
 
-	return trimmed, nil
+	return "", fmt.Errorf("invalid date format %q: must be YYYY-MM-DD or RFC3339", raw)
 }
 
 func getExpenseIDParam(c *gin.Context) (string, bool) {
