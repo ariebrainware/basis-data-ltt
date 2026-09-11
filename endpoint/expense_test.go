@@ -53,11 +53,12 @@ func TestExpenseCRUDFlow(t *testing.T) {
 	var getResp map[string]interface{}
 	err = json.Unmarshal(rec.Body.Bytes(), &getResp)
 	assert.NoError(t, err)
-	getData := getResp["data"].(map[string]interface{})
-	assert.Equal(t, "Operational", getData["category"])
-	assert.Equal(t, float64(150000), getData["amount"])
-	assert.Equal(t, "Electricity bill", getData["description"])
-
+	getDataAny, ok := getResp["data"].(map[string]interface{})
+	if assert.True(t, ok, "expected data object, got=%T", getResp["data"]) {
+		assert.Equal(t, "Operational", getDataAny["category"])
+		assert.Equal(t, float64(150000), getDataAny["amount"])
+		assert.Equal(t, "Electricity bill", getDataAny["description"])
+	}
 	// 3. Update the expense
 	updatePayload := `{"amount":175000,"description":"Electricity bill updated"}`
 	rec = httptest.NewRecorder()
