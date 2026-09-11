@@ -878,11 +878,6 @@ func TestUploadTransactionAttachment_ValidFormats(t *testing.T) {
 			filename: "receipt.heic",
 			content:  []byte("\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic"),
 		},
-		{
-			name:     "HEIC image (heif)",
-			filename: "receipt.heif",
-			content:  []byte("\x00\x00\x00\x18ftypmif1\x00\x00\x00\x00mif1heic"),
-		},
 	}
 
 	for _, tc := range testCases {
@@ -895,7 +890,7 @@ func TestUploadTransactionAttachment_ValidFormats(t *testing.T) {
 			data := response["data"].(map[string]interface{})
 			filePath, ok := data["file_path"].(string)
 			assert.True(t, ok)
-			assert.True(t, strings.HasPrefix(filePath, "uploads/attachments/"))
+			assert.True(t, strings.HasPrefix(filePath, "private_uploads/transaction_attachments/"))
 			assert.True(t, strings.HasSuffix(filePath, tc.filename))
 
 			// Cleanup created test file
@@ -931,6 +926,7 @@ func TestUploadTransactionAttachment_InvalidFileType(t *testing.T) {
 		{name: "Executable", filename: "virus.exe", content: []byte("MZ\x90\x00")},
 		{name: "Shell script", filename: "script.sh", content: []byte("#!/bin/bash\necho bad")},
 		{name: "Text file", filename: "notes.txt", content: []byte("Just some plain text")},
+		{name: "Fake PDF content", filename: "receipt.pdf", content: []byte("not really a pdf")},
 	}
 
 	for _, tc := range invalidFiles {
@@ -941,6 +937,17 @@ func TestUploadTransactionAttachment_InvalidFileType(t *testing.T) {
 			assert.False(t, response["success"].(bool))
 			assert.Contains(t, response["msg"].(string), "Allowed types: pdf, jpeg, png, heic")
 		})
+	}
+
+	func TestUploadTransactionAttachment_RejectsEmptyFile(t *testing.T) {
+		r, _ := setupEndpointTest(t)
+		r.POST("/transaction/upload", UploadTransactionAttachment)
+
+		w, response, err := performMultipartUpload(r, "file", "receipt.png", []byte{})
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.False(t, response["success"].(bool))
+		assert.Contains(t, response["msg"].(string), "Empty files are not allowed")
 	}
 }
 

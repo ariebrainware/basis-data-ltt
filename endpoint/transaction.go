@@ -1,6 +1,8 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -512,7 +514,40 @@ func UpdateTransaction(c *gin.Context) {
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Transaction updated", Data: transaction})
 }
 
-func isAllowedTransactionAttachmentType(filename string, headerContentType string, fileContent []byte) bool {
+func isValidHEICContent(fileContent []byte) bool {
+	if len(fileContent) < 12 {
+		return false
+	}
+
+	if string(fileContent[4:8]) != "ftyp" {
+		return false
+	}
+
+	majorBrand := string(fileContent[8:12])
+	if majorBrand == "heic" || majorBrand == "heix" || majorBrand == "hevc" || majorBrand == "hevx" || majorBrand == "mif1" || majorBrand == "msf1" {
+		return true
+	}
+
+	if len(fileContent) < 16 {
+		return false
+	}
+
+	boxSize := int(binary.BigEndian.Uint32(fileContent[0:4]))
+	if boxSize <= 16 || boxSize > len(fileContent) {
+		boxSize = len(fileContent)
+	}
+
+	for i := 16; i+4 <= boxSize; i += 4 {
+		brand := string(fileContent[i : i+4])
+		if brand == "heic" || brand == "heix" || brand == "hevc" || brand == "hevx" || brand == "mif1" || brand == "msf1" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isAllowedTransactionAttachmentType(filename string, fileContent []byte) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
 	allowedExts := map[string]bool{
 		".pdf":  true,
@@ -520,34 +555,28 @@ func isAllowedTransactionAttachmentType(filename string, headerContentType strin
 		".jpeg": true,
 		".png":  true,
 		".heic": true,
-		".heif": true,
 	}
 
 	if !allowedExts[ext] {
 		return false
 	}
 
-	if len(fileContent) > 0 {
-		detectedType := http.DetectContentType(fileContent)
-		switch ext {
-		case ".pdf":
-			if detectedType != "application/pdf" && !strings.Contains(headerContentType, "pdf") && detectedType != "application/octet-stream" {
-				return false
-			}
-		case ".jpg", ".jpeg":
-			if detectedType != "image/jpeg" && !strings.Contains(headerContentType, "jpeg") && !strings.Contains(headerContentType, "jpg") && detectedType != "application/octet-stream" {
-				return false
-			}
-		case ".png":
-			if detectedType != "image/png" && !strings.Contains(headerContentType, "png") && detectedType != "application/octet-stream" {
-				return false
-			}
-		case ".heic", ".heif":
-			return true
-		}
+	if len(fileContent) == 0 {
+		return false
 	}
 
-	return true
+	switch ext {
+	case ".pdf":
+		return bytes.HasPrefix(fileContent, []byte("%PDF-"))
+	case ".jpg", ".jpeg":
+		return len(fileContent) >= 3 && fileContent[0] == 0xFF && fileContent[1] == 0xD8 && fileContent[2] == 0xFF
+	case ".png":
+		return bytes.HasPrefix(fileContent, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'})
+	case ".heic":
+		return isValidHEICContent(fileContent)
+	}
+
+	return false
 }
 
 // UploadTransactionAttachment godoc
@@ -598,7 +627,15 @@ func UploadTransactionAttachment(c *gin.Context) {
 		_, _ = seeker.Seek(0, io.SeekStart)
 	}
 
-	if !isAllowedTransactionAttachmentType(header.Filename, header.Header.Get("Content-Type"), buf[:n]) {
+	if n == 0 {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Empty files are not allowed",
+			Err: fmt.Errorf("uploaded file is empty"),
+		})
+		return
+	}
+
+	if !isAllowedTransactionAttachmentType(header.Filename, buf[:n]) {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid file type. Allowed types: pdf, jpeg, png, heic",
 			Err: fmt.Errorf("unsupported file extension or format for %s", header.Filename),
@@ -606,7 +643,7 @@ func UploadTransactionAttachment(c *gin.Context) {
 		return
 	}
 
-	dir := "uploads/attachments"
+	dir := "private_uploads/transaction_attachments"
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create upload directory",
