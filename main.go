@@ -277,6 +277,7 @@ func registerTransactionRoutes(auth *gin.RouterGroup) {
 	transaction.GET("", endpoint.ListTransactions)
 	transaction.GET("/:id", endpoint.GetTransactionInfo)
 	transaction.PATCH("/:id", endpoint.UpdateTransaction)
+	transaction.POST("/upload", endpoint.UploadTransactionAttachment)
 }
 
 func registerTherapistRoutes(auth *gin.RouterGroup) {

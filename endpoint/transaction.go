@@ -4,8 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -21,11 +26,12 @@ type transactionItemRequest struct {
 }
 
 type updateTransactionRequest struct {
-	Amount        *int64                   `json:"amount"`
-	Remarks       *string                  `json:"remarks"`
-	PaymentMethod *string                  `json:"payment_method"`
-	PaymentStatus *string                  `json:"payment_status"`
-	Items         []transactionItemRequest `json:"items"`
+	Amount         *int64                   `json:"amount"`
+	Remarks        *string                  `json:"remarks"`
+	PaymentMethod  *string                  `json:"payment_method"`
+	PaymentStatus  *string                  `json:"payment_status"`
+	AttachmentPath *string                  `json:"attachment_path"`
+	Items          []transactionItemRequest `json:"items"`
 }
 
 type transactionUserError struct {
@@ -474,6 +480,10 @@ func UpdateTransaction(c *gin.Context) {
 			updates["payment_status"] = *req.PaymentStatus
 		}
 
+		if req.AttachmentPath != nil {
+			updates["attachment_path"] = *req.AttachmentPath
+		}
+
 		if len(updates) == 0 {
 			return &transactionUserError{msg: "No fields to update"}
 		}
@@ -501,3 +511,127 @@ func UpdateTransaction(c *gin.Context) {
 
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Transaction updated", Data: transaction})
 }
+
+func isAllowedTransactionAttachmentType(filename string, headerContentType string, fileContent []byte) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	allowedExts := map[string]bool{
+		".pdf":  true,
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".heic": true,
+		".heif": true,
+	}
+
+	if !allowedExts[ext] {
+		return false
+	}
+
+	if len(fileContent) > 0 {
+		detectedType := http.DetectContentType(fileContent)
+		switch ext {
+		case ".pdf":
+			if detectedType != "application/pdf" && !strings.Contains(headerContentType, "pdf") && detectedType != "application/octet-stream" {
+				return false
+			}
+		case ".jpg", ".jpeg":
+			if detectedType != "image/jpeg" && !strings.Contains(headerContentType, "jpeg") && !strings.Contains(headerContentType, "jpg") && detectedType != "application/octet-stream" {
+				return false
+			}
+		case ".png":
+			if detectedType != "image/png" && !strings.Contains(headerContentType, "png") && detectedType != "application/octet-stream" {
+				return false
+			}
+		case ".heic", ".heif":
+			return true
+		}
+	}
+
+	return true
+}
+
+// UploadTransactionAttachment godoc
+// @Summary      Upload an attachment for a transaction
+// @Description  Upload an attachment file (pdf, jpeg, png, heic) up to 5MB
+// @Tags         Transaction
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        file formData file true "Attachment file (pdf, jpeg, png, heic up to 5MB)"
+// @Success      200 {object} util.APIResponse "File uploaded successfully"
+// @Failure      400 {object} util.APIResponse "Invalid request, invalid file type, or file size too large"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /transaction/upload [post]
+func UploadTransactionAttachment(c *gin.Context) {
+	// Limit request size to 5.5MB to account for headers/multipart overhead
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, int64(5.5*1024*1024))
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		if err.Error() == "http: request body too large" || strings.Contains(err.Error(), "too large") {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "File size exceeds the 5MB limit",
+				Err: err,
+			})
+			return
+		}
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "No file was uploaded",
+			Err: err,
+		})
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 5*1024*1024 {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "File size exceeds the 5MB limit",
+			Err: fmt.Errorf("file size %d exceeds 5MB limit", header.Size),
+		})
+		return
+	}
+
+	buf := make([]byte, 512)
+	n, _ := file.Read(buf)
+	if seeker, ok := file.(io.ReadSeeker); ok {
+		_, _ = seeker.Seek(0, io.SeekStart)
+	}
+
+	if !isAllowedTransactionAttachmentType(header.Filename, header.Header.Get("Content-Type"), buf[:n]) {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid file type. Allowed types: pdf, jpeg, png, heic",
+			Err: fmt.Errorf("unsupported file extension or format for %s", header.Filename),
+		})
+		return
+	}
+
+	dir := "uploads/attachments"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to create upload directory",
+			Err: err,
+		})
+		return
+	}
+
+	cleanName := filepath.Base(strings.ReplaceAll(header.Filename, " ", "_"))
+	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), cleanName)
+	filePath := filepath.Join(dir, filename)
+
+	if err := c.SaveUploadedFile(header, filePath); err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to save file",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg: "File uploaded successfully",
+		Data: gin.H{
+			"file_path": filePath,
+		},
+	})
+}
+

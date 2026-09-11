@@ -19,8 +19,9 @@ type Transaction struct {
 	Amount        int64             `json:"amount" gorm:"not null" example:"50000"`
 	Remarks       string            `json:"remarks" example:"Urgent handling fee"`
 	PaymentMethod string            `json:"payment_method" example:"cash"`
-	PaymentStatus string            `json:"payment_status" gorm:"size:50;default:'unpaid';index" example:"unpaid"`
-	Items         []TransactionItem `json:"items,omitempty" gorm:"serializer:json;type:json"`
+	PaymentStatus  string            `json:"payment_status" gorm:"size:50;default:'unpaid';index" example:"unpaid"`
+	AttachmentPath string            `json:"attachment_path,omitempty" gorm:"column:attachment_path" example:"uploads/attachments/172468112_receipt.pdf"`
+	Items          []TransactionItem `json:"items,omitempty" gorm:"serializer:json;type:json"`
 }
 
 // ListTransactionResponse represents transaction list data with patient details.
