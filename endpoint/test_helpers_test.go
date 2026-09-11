@@ -23,7 +23,7 @@ func SetupTestServer(t *testing.T) (*gin.Engine, *gorm.DB, func()) {
 	}
 
 	testModels := []interface{}{
-		&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Transaction{}, &model.PatientCode{}, &model.Employee{},
+		&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Transaction{}, &model.PatientCode{}, &model.Employee{}, &model.Expense{},
 	}
 
 	if err := db.AutoMigrate(testModels...); err != nil {

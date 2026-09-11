@@ -728,6 +728,467 @@ const docTemplate = `{
                 }
             }
         },
+        "/expense": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Get a paginated list of expenses with summary analytics and optional filtering",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Expense"
+                ],
+                "summary": "List expenses",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 100,
+                        "description": "Limit number of results",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset for pagination",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter expenses from date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter expenses to date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by expense category",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by payment method",
+                        "name": "payment_method",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expenses retrieved",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.ListExpensesResponseData"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Add a new expense record",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Expense"
+                ],
+                "summary": "Create a new expense",
+                "parameters": [
+                    {
+                        "description": "Expense information",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.CreateExpenseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expense created",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Expense"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body or validation failure",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/expense/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Get aggregated expense totals and category breakdowns for optional date ranges and filters",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Expense"
+                ],
+                "summary": "Get expense summary statistics",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter expenses from date (YYYY-MM-DD)",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter expenses to date (YYYY-MM-DD)",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by expense category",
+                        "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by payment method",
+                        "name": "payment_method",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expense summary retrieved",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.ExpenseSummary"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/expense/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Retrieve an expense record by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Expense"
+                ],
+                "summary": "Get expense information",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Expense ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expense retrieved",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Expense"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid ID or expense not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Soft delete an expense by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Expense"
+                ],
+                "summary": "Delete an expense",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Expense ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expense deleted",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Expense not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Update an existing expense record",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Expense"
+                ],
+                "summary": "Update expense information",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Expense ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Updated expense information",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/model.UpdateExpenseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Expense updated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Expense"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or expense not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/item": {
             "get": {
                 "security": [
@@ -1311,6 +1772,50 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Invalid request or patient already exists",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/patient/upload": {
+            "post": {
+                "description": "Upload a doc/file attachment up to 10MB",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Patient"
+                ],
+                "summary": "Upload an attachment for a patient",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Attachment file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File uploaded successfully",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request or file size too large",
                         "schema": {
                             "$ref": "#/definitions/util.APIResponse"
                         }
@@ -3319,6 +3824,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Admin"
                 },
+                "therapist_id": {
+                    "type": "integer",
+                    "example": 1
+                },
                 "token": {
                     "type": "string",
                     "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -3425,6 +3934,15 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 30
                 },
+                "attachment_path": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"uploads/attachments/172468112_file.pdf\"]"
+                    ]
+                },
                 "email": {
                     "type": "string",
                     "example": "john@example.com"
@@ -3468,6 +3986,10 @@ const docTemplate = `{
                         "081234567890",
                         "081234567891"
                     ]
+                },
+                "signature": {
+                    "type": "string",
+                    "example": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
                 },
                 "surgery_history": {
                     "type": "string",
@@ -3573,6 +4095,9 @@ const docTemplate = `{
                 "item_id": {
                     "type": "integer"
                 },
+                "price": {
+                    "type": "integer"
+                },
                 "quantity": {
                     "type": "integer"
                 }
@@ -3644,6 +4169,24 @@ const docTemplate = `{
                 }
             }
         },
+        "model.CategoryExpenseBreakdown": {
+            "description": "Expense category aggregation",
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "Operational"
+                },
+                "count": {
+                    "type": "integer",
+                    "example": 12
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 4500000
+                }
+            }
+        },
         "model.CreateEmployeeRequest": {
             "description": "Employee creation request payload",
             "type": "object",
@@ -3704,6 +4247,47 @@ const docTemplate = `{
                 "religion": {
                     "type": "string",
                     "example": "Islam"
+                }
+            }
+        },
+        "model.CreateExpenseRequest": {
+            "description": "Expense creation request payload",
+            "type": "object",
+            "required": [
+                "amount",
+                "category",
+                "description",
+                "expense_date",
+                "payment_method"
+            ],
+            "properties": {
+                "amount": {
+                    "type": "integer",
+                    "example": 150000
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Operational"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Electricity bill for clinic"
+                },
+                "expense_date": {
+                    "type": "string",
+                    "example": "2025-01-15"
+                },
+                "notes": {
+                    "type": "string",
+                    "example": "Paid on time"
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "bank_transfer"
+                },
+                "receipt_url": {
+                    "type": "string",
+                    "example": "https://example.com/receipts/rec-123.jpg"
                 }
             }
         },
@@ -3799,6 +4383,72 @@ const docTemplate = `{
                 }
             }
         },
+        "model.Expense": {
+            "description": "Expense entity information",
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer",
+                    "example": 150000
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Operational"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "deletedAt": {
+                    "$ref": "#/definitions/gorm.DeletedAt"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Electricity bill for clinic"
+                },
+                "expense_date": {
+                    "type": "string",
+                    "example": "2025-01-15"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "notes": {
+                    "type": "string",
+                    "example": "Paid on time"
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "bank_transfer"
+                },
+                "receipt_url": {
+                    "type": "string",
+                    "example": "https://example.com/receipts/rec-123.jpg"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.ExpenseSummary": {
+            "description": "Expense summary statistics",
+            "type": "object",
+            "properties": {
+                "category_breakdown": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.CategoryExpenseBreakdown"
+                    }
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 4500000
+                },
+                "total_count": {
+                    "type": "integer",
+                    "example": 12
+                }
+            }
+        },
         "model.Item": {
             "description": "Item information",
             "type": "object",
@@ -3826,6 +4476,21 @@ const docTemplate = `{
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "model.ListExpensesResponseData": {
+            "description": "Paginated expense list with summary",
+            "type": "object",
+            "properties": {
+                "expenses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Expense"
+                    }
+                },
+                "summary": {
+                    "$ref": "#/definitions/model.ExpenseSummary"
                 }
             }
         },
@@ -3915,6 +4580,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 30
                 },
+                "attachment_path": {
+                    "type": "string",
+                    "example": "uploads/attachments/172468112_file.pdf"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -3955,6 +4624,10 @@ const docTemplate = `{
                 "phone_number": {
                     "type": "string",
                     "example": "081234567890"
+                },
+                "signature_path": {
+                    "type": "string",
+                    "example": "uploads/signatures/xyz.png"
                 },
                 "surgery_history": {
                     "type": "string",
@@ -4143,6 +4816,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 1
                 },
+                "price": {
+                    "type": "integer",
+                    "example": 10000
+                },
                 "quantity": {
                     "type": "integer",
                     "example": 2
@@ -4324,6 +5001,40 @@ const docTemplate = `{
                 }
             }
         },
+        "model.UpdateExpenseRequest": {
+            "description": "Expense update request payload",
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer",
+                    "example": 150000
+                },
+                "category": {
+                    "type": "string",
+                    "example": "Operational"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Electricity bill for clinic"
+                },
+                "expense_date": {
+                    "type": "string",
+                    "example": "2025-01-15"
+                },
+                "notes": {
+                    "type": "string",
+                    "example": "Paid on time"
+                },
+                "payment_method": {
+                    "type": "string",
+                    "example": "bank_transfer"
+                },
+                "receipt_url": {
+                    "type": "string",
+                    "example": "https://example.com/receipts/rec-123.jpg"
+                }
+            }
+        },
         "model.UpdatePatientRequest": {
             "type": "object",
             "properties": {
@@ -4334,6 +5045,15 @@ const docTemplate = `{
                 "age": {
                     "type": "integer",
                     "example": 30
+                },
+                "attachment_path": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "[\"uploads/attachments/172468112_file.pdf\"]"
+                    ]
                 },
                 "email": {
                     "type": "string",
@@ -4372,6 +5092,10 @@ const docTemplate = `{
                         "[\"081234567890\"",
                         "\"081234567891\"]"
                     ]
+                },
+                "signature": {
+                    "type": "string",
+                    "example": "data:image/png;base64,..."
                 },
                 "surgery_history": {
                     "type": "string",
