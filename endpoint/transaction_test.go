@@ -954,4 +954,3 @@ func TestUploadTransactionAttachment_NoFile(t *testing.T) {
 	assert.False(t, response["success"].(bool))
 	assert.Contains(t, response["msg"].(string), "No file was uploaded")
 }
-
