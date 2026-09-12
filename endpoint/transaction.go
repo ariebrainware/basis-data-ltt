@@ -747,8 +747,8 @@ func DownloadTransactionAttachment(c *gin.Context) {
 
 	primaryPath, err := resolveAttachmentPath("storage/attachments", cleanFilename)
 	if err == nil {
-		if _, statErr := os.Stat(primaryPath); statErr == nil {
-			c.File(primaryPath)
+		if fileBytes, readErr := os.ReadFile(primaryPath); readErr == nil {
+			c.Data(http.StatusOK, "application/octet-stream", fileBytes)
 			return
 		}
 	}
@@ -756,8 +756,8 @@ func DownloadTransactionAttachment(c *gin.Context) {
 	// Fallback to legacy path for backward compatibility
 	legacyPath, err := resolveAttachmentPath("uploads/attachments", cleanFilename)
 	if err == nil {
-		if _, statErr := os.Stat(legacyPath); statErr == nil {
-			c.File(legacyPath)
+		if fileBytes, readErr := os.ReadFile(legacyPath); readErr == nil {
+			c.Data(http.StatusOK, "application/octet-stream", fileBytes)
 			return
 		}
 	}
