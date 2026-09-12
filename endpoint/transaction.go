@@ -690,10 +690,13 @@ func sanitizeAttachmentFilename(raw string) (string, error) {
 		return "", fmt.Errorf("missing filename parameter")
 	}
 
+	clean := filepath.Clean(raw)
 	filenamePattern := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
-	clean := filepath.Base(raw)
-	if clean != raw || clean == "." || clean == ".." || clean == "/" ||
-		!filenamePattern.MatchString(raw) || strings.Contains(raw, "..") || strings.ContainsAny(raw, `/\`) {
+	if clean != raw ||
+		clean == "." || clean == ".." || clean == "/" || clean == "" ||
+		strings.ContainsAny(clean, `/\`) ||
+		strings.Contains(clean, "..") ||
+		!filenamePattern.MatchString(clean) {
 		return "", fmt.Errorf("directory traversal or invalid path detected")
 	}
 
@@ -720,15 +723,8 @@ func resolveAttachmentPath(baseDir, filename string) (string, error) {
 		}
 	}
 
-	candidateAbs := filepath.Join(baseCanonical, filename)
-	candidateCanonical := candidateAbs
-	if resolved, evalErr := filepath.EvalSymlinks(candidateAbs); evalErr == nil {
-		candidateCanonical = resolved
-	} else if !os.IsNotExist(evalErr) {
-		return "", evalErr
-	}
-
-	rel, err := filepath.Rel(baseCanonical, candidateCanonical)
+	candidateAbs := filepath.Clean(filepath.Join(baseCanonical, filename))
+	rel, err := filepath.Rel(baseCanonical, candidateAbs)
 	if err != nil {
 		return "", err
 	}
@@ -736,7 +732,7 @@ func resolveAttachmentPath(baseDir, filename string) (string, error) {
 		return "", fmt.Errorf("resolved path escapes base directory")
 	}
 
-	return candidateCanonical, nil
+	return candidateAbs, nil
 }
 
 func DownloadTransactionAttachment(c *gin.Context) {
