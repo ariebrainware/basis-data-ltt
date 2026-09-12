@@ -239,6 +239,8 @@ definitions:
     properties:
       amount:
         type: integer
+      attachment_path:
+        type: string
       items:
         items:
           $ref: '#/definitions/endpoint.transactionItemRequest'
@@ -501,6 +503,9 @@ definitions:
       amount:
         example: 50000
         type: integer
+      attachment_path:
+        example: uploads/attachments/172468112_receipt.pdf
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -691,6 +696,9 @@ definitions:
       amount:
         example: 50000
         type: integer
+      attachment_path:
+        example: uploads/attachments/172468112_receipt.pdf
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -2821,6 +2829,38 @@ paths:
       - BearerAuth: []
       - SessionToken: []
       summary: Update a transaction
+      tags:
+      - Transaction
+  /transaction/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload an attachment file (pdf, jpeg, png, heic) up to 5MB
+      parameters:
+      - description: Attachment file (pdf, jpeg, png, heic up to 5MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: File uploaded successfully
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "400":
+          description: Invalid request, invalid file type, or file size too large
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Upload an attachment for a transaction
       tags:
       - Transaction
   /treatment:

@@ -3,6 +3,7 @@ package endpoint
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -238,6 +239,10 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 	}
 
 	util.LogLoginSuccess(util.LoginParams{UserID: user.ID, Email: user.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent})
+	ctx.C.SetSameSite(http.SameSiteLaxMode)
+	ctx.C.SetCookie("session_token", tokenString, int(time.Until(sessionInfo.Expires).Seconds()), "/", "", true, true)
+	ctx.C.SetCookie("session-token", tokenString, int(time.Until(sessionInfo.Expires).Seconds()), "/", "", true, true)
+
 	util.CallSuccessOK(ctx.C, util.APISuccessParams{Msg: "Login successful", Data: LoginResponse{
 		Token:       tokenString,
 		Role:        role.Name,
@@ -393,8 +398,21 @@ func recordSession(db *gorm.DB, info SessionInfo) (model.Session, error) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /logout [delete]
 func Logout(c *gin.Context) {
-	// Extract the session-token from the request header
+	// Extract the session-token from header, cookie, or query
 	sessionToken := c.GetHeader("session-token")
+	if sessionToken == "" {
+		if cookie, err := c.Cookie("session_token"); err == nil && cookie != "" {
+			sessionToken = cookie
+		}
+	}
+	if sessionToken == "" {
+		if cookie, err := c.Cookie("session-token"); err == nil && cookie != "" {
+			sessionToken = cookie
+		}
+	}
+	if sessionToken == "" {
+		sessionToken = c.Query("token")
+	}
 	if sessionToken == "" {
 		util.CallUserNotAuthorized(c, util.APIErrorParams{
 			Msg: "Session token not provided",
@@ -444,6 +462,10 @@ func Logout(c *gin.Context) {
 		// Also remove token from the per-user set via util helper
 		_ = util.RemoveSessionTokenFromUserSet(session.UserID, sessionToken)
 	}
+
+	// Clear session cookies
+	c.SetCookie("session_token", "", -1, "/", "", true, true)
+	c.SetCookie("session-token", "", -1, "/", "", true, true)
 
 	// Respond with a success message
 	util.CallSuccessOK(c, util.APISuccessParams{

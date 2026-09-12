@@ -1,13 +1,23 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
@@ -742,4 +752,327 @@ func TestListTransactions_WithDateRange(t *testing.T) {
 	assert.Equal(t, float64(1), paymentStatusCounts["paid"])
 	assert.Equal(t, float64(1), paymentStatusCounts["partial"])
 	assert.Equal(t, float64(0), paymentStatusCounts["unpaid"])
+}
+
+func TestUpdateTransaction_AttachmentPath(t *testing.T) {
+	r, db := setupEndpointTest(t)
+
+	patient := model.Patient{
+		FullName:    "Patient Attachment",
+		PatientCode: "PAT01",
+		Email:       "patient-attachment@example.com",
+	}
+	assert.NoError(t, db.Create(&patient).Error)
+
+	therapist := model.Therapist{
+		FullName: "Therapist Attachment",
+		NIK:      "NIK-ATTACH-001",
+		Email:    "therapist-attachment@example.com",
+	}
+	assert.NoError(t, db.Create(&therapist).Error)
+
+	treatment := model.Treatment{
+		TreatmentDate: "2026-04-16",
+		PatientCode:   patient.PatientCode,
+		TherapistID:   therapist.ID,
+		Issues:        "Knee pain",
+		Treatment:     "Physiotherapy",
+		Remarks:       "Session 1",
+		NextVisit:     "2026-04-23",
+	}
+	assert.NoError(t, db.Create(&treatment).Error)
+
+	transaction := model.Transaction{
+		TreatmentID:   treatment.ID,
+		TherapistID:   therapist.ID,
+		Amount:        200000,
+		Remarks:       "Initial remarks",
+		PaymentMethod: "cash",
+		PaymentStatus: "unpaid",
+	}
+	assert.NoError(t, db.Create(&transaction).Error)
+
+	attachmentPath := "uploads/attachments/172468112_receipt.pdf"
+	w, response, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/transaction/:id",
+		requestPath:  "/transaction/" + strconv.FormatUint(uint64(transaction.ID), 10),
+		handler:      UpdateTransaction,
+		body: map[string]interface{}{
+			"attachment_path": attachmentPath,
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, response["success"].(bool))
+
+	updated := response["data"].(map[string]interface{})
+	assert.Equal(t, attachmentPath, updated["attachment_path"])
+
+	var dbTx model.Transaction
+	assert.NoError(t, db.First(&dbTx, transaction.ID).Error)
+	assert.Equal(t, attachmentPath, dbTx.AttachmentPath)
+}
+
+func performMultipartUpload(r *gin.Engine, fieldName, filename string, content []byte) (*httptest.ResponseRecorder, map[string]interface{}, error) {
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	if fieldName != "" {
+		part, err := writer.CreateFormFile(fieldName, filename)
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, err := part.Write(content); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, nil, err
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/transaction/upload", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	var response map[string]interface{}
+	if w.Body.Len() > 0 {
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+			return w, nil, err
+		}
+	}
+	return w, response, nil
+}
+
+func TestUploadTransactionAttachment_ValidFormats(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.POST("/transaction/upload", UploadTransactionAttachment)
+
+	testCases := []struct {
+		name     string
+		filename string
+		content  []byte
+	}{
+		{
+			name:     "PDF file",
+			filename: "receipt.pdf",
+			content:  []byte("%PDF-1.4 test pdf file content"),
+		},
+		{
+			name:     "PNG image",
+			filename: "receipt.png",
+			content:  []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"),
+		},
+		{
+			name:     "JPEG image (jpg)",
+			filename: "receipt.jpg",
+			content:  []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xff\xdb"),
+		},
+		{
+			name:     "JPEG image (jpeg)",
+			filename: "receipt.jpeg",
+			content:  []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x01\x00`\x00`\x00\x00\xff\xdb"),
+		},
+		{
+			name:     "HEIC image (heic)",
+			filename: "receipt.heic",
+			content:  []byte("\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, response, err := performMultipartUpload(r, "file", tc.filename, tc.content)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, w.Code)
+			data := response["data"].(map[string]interface{})
+			filePath, ok := data["file_path"].(string)
+			assert.True(t, ok)
+			assert.True(t, strings.HasPrefix(filePath, "storage/attachments/"))
+			assert.True(t, strings.HasSuffix(filePath, tc.filename))
+
+			// Cleanup created test file
+			defer os.Remove(filePath)
+		})
+	}
+}
+
+func TestUploadTransactionAttachment_Exceeds5MBLimit(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.POST("/transaction/upload", UploadTransactionAttachment)
+
+	// Create content exceeding 5MB (5MB + 1024 bytes)
+	largeContent := make([]byte, 5*1024*1024+1024)
+	copy(largeContent, []byte("%PDF-1.4"))
+
+	w, response, err := performMultipartUpload(r, "file", "large.pdf", largeContent)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.False(t, response["success"].(bool))
+	assert.Contains(t, response["msg"].(string), "5MB limit")
+}
+
+func TestUploadTransactionAttachment_InvalidFileType(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.POST("/transaction/upload", UploadTransactionAttachment)
+
+	invalidFiles := []struct {
+		name     string
+		filename string
+		content  []byte
+	}{
+		{name: "Executable", filename: "virus.exe", content: []byte("MZ\x90\x00")},
+		{name: "Shell script", filename: "script.sh", content: []byte("#!/bin/bash\necho bad")},
+		{name: "Text file", filename: "notes.txt", content: []byte("Just some plain text")},
+		{name: "Fake PDF content", filename: "receipt.pdf", content: []byte("not really a pdf")},
+	}
+
+	for _, tc := range invalidFiles {
+		t.Run(tc.name, func(t *testing.T) {
+			w, response, err := performMultipartUpload(r, "file", tc.filename, tc.content)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.False(t, response["success"].(bool))
+			assert.Contains(t, response["msg"].(string), "Allowed types: pdf, jpeg, png, heic")
+		})
+	}
+
+}
+
+func TestUploadTransactionAttachment_RejectsEmptyFile(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.POST("/transaction/upload", UploadTransactionAttachment)
+
+	w, response, err := performMultipartUpload(r, "file", "receipt.png", []byte{})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.False(t, response["success"].(bool))
+	assert.Contains(t, response["msg"].(string), "Empty files are not allowed")
+}
+
+func TestUploadTransactionAttachment_NoFile(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.POST("/transaction/upload", UploadTransactionAttachment)
+
+	w, response, err := performMultipartUpload(r, "", "", nil)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.False(t, response["success"].(bool))
+	assert.Contains(t, response["msg"].(string), "No file was uploaded")
+}
+
+func TestDownloadTransactionAttachment_Success(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	// Test storage/attachments
+	dir := "storage/attachments"
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	testFilename := fmt.Sprintf("test_%d.pdf", time.Now().UnixNano())
+	testFilePath := filepath.Join(dir, testFilename)
+	testContent := []byte("%PDF-1.4 secure receipt content")
+	require.NoError(t, os.WriteFile(testFilePath, testContent, 0644))
+	defer os.Remove(testFilePath)
+
+	req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/"+testFilename, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, testContent, w.Body.Bytes())
+}
+
+func TestDownloadTransactionAttachment_LegacyFallback(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	// Test fallback to uploads/attachments
+	dir := "uploads/attachments"
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	testFilename := fmt.Sprintf("legacy_%d.pdf", time.Now().UnixNano())
+	testFilePath := filepath.Join(dir, testFilename)
+	testContent := []byte("%PDF-1.4 legacy receipt content")
+	require.NoError(t, os.WriteFile(testFilePath, testContent, 0644))
+	defer os.Remove(testFilePath)
+
+	req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/"+testFilename, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, testContent, w.Body.Bytes())
+}
+
+func TestDownloadTransactionAttachment_PathTraversalProtection(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	maliciousFilenames := []string{
+		"../main.go",
+		"..%2Fmain.go",
+		"..\\main.go",
+		"sub/file.pdf",
+	}
+
+	for _, badFilename := range maliciousFilenames {
+		t.Run(badFilename, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/"+badFilename, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.True(t, w.Code == http.StatusBadRequest || w.Code == http.StatusNotFound)
+		})
+	}
+}
+
+func TestDownloadTransactionAttachment_NotFound(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/non_existent_file.pdf", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.False(t, resp["success"].(bool))
+	assert.Equal(t, "Attachment not found", resp["msg"])
+}
+
+func TestDownloadTransactionAttachment_ImageContentTypeAndAliases(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+	r.GET("/storage/attachments/:filename", DownloadTransactionAttachment)
+	r.GET("/uploads/attachments/:filename", DownloadTransactionAttachment)
+
+	dir := "storage/attachments"
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	testFilename := fmt.Sprintf("preview_%d.png", time.Now().UnixNano())
+	testFilePath := filepath.Join(dir, testFilename)
+	pngContent := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
+	require.NoError(t, os.WriteFile(testFilePath, pngContent, 0644))
+	defer os.Remove(testFilePath)
+
+	endpoints := []string{
+		"/transaction/attachment/" + testFilename,
+		"/storage/attachments/" + testFilename,
+		"/uploads/attachments/" + testFilename,
+	}
+
+	for _, path := range endpoints {
+		t.Run(path, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, pngContent, w.Body.Bytes())
+			assert.Contains(t, w.Header().Get("Content-Type"), "image/png")
+		})
+	}
 }

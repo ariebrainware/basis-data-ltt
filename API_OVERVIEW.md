@@ -75,6 +75,14 @@ The API uses two types of authentication:
 | PATCH | `/expense/{id}` | Update expense record | Yes | Admin |
 | DELETE | `/expense/{id}` | Delete expense record | Yes | Admin |
 
+### Transaction Management
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|----------|-------------|---------------|------|
+| GET | `/transaction` | List transactions (with pagination and date filtering) | Yes | Admin |
+| GET | `/transaction/{id}` | Get transaction details | Yes | Admin |
+| PATCH | `/transaction/{id}` | Update transaction record (amount, remarks, payment_method, payment_status, attachment_path, items) | Yes | Admin |
+| POST | `/transaction/upload` | Upload transaction attachment (pdf, jpeg, png, heic up to 5MB) | Yes | Admin |
+
 ## User Roles
 
 1. **Admin** (role_id: 1)

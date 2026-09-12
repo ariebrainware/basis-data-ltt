@@ -1,11 +1,19 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -21,11 +29,12 @@ type transactionItemRequest struct {
 }
 
 type updateTransactionRequest struct {
-	Amount        *int64                   `json:"amount"`
-	Remarks       *string                  `json:"remarks"`
-	PaymentMethod *string                  `json:"payment_method"`
-	PaymentStatus *string                  `json:"payment_status"`
-	Items         []transactionItemRequest `json:"items"`
+	Amount         *int64                   `json:"amount"`
+	Remarks        *string                  `json:"remarks"`
+	PaymentMethod  *string                  `json:"payment_method"`
+	PaymentStatus  *string                  `json:"payment_status"`
+	AttachmentPath *string                  `json:"attachment_path"`
+	Items          []transactionItemRequest `json:"items"`
 }
 
 type transactionUserError struct {
@@ -474,6 +483,10 @@ func UpdateTransaction(c *gin.Context) {
 			updates["payment_status"] = *req.PaymentStatus
 		}
 
+		if req.AttachmentPath != nil {
+			updates["attachment_path"] = *req.AttachmentPath
+		}
+
 		if len(updates) == 0 {
 			return &transactionUserError{msg: "No fields to update"}
 		}
@@ -500,4 +513,258 @@ func UpdateTransaction(c *gin.Context) {
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Transaction updated", Data: transaction})
+}
+
+func isValidHEICContent(fileContent []byte) bool {
+	if len(fileContent) < 12 {
+		return false
+	}
+
+	if string(fileContent[4:8]) != "ftyp" {
+		return false
+	}
+
+	majorBrand := string(fileContent[8:12])
+	if majorBrand == "heic" || majorBrand == "heix" || majorBrand == "hevc" || majorBrand == "hevx" || majorBrand == "mif1" || majorBrand == "msf1" {
+		return true
+	}
+
+	if len(fileContent) < 16 {
+		return false
+	}
+
+	boxSize := int(binary.BigEndian.Uint32(fileContent[0:4]))
+	if boxSize <= 16 || boxSize > len(fileContent) {
+		boxSize = len(fileContent)
+	}
+
+	for i := 16; i+4 <= boxSize; i += 4 {
+		brand := string(fileContent[i : i+4])
+		if brand == "heic" || brand == "heix" || brand == "hevc" || brand == "hevx" || brand == "mif1" || brand == "msf1" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func isAllowedTransactionAttachmentType(filename string, fileContent []byte) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	allowedExts := map[string]bool{
+		".pdf":  true,
+		".jpg":  true,
+		".jpeg": true,
+		".png":  true,
+		".heic": true,
+	}
+
+	if !allowedExts[ext] {
+		return false
+	}
+
+	if len(fileContent) == 0 {
+		return false
+	}
+
+	switch ext {
+	case ".pdf":
+		return bytes.HasPrefix(fileContent, []byte("%PDF-"))
+	case ".jpg", ".jpeg":
+		return len(fileContent) >= 3 && fileContent[0] == 0xFF && fileContent[1] == 0xD8 && fileContent[2] == 0xFF
+	case ".png":
+		return bytes.HasPrefix(fileContent, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'})
+	case ".heic":
+		return isValidHEICContent(fileContent)
+	}
+
+	return false
+}
+
+// UploadTransactionAttachment godoc
+// @Summary      Upload an attachment for a transaction
+// @Description  Upload an attachment file (pdf, jpeg, png, heic) up to 5MB
+// @Tags         Transaction
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        file formData file true "Attachment file (pdf, jpeg, png, heic up to 5MB)"
+// @Success      200 {object} util.APIResponse "File uploaded successfully"
+// @Failure      400 {object} util.APIResponse "Invalid request, invalid file type, or file size too large"
+// @Failure      500 {object} util.APIResponse "Server error"
+// @Router       /transaction/upload [post]
+func UploadTransactionAttachment(c *gin.Context) {
+	// Limit request size to 5.5MB to account for headers/multipart overhead
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, int64(5.5*1024*1024))
+
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		if err.Error() == "http: request body too large" || strings.Contains(err.Error(), "too large") {
+			util.CallUserError(c, util.APIErrorParams{
+				Msg: "File size exceeds the 5MB limit",
+				Err: err,
+			})
+			return
+		}
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "No file was uploaded",
+			Err: err,
+		})
+		return
+	}
+	defer file.Close()
+
+	if header.Size > 5*1024*1024 {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "File size exceeds the 5MB limit",
+			Err: fmt.Errorf("file size %d exceeds 5MB limit", header.Size),
+		})
+		return
+	}
+
+	buf := make([]byte, 512)
+	n, _ := file.Read(buf)
+	if seeker, ok := file.(io.ReadSeeker); ok {
+		_, _ = seeker.Seek(0, io.SeekStart)
+	}
+
+	if n == 0 {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Empty files are not allowed",
+			Err: fmt.Errorf("uploaded file is empty"),
+		})
+		return
+	}
+
+	if !isAllowedTransactionAttachmentType(header.Filename, buf[:n]) {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid file type. Allowed types: pdf, jpeg, png, heic",
+			Err: fmt.Errorf("unsupported file extension or format for %s", header.Filename),
+		})
+		return
+	}
+
+	dir := "storage/attachments"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to create upload directory",
+			Err: err,
+		})
+		return
+	}
+
+	cleanName := filepath.Base(strings.ReplaceAll(header.Filename, " ", "_"))
+	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), cleanName)
+	filePath := filepath.Join(dir, filename)
+
+	if err := c.SaveUploadedFile(header, filePath); err != nil {
+		util.CallServerError(c, util.APIErrorParams{
+			Msg: "Failed to save file",
+			Err: err,
+		})
+		return
+	}
+
+	util.CallSuccessOK(c, util.APISuccessParams{
+		Msg: "File uploaded successfully",
+		Data: gin.H{
+			"file_path": filePath,
+		},
+	})
+}
+
+// DownloadTransactionAttachment godoc
+// @Summary      Download a transaction attachment file
+// @Description  Download an attachment file for a transaction (Admin only)
+// @Tags         Transaction
+// @Produce      octet-stream
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        filename path string true "Attachment filename"
+// @Success      200 {file} file "Attachment binary content"
+// @Failure      400 {object} util.APIResponse "Invalid filename"
+// @Failure      404 {object} util.APIResponse "Attachment not found"
+// @Router       /transaction/attachment/{filename} [get]
+func sanitizeAttachmentFilename(raw string) (string, error) {
+	if raw == "" {
+		return "", fmt.Errorf("missing filename parameter")
+	}
+
+	clean := filepath.Clean(raw)
+	filenamePattern := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+	if clean != raw ||
+		clean == "." || clean == ".." || clean == "/" || clean == "" ||
+		strings.ContainsAny(clean, `/\`) ||
+		strings.Contains(clean, "..") ||
+		!filenamePattern.MatchString(clean) {
+		return "", fmt.Errorf("directory traversal or invalid path detected")
+	}
+
+	return clean, nil
+}
+
+func resolveAttachmentPath(baseDir, filename string) (string, error) {
+	if filename == "" || filename == "." || filename == ".." || strings.ContainsAny(filename, `/\`) {
+		return "", fmt.Errorf("invalid filename")
+	}
+
+	baseAbs, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", err
+	}
+
+	baseCanonical, err := filepath.EvalSymlinks(baseAbs)
+	if err != nil {
+		// If base does not exist yet, keep absolute base as canonical fallback.
+		if os.IsNotExist(err) {
+			baseCanonical = baseAbs
+		} else {
+			return "", err
+		}
+	}
+
+	candidateAbs := filepath.Clean(filepath.Join(baseCanonical, filename))
+	rel, err := filepath.Rel(baseCanonical, candidateAbs)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("resolved path escapes base directory")
+	}
+
+	return candidateAbs, nil
+}
+
+func DownloadTransactionAttachment(c *gin.Context) {
+	rawFilename := c.Param("filename")
+	safeFilename, sanitizeErr := sanitizeAttachmentFilename(rawFilename)
+	if sanitizeErr != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid filename",
+			Err: sanitizeErr,
+		})
+		return
+	}
+
+	primaryPath, err := resolveAttachmentPath("storage/attachments", safeFilename)
+	if err == nil {
+		if fi, statErr := os.Stat(primaryPath); statErr == nil && !fi.IsDir() {
+			c.File(primaryPath)
+			return
+		}
+	}
+
+	// Fallback to legacy path for backward compatibility
+	legacyPath, err := resolveAttachmentPath("uploads/attachments", safeFilename)
+	if err == nil {
+		if fi, statErr := os.Stat(legacyPath); statErr == nil && !fi.IsDir() {
+			c.File(legacyPath)
+			return
+		}
+	}
+
+	util.CallErrorNotFound(c, util.APIErrorParams{
+		Msg: "Attachment not found",
+		Err: fmt.Errorf("file %s does not exist", safeFilename),
+	})
 }

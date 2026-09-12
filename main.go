@@ -168,7 +168,7 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	r.Use(middleware.DatabaseMiddleware(db))
 	r.Use(middleware.EndpointCallLogger())
 
-	r.Static("/uploads", "./uploads")
+	r.Static("/uploads/signatures", "./uploads/signatures")
 
 	registerPublicRoutes(r, cfg)
 	registerAuthenticatedRoutes(r, cfg)
@@ -198,6 +198,11 @@ func registerAuthenticatedRoutes(r *gin.Engine, cfg *config.Config) {
 	auth.DELETE("/logout", endpoint.Logout)
 	auth.PATCH("/user", endpoint.UpdateUser)
 	auth.POST("/verify-password", endpoint.VerifyPassword)
+
+	// Attachment download routes (Strict authentication required via session-token header, cookie, or ?token= query param)
+	auth.GET("/storage/attachments/:filename", endpoint.DownloadTransactionAttachment)
+	auth.GET("/uploads/attachments/:filename", endpoint.DownloadTransactionAttachment)
+	auth.GET("/transaction/attachment/:filename", endpoint.DownloadTransactionAttachment)
 
 	registerUserRoutes(auth)
 	registerPatientRoutes(auth)
@@ -277,6 +282,7 @@ func registerTransactionRoutes(auth *gin.RouterGroup) {
 	transaction.GET("", endpoint.ListTransactions)
 	transaction.GET("/:id", endpoint.GetTransactionInfo)
 	transaction.PATCH("/:id", endpoint.UpdateTransaction)
+	transaction.POST("/upload", endpoint.UploadTransactionAttachment)
 }
 
 func registerTherapistRoutes(auth *gin.RouterGroup) {

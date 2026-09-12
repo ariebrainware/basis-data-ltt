@@ -19,6 +19,11 @@ func EndpointCallLogger() gin.HandlerFunc {
 		duration := time.Since(start)
 		status := c.Writer.Status()
 
+		// Skip logging CORS preflight OPTIONS requests
+		if c.Request.Method == "OPTIONS" {
+			return
+		}
+
 		userID, _ := GetUserID(c)
 		roleID, _ := GetRoleID(c)
 

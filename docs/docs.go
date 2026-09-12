@@ -2969,6 +2969,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/transaction/upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Upload an attachment file (pdf, jpeg, png, heic) up to 5MB",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transaction"
+                ],
+                "summary": "Upload an attachment for a transaction",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Attachment file (pdf, jpeg, png, heic up to 5MB)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "File uploaded successfully",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request, invalid file type, or file size too large",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/transaction/{id}": {
             "get": {
                 "security": [
@@ -4140,6 +4192,9 @@ const docTemplate = `{
                 "amount": {
                     "type": "integer"
                 },
+                "attachment_path": {
+                    "type": "string"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -4502,6 +4557,10 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 50000
                 },
+                "attachment_path": {
+                    "type": "string",
+                    "example": "uploads/attachments/172468112_receipt.pdf"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -4767,6 +4826,10 @@ const docTemplate = `{
                 "amount": {
                     "type": "integer",
                     "example": 50000
+                },
+                "attachment_path": {
+                    "type": "string",
+                    "example": "uploads/attachments/172468112_receipt.pdf"
                 },
                 "createdAt": {
                     "type": "string"
