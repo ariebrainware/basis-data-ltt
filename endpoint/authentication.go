@@ -240,8 +240,8 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 
 	util.LogLoginSuccess(util.LoginParams{UserID: user.ID, Email: user.Email, IP: ctx.CI.IP, UserAgent: ctx.CI.Agent})
 	ctx.C.SetSameSite(http.SameSiteLaxMode)
-	ctx.C.SetCookie("session_token", tokenString, int(time.Until(sessionInfo.Expires).Seconds()), "/", "", false, true)
-	ctx.C.SetCookie("session-token", tokenString, int(time.Until(sessionInfo.Expires).Seconds()), "/", "", false, true)
+	ctx.C.SetCookie("session_token", tokenString, int(time.Until(sessionInfo.Expires).Seconds()), "/", "", true, true)
+	ctx.C.SetCookie("session-token", tokenString, int(time.Until(sessionInfo.Expires).Seconds()), "/", "", true, true)
 
 	util.CallSuccessOK(ctx.C, util.APISuccessParams{Msg: "Login successful", Data: LoginResponse{
 		Token:       tokenString,
