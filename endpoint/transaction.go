@@ -748,4 +748,3 @@ func DownloadTransactionAttachment(c *gin.Context) {
 		Err: fmt.Errorf("file %s does not exist", cleanFilename),
 	})
 }
-
