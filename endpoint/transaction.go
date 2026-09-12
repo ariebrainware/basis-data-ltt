@@ -736,7 +736,7 @@ func resolveAttachmentPath(baseDir, filename string) (string, error) {
 		return "", fmt.Errorf("resolved path escapes base directory")
 	}
 
-	return candidateAbs, nil
+	return candidateCanonical, nil
 }
 
 func DownloadTransactionAttachment(c *gin.Context) {
