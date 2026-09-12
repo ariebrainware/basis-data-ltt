@@ -464,8 +464,8 @@ func Logout(c *gin.Context) {
 	}
 
 	// Clear session cookies
-	c.SetCookie("session_token", "", -1, "/", "", false, true)
-	c.SetCookie("session-token", "", -1, "/", "", false, true)
+	c.SetCookie("session_token", "", -1, "/", "", true, true)
+	c.SetCookie("session-token", "", -1, "/", "", true, true)
 
 	// Respond with a success message
 	util.CallSuccessOK(c, util.APISuccessParams{
