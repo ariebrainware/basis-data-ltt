@@ -686,17 +686,34 @@ func UploadTransactionAttachment(c *gin.Context) {
 // @Failure      404 {object} util.APIResponse "Attachment not found"
 // @Router       /transaction/attachment/{filename} [get]
 func resolveAttachmentPath(baseDir, filename string) (string, error) {
+	if filename == "" || filename == "." || filename == ".." || strings.ContainsAny(filename, `/\`) {
+		return "", fmt.Errorf("invalid filename")
+	}
+
 	baseAbs, err := filepath.Abs(baseDir)
 	if err != nil {
 		return "", err
 	}
 
-	candidateAbs, err := filepath.Abs(filepath.Join(baseAbs, filename))
+	baseCanonical, err := filepath.EvalSymlinks(baseAbs)
 	if err != nil {
-		return "", err
+		// If base does not exist yet, keep absolute base as canonical fallback.
+		if os.IsNotExist(err) {
+			baseCanonical = baseAbs
+		} else {
+			return "", err
+		}
 	}
 
-	rel, err := filepath.Rel(baseAbs, candidateAbs)
+	candidateAbs := filepath.Join(baseCanonical, filename)
+	candidateCanonical := candidateAbs
+	if resolved, evalErr := filepath.EvalSymlinks(candidateAbs); evalErr == nil {
+		candidateCanonical = resolved
+	} else if !os.IsNotExist(evalErr) {
+		return "", evalErr
+	}
+
+	rel, err := filepath.Rel(baseCanonical, candidateCanonical)
 	if err != nil {
 		return "", err
 	}
