@@ -331,7 +331,10 @@ func ValidateLoginToken() gin.HandlerFunc {
 		}
 		// First try Redis for fast session validation: key session:<token> -> "userID:roleID"
 		if rdb := config.GetRedisClient(); rdb != nil {
-			if val, err := rdb.Get(context.Background(), fmt.Sprintf("session:%s", sessionToken)).Result(); err == nil {
+			ctx, cancel := context.WithTimeout(c.Request.Context(), 500*time.Millisecond)
+			val, err := rdb.Get(ctx, fmt.Sprintf("session:%s", sessionToken)).Result()
+			cancel()
+			if err == nil {
 				if uid, rid, ok := tryParseRedisSession(val); ok {
 					c.Set(UserIDKey, uid)
 					c.Set(RoleIDKey, rid)

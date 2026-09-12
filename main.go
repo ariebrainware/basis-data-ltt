@@ -185,11 +185,6 @@ func registerPublicRoutes(r *gin.Engine, cfg *config.Config) {
 	r.POST("/patient", endpoint.CreatePatient)
 	r.POST("/patient/upload", endpoint.UploadAttachment)
 
-	// Public attachment preview / download routes (storage and legacy uploads)
-	r.GET("/storage/attachments/:filename", endpoint.DownloadTransactionAttachment)
-	r.GET("/uploads/attachments/:filename", endpoint.DownloadTransactionAttachment)
-	r.GET("/transaction/attachment/:filename", endpoint.DownloadTransactionAttachment)
-
 	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 5, Window: 15 * time.Minute})
 	r.POST("/login", authRateLimit, endpoint.Login)
 	r.POST("/signup", authRateLimit, endpoint.Signup)
@@ -203,6 +198,11 @@ func registerAuthenticatedRoutes(r *gin.Engine, cfg *config.Config) {
 	auth.DELETE("/logout", endpoint.Logout)
 	auth.PATCH("/user", endpoint.UpdateUser)
 	auth.POST("/verify-password", endpoint.VerifyPassword)
+
+	// Attachment download routes (Strict authentication required via session-token header, cookie, or ?token= query param)
+	auth.GET("/storage/attachments/:filename", endpoint.DownloadTransactionAttachment)
+	auth.GET("/uploads/attachments/:filename", endpoint.DownloadTransactionAttachment)
+	auth.GET("/transaction/attachment/:filename", endpoint.DownloadTransactionAttachment)
 
 	registerUserRoutes(auth)
 	registerPatientRoutes(auth)
