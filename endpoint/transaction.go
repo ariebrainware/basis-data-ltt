@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -716,9 +717,10 @@ func DownloadTransactionAttachment(c *gin.Context) {
 		return
 	}
 
-	// Prevent directory traversal attacks
+	// Prevent directory traversal and restrict to a safe filename pattern
+	filenamePattern := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	cleanFilename := filepath.Base(rawFilename)
-	if cleanFilename != rawFilename || cleanFilename == "." || cleanFilename == "/" || strings.Contains(rawFilename, "..") || strings.ContainsAny(rawFilename, "/\\") {
+	if cleanFilename != rawFilename || cleanFilename == "." || cleanFilename == "/" || !filenamePattern.MatchString(rawFilename) || strings.Contains(rawFilename, "..") || strings.ContainsAny(rawFilename, "/\\") {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid filename",
 			Err: fmt.Errorf("directory traversal or invalid path detected"),
