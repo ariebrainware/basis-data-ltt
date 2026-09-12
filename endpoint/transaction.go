@@ -684,6 +684,28 @@ func UploadTransactionAttachment(c *gin.Context) {
 // @Failure      400 {object} util.APIResponse "Invalid filename"
 // @Failure      404 {object} util.APIResponse "Attachment not found"
 // @Router       /transaction/attachment/{filename} [get]
+func resolveAttachmentPath(baseDir, filename string) (string, error) {
+	baseAbs, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", err
+	}
+
+	candidateAbs, err := filepath.Abs(filepath.Join(baseAbs, filename))
+	if err != nil {
+		return "", err
+	}
+
+	rel, err := filepath.Rel(baseAbs, candidateAbs)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("resolved path escapes base directory")
+	}
+
+	return candidateAbs, nil
+}
+
 func DownloadTransactionAttachment(c *gin.Context) {
 	rawFilename := c.Param("filename")
 	if rawFilename == "" {
@@ -704,17 +726,21 @@ func DownloadTransactionAttachment(c *gin.Context) {
 		return
 	}
 
-	primaryPath := filepath.Join("storage/attachments", cleanFilename)
-	if _, err := os.Stat(primaryPath); err == nil {
-		c.File(primaryPath)
-		return
+	primaryPath, err := resolveAttachmentPath("storage/attachments", cleanFilename)
+	if err == nil {
+		if _, statErr := os.Stat(primaryPath); statErr == nil {
+			c.File(primaryPath)
+			return
+		}
 	}
 
 	// Fallback to legacy path for backward compatibility
-	legacyPath := filepath.Join("uploads/attachments", cleanFilename)
-	if _, err := os.Stat(legacyPath); err == nil {
-		c.File(legacyPath)
-		return
+	legacyPath, err := resolveAttachmentPath("uploads/attachments", cleanFilename)
+	if err == nil {
+		if _, statErr := os.Stat(legacyPath); statErr == nil {
+			c.File(legacyPath)
+			return
+		}
 	}
 
 	util.CallErrorNotFound(c, util.APIErrorParams{
