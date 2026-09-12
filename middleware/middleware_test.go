@@ -518,4 +518,3 @@ func TestValidateLoginToken_QueryParamAndBearerToken(t *testing.T) {
 		})
 	}
 }
-

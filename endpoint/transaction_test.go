@@ -1076,5 +1076,3 @@ func TestDownloadTransactionAttachment_ImageContentTypeAndAliases(t *testing.T) 
 		})
 	}
 }
-
-
