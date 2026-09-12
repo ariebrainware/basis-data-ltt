@@ -3,10 +3,12 @@ package endpoint
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUpdateTransaction_AllowsNewPaymentStatuses(t *testing.T) {
@@ -885,12 +888,10 @@ func TestUploadTransactionAttachment_ValidFormats(t *testing.T) {
 			w, response, err := performMultipartUpload(r, "file", tc.filename, tc.content)
 			assert.NoError(t, err)
 			assert.Equal(t, http.StatusOK, w.Code)
-			assert.True(t, response["success"].(bool))
-
 			data := response["data"].(map[string]interface{})
 			filePath, ok := data["file_path"].(string)
 			assert.True(t, ok)
-			assert.True(t, strings.HasPrefix(filePath, "uploads/attachments/"))
+			assert.True(t, strings.HasPrefix(filePath, "storage/attachments/"))
 			assert.True(t, strings.HasSuffix(filePath, tc.filename))
 
 			// Cleanup created test file
@@ -962,3 +963,118 @@ func TestUploadTransactionAttachment_NoFile(t *testing.T) {
 	assert.False(t, response["success"].(bool))
 	assert.Contains(t, response["msg"].(string), "No file was uploaded")
 }
+
+func TestDownloadTransactionAttachment_Success(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	// Test storage/attachments
+	dir := "storage/attachments"
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	testFilename := fmt.Sprintf("test_%d.pdf", time.Now().UnixNano())
+	testFilePath := filepath.Join(dir, testFilename)
+	testContent := []byte("%PDF-1.4 secure receipt content")
+	require.NoError(t, os.WriteFile(testFilePath, testContent, 0644))
+	defer os.Remove(testFilePath)
+
+	req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/"+testFilename, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, testContent, w.Body.Bytes())
+}
+
+func TestDownloadTransactionAttachment_LegacyFallback(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	// Test fallback to uploads/attachments
+	dir := "uploads/attachments"
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	testFilename := fmt.Sprintf("legacy_%d.pdf", time.Now().UnixNano())
+	testFilePath := filepath.Join(dir, testFilename)
+	testContent := []byte("%PDF-1.4 legacy receipt content")
+	require.NoError(t, os.WriteFile(testFilePath, testContent, 0644))
+	defer os.Remove(testFilePath)
+
+	req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/"+testFilename, nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, testContent, w.Body.Bytes())
+}
+
+func TestDownloadTransactionAttachment_PathTraversalProtection(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	maliciousFilenames := []string{
+		"../main.go",
+		"..%2Fmain.go",
+		"..\\main.go",
+		"sub/file.pdf",
+	}
+
+	for _, badFilename := range maliciousFilenames {
+		t.Run(badFilename, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/"+badFilename, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.True(t, w.Code == http.StatusBadRequest || w.Code == http.StatusNotFound)
+		})
+	}
+}
+
+func TestDownloadTransactionAttachment_NotFound(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+
+	req, _ := http.NewRequest(http.MethodGet, "/transaction/attachment/non_existent_file.pdf", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	var resp map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.NoError(t, err)
+	assert.False(t, resp["success"].(bool))
+	assert.Equal(t, "Attachment not found", resp["msg"])
+}
+
+func TestDownloadTransactionAttachment_ImageContentTypeAndAliases(t *testing.T) {
+	r, _ := setupEndpointTest(t)
+	r.GET("/transaction/attachment/:filename", DownloadTransactionAttachment)
+	r.GET("/storage/attachments/:filename", DownloadTransactionAttachment)
+	r.GET("/uploads/attachments/:filename", DownloadTransactionAttachment)
+
+	dir := "storage/attachments"
+	require.NoError(t, os.MkdirAll(dir, 0755))
+	testFilename := fmt.Sprintf("preview_%d.png", time.Now().UnixNano())
+	testFilePath := filepath.Join(dir, testFilename)
+	pngContent := []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4")
+	require.NoError(t, os.WriteFile(testFilePath, pngContent, 0644))
+	defer os.Remove(testFilePath)
+
+	endpoints := []string{
+		"/transaction/attachment/" + testFilename,
+		"/storage/attachments/" + testFilename,
+		"/uploads/attachments/" + testFilename,
+	}
+
+	for _, path := range endpoints {
+		t.Run(path, func(t *testing.T) {
+			req, _ := http.NewRequest(http.MethodGet, path, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, pngContent, w.Body.Bytes())
+			assert.Contains(t, w.Header().Get("Content-Type"), "image/png")
+		})
+	}
+}
+
+

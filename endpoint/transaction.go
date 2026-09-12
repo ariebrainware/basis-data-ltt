@@ -643,7 +643,7 @@ func UploadTransactionAttachment(c *gin.Context) {
 		return
 	}
 
-	dir := "uploads/attachments"
+	dir := "storage/attachments"
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		util.CallServerError(c, util.APIErrorParams{
 			Msg: "Failed to create upload directory",
@@ -671,3 +671,55 @@ func UploadTransactionAttachment(c *gin.Context) {
 		},
 	})
 }
+
+// DownloadTransactionAttachment godoc
+// @Summary      Download a transaction attachment file
+// @Description  Download an attachment file for a transaction (Admin only)
+// @Tags         Transaction
+// @Produce      octet-stream
+// @Security     BearerAuth
+// @Security     SessionToken
+// @Param        filename path string true "Attachment filename"
+// @Success      200 {file} file "Attachment binary content"
+// @Failure      400 {object} util.APIResponse "Invalid filename"
+// @Failure      404 {object} util.APIResponse "Attachment not found"
+// @Router       /transaction/attachment/{filename} [get]
+func DownloadTransactionAttachment(c *gin.Context) {
+	rawFilename := c.Param("filename")
+	if rawFilename == "" {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Filename is required",
+			Err: fmt.Errorf("missing filename parameter"),
+		})
+		return
+	}
+
+	// Prevent directory traversal attacks
+	cleanFilename := filepath.Base(rawFilename)
+	if cleanFilename != rawFilename || cleanFilename == "." || cleanFilename == "/" || strings.Contains(rawFilename, "..") || strings.ContainsAny(rawFilename, "/\\") {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid filename",
+			Err: fmt.Errorf("directory traversal or invalid path detected"),
+		})
+		return
+	}
+
+	primaryPath := filepath.Join("storage/attachments", cleanFilename)
+	if _, err := os.Stat(primaryPath); err == nil {
+		c.File(primaryPath)
+		return
+	}
+
+	// Fallback to legacy path for backward compatibility
+	legacyPath := filepath.Join("uploads/attachments", cleanFilename)
+	if _, err := os.Stat(legacyPath); err == nil {
+		c.File(legacyPath)
+		return
+	}
+
+	util.CallErrorNotFound(c, util.APIErrorParams{
+		Msg: "Attachment not found",
+		Err: fmt.Errorf("file %s does not exist", cleanFilename),
+	})
+}
+

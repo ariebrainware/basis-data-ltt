@@ -11,6 +11,7 @@ import (
 	"github.com/ariebrainware/basis-data-ltt/model"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redismock/v9"
+	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -456,3 +457,65 @@ func TestValidateLoginToken_DBFallback_ExpiredSession(t *testing.T) {
 		t.Fatalf("expected 401 when session is expired, got %d", w.Code)
 	}
 }
+
+func TestValidateLoginToken_QueryParamAndBearerToken(t *testing.T) {
+	config.ResetRedisClientForTest()
+	defer config.ResetRedisClientForTest()
+
+	db, user, _ := newTestDBWithUserSession(t, testSessionParams{roleID: 1, token: "valid-query-token"})
+
+	testCases := []struct {
+		name    string
+		url     string
+		headers map[string]string
+	}{
+		{
+			name: "token query param",
+			url:  "/test?token=valid-query-token",
+		},
+		{
+			name: "session_token query param",
+			url:  "/test?session_token=valid-query-token",
+		},
+		{
+			name: "session-token query param",
+			url:  "/test?session-token=valid-query-token",
+		},
+		{
+			name:    "Authorization Bearer header",
+			url:     "/test",
+			headers: map[string]string{"Authorization": "Bearer valid-query-token"},
+		},
+		{
+			name:    "session_token cookie",
+			url:     "/test",
+			headers: map[string]string{"Cookie": "session_token=valid-query-token"},
+		},
+		{
+			name:    "session-token cookie",
+			url:     "/test",
+			headers: map[string]string{"Cookie": "session-token=valid-query-token"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			_, r := gin.CreateTestContext(w)
+			r.Use(DatabaseMiddleware(db))
+			r.GET("/test", ValidateLoginToken(), func(c *gin.Context) {
+				assertUserContext(t, c, user, " from query/bearer")
+				c.Status(http.StatusOK)
+			})
+
+			req := httptest.NewRequest("GET", tc.url, nil)
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, http.StatusOK, w.Code)
+		})
+	}
+}
+

@@ -168,7 +168,7 @@ func setupRouter(cfg *config.Config, db *gorm.DB) *gin.Engine {
 	r.Use(middleware.DatabaseMiddleware(db))
 	r.Use(middleware.EndpointCallLogger())
 
-	r.Static("/uploads", "./uploads")
+	r.Static("/uploads/signatures", "./uploads/signatures")
 
 	registerPublicRoutes(r, cfg)
 	registerAuthenticatedRoutes(r, cfg)
@@ -184,6 +184,11 @@ func registerPublicRoutes(r *gin.Engine, cfg *config.Config) {
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	r.POST("/patient", endpoint.CreatePatient)
 	r.POST("/patient/upload", endpoint.UploadAttachment)
+
+	// Public attachment preview / download routes (storage and legacy uploads)
+	r.GET("/storage/attachments/:filename", endpoint.DownloadTransactionAttachment)
+	r.GET("/uploads/attachments/:filename", endpoint.DownloadTransactionAttachment)
+	r.GET("/transaction/attachment/:filename", endpoint.DownloadTransactionAttachment)
 
 	authRateLimit := middleware.RateLimiter(middleware.RateLimitConfig{Limit: 5, Window: 15 * time.Minute})
 	r.POST("/login", authRateLimit, endpoint.Login)

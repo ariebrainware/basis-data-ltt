@@ -152,7 +152,9 @@ func setCorsHeaders(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Headers", getenvOrDefault("CORSALLOWHEADERS", "X-Requested-With, Content-Type, Authorization, session-token, Origin, Accept, Access-Control-Request-Method, Access-Control-Request-Headers"))
 	c.Writer.Header().Set("Access-Control-Max-Age", getenvOrDefault("CORSMAXAGE", "86400"))
 	c.Writer.Header().Set("Access-Control-Allow-Credentials", getenvOrDefault("CORSALLOWCREDENTIALS", "true"))
-	if !strings.HasPrefix(c.Request.URL.Path, "/uploads/") {
+	if !strings.HasPrefix(c.Request.URL.Path, "/uploads/") &&
+		!strings.HasPrefix(c.Request.URL.Path, "/storage/") &&
+		!strings.Contains(c.Request.URL.Path, "/attachment") {
 		c.Writer.Header().Set("Content-Type", getenvOrDefault("CORSCONTENTTYPE", "application/json"))
 	}
 
@@ -293,6 +295,36 @@ func ValidateLoginToken() gin.HandlerFunc {
 			return
 		}
 		sessionToken := c.GetHeader("session-token")
+		if sessionToken == "" {
+			if cookie, err := c.Cookie("session_token"); err == nil && cookie != "" {
+				sessionToken = cookie
+			}
+		}
+		if sessionToken == "" {
+			if cookie, err := c.Cookie("session-token"); err == nil && cookie != "" {
+				sessionToken = cookie
+			}
+		}
+		if sessionToken == "" {
+			if cookie, err := c.Cookie("token"); err == nil && cookie != "" {
+				sessionToken = cookie
+			}
+		}
+		if sessionToken == "" {
+			sessionToken = c.Query("token")
+		}
+		if sessionToken == "" {
+			sessionToken = c.Query("session_token")
+		}
+		if sessionToken == "" {
+			sessionToken = c.Query("session-token")
+		}
+		if sessionToken == "" {
+			authHeader := c.GetHeader("Authorization")
+			if strings.HasPrefix(authHeader, "Bearer ") {
+				sessionToken = strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+			}
+		}
 		if sessionToken == "" {
 			unauthorizedSession(c, "Session token not provided", "Session token not provided", fmt.Errorf("session token not provided"))
 			return
