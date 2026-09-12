@@ -761,27 +761,9 @@ func DownloadTransactionAttachment(c *gin.Context) {
 	// Fallback to legacy path for backward compatibility
 	legacyPath, err := resolveAttachmentPath("uploads/attachments", safeFilename)
 	if err == nil {
-		legacyBaseAbs, baseErr := filepath.Abs("uploads/attachments")
-		if baseErr == nil {
-			legacyBaseCanonical, evalBaseErr := filepath.EvalSymlinks(legacyBaseAbs)
-			if evalBaseErr != nil {
-				if os.IsNotExist(evalBaseErr) {
-					legacyBaseCanonical = legacyBaseAbs
-				} else {
-					legacyBaseCanonical = ""
-				}
-			}
-
-			legacyPathAbs, absErr := filepath.Abs(legacyPath)
-			if absErr == nil && legacyBaseCanonical != "" {
-				relLegacy, relErr := filepath.Rel(legacyBaseCanonical, legacyPathAbs)
-				if relErr == nil && relLegacy != ".." && !strings.HasPrefix(relLegacy, ".."+string(os.PathSeparator)) && !filepath.IsAbs(relLegacy) {
-					if fileBytes, readErr := os.ReadFile(legacyPathAbs); readErr == nil {
-						c.Data(http.StatusOK, "application/octet-stream", fileBytes)
-						return
-					}
-				}
-			}
+		if fileBytes, readErr := os.ReadFile(legacyPath); readErr == nil {
+			c.Data(http.StatusOK, "application/octet-stream", fileBytes)
+			return
 		}
 	}
 
