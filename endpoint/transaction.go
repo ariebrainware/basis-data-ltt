@@ -685,6 +685,21 @@ func UploadTransactionAttachment(c *gin.Context) {
 // @Failure      400 {object} util.APIResponse "Invalid filename"
 // @Failure      404 {object} util.APIResponse "Attachment not found"
 // @Router       /transaction/attachment/{filename} [get]
+func sanitizeAttachmentFilename(raw string) (string, error) {
+	if raw == "" {
+		return "", fmt.Errorf("missing filename parameter")
+	}
+
+	filenamePattern := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+	clean := filepath.Base(raw)
+	if clean != raw || clean == "." || clean == ".." || clean == "/" ||
+		!filenamePattern.MatchString(raw) || strings.Contains(raw, "..") || strings.ContainsAny(raw, `/\`) {
+		return "", fmt.Errorf("directory traversal or invalid path detected")
+	}
+
+	return clean, nil
+}
+
 func resolveAttachmentPath(baseDir, filename string) (string, error) {
 	if filename == "" || filename == "." || filename == ".." || strings.ContainsAny(filename, `/\`) {
 		return "", fmt.Errorf("invalid filename")
@@ -726,26 +741,16 @@ func resolveAttachmentPath(baseDir, filename string) (string, error) {
 
 func DownloadTransactionAttachment(c *gin.Context) {
 	rawFilename := c.Param("filename")
-	if rawFilename == "" {
-		util.CallUserError(c, util.APIErrorParams{
-			Msg: "Filename is required",
-			Err: fmt.Errorf("missing filename parameter"),
-		})
-		return
-	}
-
-	// Prevent directory traversal and restrict to a safe filename pattern
-	filenamePattern := regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
-	cleanFilename := filepath.Base(rawFilename)
-	if cleanFilename != rawFilename || cleanFilename == "." || cleanFilename == "/" || !filenamePattern.MatchString(rawFilename) || strings.Contains(rawFilename, "..") || strings.ContainsAny(rawFilename, "/\\") {
+	safeFilename, sanitizeErr := sanitizeAttachmentFilename(rawFilename)
+	if sanitizeErr != nil {
 		util.CallUserError(c, util.APIErrorParams{
 			Msg: "Invalid filename",
-			Err: fmt.Errorf("directory traversal or invalid path detected"),
+			Err: sanitizeErr,
 		})
 		return
 	}
 
-	primaryPath, err := resolveAttachmentPath("storage/attachments", cleanFilename)
+	primaryPath, err := resolveAttachmentPath("storage/attachments", safeFilename)
 	if err == nil {
 		if fileBytes, readErr := os.ReadFile(primaryPath); readErr == nil {
 			c.Data(http.StatusOK, "application/octet-stream", fileBytes)
@@ -754,7 +759,7 @@ func DownloadTransactionAttachment(c *gin.Context) {
 	}
 
 	// Fallback to legacy path for backward compatibility
-	legacyPath, err := resolveAttachmentPath("uploads/attachments", cleanFilename)
+	legacyPath, err := resolveAttachmentPath("uploads/attachments", safeFilename)
 	if err == nil {
 		if fileBytes, readErr := os.ReadFile(legacyPath); readErr == nil {
 			c.Data(http.StatusOK, "application/octet-stream", fileBytes)
@@ -764,6 +769,6 @@ func DownloadTransactionAttachment(c *gin.Context) {
 
 	util.CallErrorNotFound(c, util.APIErrorParams{
 		Msg: "Attachment not found",
-		Err: fmt.Errorf("file %s does not exist", cleanFilename),
+		Err: fmt.Errorf("file %s does not exist", safeFilename),
 	})
 }
