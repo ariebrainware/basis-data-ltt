@@ -51,7 +51,11 @@ ENV APPNAME=$APPNAME \
 
 # Copy the pre-built binary produced by goreleaser into the image.
 COPY ./basis-data-ltt ./basis-data-ltt
-RUN chmod +x ./basis-data-ltt
+RUN chmod +x ./basis-data-ltt && \
+    mkdir -p /app/storage/attachments /app/uploads/attachments /app/uploads/signatures
+
+# Declare persistent volumes for user uploads and storage (including transaction attachments)
+VOLUME ["/app/storage", "/app/uploads", "/app/storage/attachments", "/app/uploads/attachments"]
 
 EXPOSE 19091
 
