@@ -16,11 +16,14 @@ Quick docker run example (for a docker-host production without compose):
 export GEOIP_URL="https://...presigned-url..."
 export GEOIP_SHA256="<hex>"
 
-docker run --rm \
+docker run -d \
   -e GEOIP_URL="$GEOIP_URL" \
   -e GEOIP_SHA256="$GEOIP_SHA256" \
   -v geoip-data:/etc/geoip \
+  -v ltt-storage:/app/storage \
+  -v ltt-uploads:/app/uploads \
   --name ltt \
+  --restart unless-stopped \
   myregistry/basis-data-ltt:latest
 ```
 

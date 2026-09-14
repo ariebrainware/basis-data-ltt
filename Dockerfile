@@ -93,9 +93,13 @@ RUN chmod +x /entrypoint.sh
 # Install curl (for downloads) and su-exec to drop privileges when running the app
 RUN apk add --no-cache ca-certificates curl su-exec && \
     addgroup -S ltt && adduser -S -u 1000 -G ltt ltt && \
-    chown ltt:ltt ./basis-data-ltt
+    mkdir -p /app/storage/attachments /app/uploads/attachments /app/uploads/signatures && \
+    chown -R ltt:ltt /app
 
 EXPOSE 19091
+
+# Declare persistent volumes for user uploads and storage
+VOLUME ["/app/storage", "/app/uploads"]
 
 # Entrypoint will optionally fetch GeoIP DB then exec the command.
 # Default will run the binary as the non-root `ltt` user using `su-exec`.

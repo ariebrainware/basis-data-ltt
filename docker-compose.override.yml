@@ -12,8 +12,14 @@ services:
       - GEOIP_SHA256_URL=${GEOIP_SHA256_URL}
     volumes:
       - geoip-data:/etc/geoip
+      - storage-data:/app/storage
+      - uploads-data:/app/uploads
     restart: unless-stopped
 
 volumes:
   geoip-data:
+    driver: local
+  storage-data:
+    driver: local
+  uploads-data:
     driver: local
