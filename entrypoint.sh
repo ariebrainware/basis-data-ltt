@@ -82,4 +82,9 @@ if [ -n "${GEOIP_URL:-}" ]; then
   echo "GeoIP DB ready at $GEOIP_PATH"
 fi
 
+# Ensure storage and upload directories exist and are owned by ltt (UID 1000)
+mkdir -p /app/storage/attachments /app/uploads/attachments /app/uploads/signatures 2>/dev/null || true
+chown -R 1000:1000 /app/storage /app/uploads 2>/dev/null || true
+chmod -R 0775 /app/storage /app/uploads 2>/dev/null || true
+
 exec "$@"
