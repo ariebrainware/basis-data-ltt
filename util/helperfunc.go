@@ -3,6 +3,7 @@ package util
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -118,4 +119,40 @@ func NormalizeName(name string) string {
 	name = strings.TrimSpace(name)
 	// Collapse multiple internal spaces into single space
 	return strings.Join(strings.Fields(name), " ")
+}
+
+// CalculateAge calculates age in years from a date of birth string (e.g. "YYYY-MM-DD" or RFC3339).
+// If the string cannot be parsed or is in the future, it returns 0.
+func CalculateAge(dobStr string) int {
+	dobStr = strings.TrimSpace(dobStr)
+	if dobStr == "" {
+		return 0
+	}
+
+	var dob time.Time
+	var err error
+	formats := []string{"2006-01-02", time.RFC3339, "2006-01-02T15:04:05Z07:00", "02-01-2006", "02/01/2006"}
+	for _, f := range formats {
+		dob, err = time.Parse(f, dobStr)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return 0
+	}
+
+	now := time.Now()
+	if dob.After(now) {
+		return 0
+	}
+
+	years := now.Year() - dob.Year()
+	if now.Month() < dob.Month() || (now.Month() == dob.Month() && now.Day() < dob.Day()) {
+		years--
+	}
+	if years < 0 {
+		return 0
+	}
+	return years
 }

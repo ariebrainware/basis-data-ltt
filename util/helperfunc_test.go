@@ -79,3 +79,19 @@ func TestNormalizeName(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateAge(t *testing.T) {
+	if age := CalculateAge(""); age != 0 {
+		t.Errorf("CalculateAge empty = %d, want 0", age)
+	}
+	if age := CalculateAge("invalid-date"); age != 0 {
+		t.Errorf("CalculateAge invalid = %d, want 0", age)
+	}
+	if age := CalculateAge("2099-01-01"); age != 0 {
+		t.Errorf("CalculateAge future = %d, want 0", age)
+	}
+	age1990 := CalculateAge("1990-01-01")
+	if age1990 <= 30 {
+		t.Errorf("CalculateAge 1990 = %d, want > 30", age1990)
+	}
+}

@@ -166,6 +166,7 @@ func ListPatients(c *gin.Context) {
 type createPatientRequest struct {
 	FullName       string   `json:"full_name" example:"John Doe"`
 	Gender         string   `json:"gender" example:"Male"`
+	DateOfBirth    string   `json:"date_of_birth" example:"1995-05-20"`
 	Age            int      `json:"age" example:"30"`
 	Job            string   `json:"job" example:"Engineer"`
 	Address        string   `json:"address" example:"123 Main St"`
@@ -294,10 +295,17 @@ func shouldCreateUser(req createPatientRequest) bool {
 }
 
 func buildPatientModel(req createPatientRequest, patientCode string, phoneNumbers []string, signaturePath string) model.Patient {
+	age := req.Age
+	if req.DateOfBirth != "" {
+		if calculatedAge := util.CalculateAge(req.DateOfBirth); calculatedAge > 0 || req.Age == 0 {
+			age = calculatedAge
+		}
+	}
 	return model.Patient{
 		FullName:       req.FullName,
 		Gender:         req.Gender,
-		Age:            req.Age,
+		DateOfBirth:    req.DateOfBirth,
+		Age:            age,
 		Job:            req.Job,
 		Address:        req.Address,
 		PhoneNumber:    strings.Join(phoneNumbers, ","),
@@ -618,7 +626,10 @@ func updatePatientDetails(existing *model.Patient, req model.UpdatePatientReques
 	if req.Gender != "" {
 		existing.Gender = req.Gender
 	}
-	if req.Age != 0 {
+	if req.DateOfBirth != "" {
+		existing.DateOfBirth = req.DateOfBirth
+		existing.Age = util.CalculateAge(req.DateOfBirth)
+	} else if req.Age != 0 {
 		existing.Age = req.Age
 	}
 	if req.Job != "" {
