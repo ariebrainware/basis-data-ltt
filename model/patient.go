@@ -9,6 +9,7 @@ type Patient struct {
 	FullName       string `json:"full_name" gorm:"column:full_name;size:191;index" example:"John Doe"`
 	Password       string `json:"password" gorm:"column:password" example:"hashed_password"`
 	Gender         string `json:"gender" gorm:"column:gender" example:"Male"`
+	DateOfBirth    string `json:"date_of_birth" gorm:"column:date_of_birth" example:"1995-05-20"`
 	Age            int    `json:"age" gorm:"column:age" example:"30"`
 	Job            string `json:"job" gorm:"column:job" example:"Engineer"`
 	Address        string `json:"address" gorm:"column:address" example:"123 Main St"`
@@ -25,6 +26,7 @@ type UpdatePatientRequest struct {
 	FullName       string    `json:"full_name" example:"John Doe"`
 	Password       string    `json:"password" example:"hashed_password"`
 	Gender         string    `json:"gender" example:"Male"`
+	DateOfBirth    string    `json:"date_of_birth" example:"1995-05-20"`
 	Age            int       `json:"age" example:"30"`
 	Job            string    `json:"job" example:"Engineer"`
 	Address        string    `json:"address" example:"123 Main St"`

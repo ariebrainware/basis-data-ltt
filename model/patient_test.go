@@ -89,6 +89,7 @@ func TestPatientModel_AllFields(t *testing.T) {
 		FullName:       "Complete Patient",
 		Password:       "hashed_password",
 		Gender:         "Female",
+		DateOfBirth:    "1995-05-20",
 		Age:            25,
 		Job:            "Engineer",
 		Address:        "123 Main St",
@@ -104,6 +105,7 @@ func TestPatientModel_AllFields(t *testing.T) {
 	db.First(&found, patient.ID)
 	assert.Equal(t, "Complete Patient", found.FullName)
 	assert.Equal(t, "Female", found.Gender)
+	assert.Equal(t, "1995-05-20", found.DateOfBirth)
 	assert.Equal(t, 25, found.Age)
 	assert.Equal(t, "Engineer", found.Job)
 	assert.Equal(t, "081234567890", found.PhoneNumber)

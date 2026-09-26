@@ -240,3 +240,42 @@ func TestCreatePatient_DuplicateDetectionWithWhitespace(t *testing.T) {
 	}
 	assertDuplicateResponse(t, rr3, "Patient already exists")
 }
+
+func TestCreatePatient_WithDateOfBirth(t *testing.T) {
+	cfg, db := setupTestEnv(t, testSetupParams{
+		secret: "test-secret",
+	})
+	cleanupTestData(t, db)
+
+	if err := model.SeedRoles(db); err != nil {
+		t.Fatalf("seed roles: %v", err)
+	}
+	if err := db.Create(&model.PatientCode{Alphabet: "B", Number: 1, Code: "B1"}).Error; err != nil {
+		t.Fatalf("seed patient code: %v", err)
+	}
+
+	r := setupTestRouter(cfg, db)
+
+	patientBody := map[string]interface{}{
+		"full_name":     "Birthday Patient",
+		"gender":        "Female",
+		"date_of_birth": "1995-05-20",
+		"job":           "Designer",
+		"address":       "Jl. Mawar No. 12",
+		"email":         "birthday@example.com",
+		"phone_number":  []string{"081999999"},
+	}
+	rr, err := sendPatientRequest(r, patientBody)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	assertResponseStatus(t, rr, http.StatusOK, "expected 200 OK, got %d: %s")
+
+	p := assertPatientExists(t, db, "birthday@example.com")
+	if p.DateOfBirth != "1995-05-20" {
+		t.Errorf("expected date_of_birth 1995-05-20, got %s", p.DateOfBirth)
+	}
+	if p.Age <= 0 {
+		t.Errorf("expected automatically calculated age > 0, got %d", p.Age)
+	}
+}
