@@ -103,6 +103,7 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 			patients.age as age,
 			patients.health_history as health_history,
 			patients.surgery_history as surgery_history,
+			patients.attachment_path as attachment_path,
 			COALESCE((SELECT p.price FROM pricings p WHERE p.therapist_id = treatments.therapist_id AND p.deleted_at IS NULL ORDER BY p.id DESC LIMIT 1), 0) as price`).
 		Where("treatments.deleted_at IS NULL AND patients.deleted_at IS NULL")
 }
@@ -476,8 +477,9 @@ func UpdateTreatment(c *gin.Context) {
 
 	type updateTreatmentRequest struct {
 		model.Treatment
-		HealthHistory  *string `json:"health_history,omitempty"`
-		SurgeryHistory *string `json:"surgery_history,omitempty"`
+		HealthHistory  *string     `json:"health_history,omitempty"`
+		SurgeryHistory *string     `json:"surgery_history,omitempty"`
+		AttachmentPath interface{} `json:"attachment_path,omitempty"`
 	}
 
 	var req updateTreatmentRequest
@@ -534,7 +536,7 @@ func UpdateTreatment(c *gin.Context) {
 		return
 	}
 
-	if req.HealthHistory != nil || req.SurgeryHistory != nil {
+	if req.HealthHistory != nil || req.SurgeryHistory != nil || req.AttachmentPath != nil {
 		var patient model.Patient
 		if err := db.Where("patient_code = ? AND deleted_at IS NULL", existingTreatment.PatientCode).First(&patient).Error; err == nil {
 			patientUpdates := map[string]interface{}{}
@@ -543,6 +545,22 @@ func UpdateTreatment(c *gin.Context) {
 			}
 			if req.SurgeryHistory != nil {
 				patientUpdates["surgery_history"] = *req.SurgeryHistory
+			}
+			if req.AttachmentPath != nil {
+				switch v := req.AttachmentPath.(type) {
+				case string:
+					patientUpdates["attachment_path"] = v
+				case []interface{}:
+					var strArr []string
+					for _, item := range v {
+						if s, ok := item.(string); ok && s != "" {
+							strArr = append(strArr, s)
+						}
+					}
+					patientUpdates["attachment_path"] = strings.Join(strArr, ",")
+				case []string:
+					patientUpdates["attachment_path"] = strings.Join(v, ",")
+				}
 			}
 			if len(patientUpdates) > 0 {
 				db.Model(&patient).Updates(patientUpdates)
