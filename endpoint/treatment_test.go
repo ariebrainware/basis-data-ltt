@@ -749,3 +749,46 @@ func handleSessionErrorTest(c *gin.Context, err error) {
 func init() {
 	util.SetJWTSecret("test-secret-key-for-treatment-tests")
 }
+
+func TestUpdateTreatment_WithAttachment_Success(t *testing.T) {
+	r, db := setupTreatmentTest(t)
+
+	_, therapist, session := createUserWithSession(db, t, CreateUserSessionOpts{
+		RoleID:          model.RoleTherapist,
+		Email:           "therapist@owner.com",
+		Token:           "owner-token",
+		CreateTherapist: true,
+	})
+
+	patient := createTestPatient(t, db)
+	treatment := createTestTreatment(db, t, patient.PatientCode, therapist.ID)
+
+	attachmentPath := "uploads/attachments/12345_scan.pdf"
+	reqBody := map[string]interface{}{
+		"remarks":         "Updated remarks with attachment",
+		"attachment_path": attachmentPath,
+	}
+
+	handler := func(c *gin.Context) {
+		c.Set("role_id", model.RoleTherapist)
+		c.Request.Header.Set("session-token", session.SessionToken)
+		UpdateTreatment(c)
+	}
+
+	w, _, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPatch,
+		registerPath: "/treatment/:id",
+		requestPath:  fmt.Sprintf("/treatment/%d", treatment.ID),
+		handler:      handler,
+		body:         reqBody,
+		headers:      map[string]string{"session-token": session.SessionToken},
+	})
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NoError(t, err)
+
+	// Verify patient attachment was updated
+	var updatedPatient model.Patient
+	db.Where("patient_code = ?", patient.PatientCode).First(&updatedPatient)
+	assert.Equal(t, attachmentPath, updatedPatient.AttachmentPath)
+}

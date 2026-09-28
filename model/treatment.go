@@ -48,4 +48,5 @@ type ListTreatementResponse struct {
 	Price          int64  `json:"price" gorm:"column:price" example:"250000"`
 	HealthHistory  string `json:"health_history" gorm:"column:health_history" example:"Diabetes,Hypertension"`
 	SurgeryHistory string `json:"surgery_history" gorm:"column:surgery_history" example:"Appendectomy 2020"`
+	AttachmentPath string `json:"attachment_path" gorm:"column:attachment_path" example:"uploads/attachments/172468112_file.pdf"`
 }
