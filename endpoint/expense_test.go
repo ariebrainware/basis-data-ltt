@@ -144,6 +144,30 @@ func TestExpenseFiltersAndSummary(t *testing.T) {
 	expensesList = listData["expenses"].([]interface{})
 	assert.Len(t, expensesList, 2)
 
+	// Test keyword filter
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/expense?keyword=Gloves", nil)
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	_ = json.Unmarshal(rec.Body.Bytes(), &listResp)
+	listData = listResp["data"].(map[string]interface{})
+	expensesList = listData["expenses"].([]interface{})
+	assert.Len(t, expensesList, 1)
+	summary = listData["summary"].(map[string]interface{})
+	assert.Equal(t, float64(200000), summary["total_amount"])
+
+	// Test search alias
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/expense?search=Bandages", nil)
+	r.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	_ = json.Unmarshal(rec.Body.Bytes(), &listResp)
+	listData = listResp["data"].(map[string]interface{})
+	expensesList = listData["expenses"].([]interface{})
+	assert.Len(t, expensesList, 1)
+	summary = listData["summary"].(map[string]interface{})
+	assert.Equal(t, float64(300000), summary["total_amount"])
+
 	// Test standalone summary endpoint
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/expense/summary?payment_method=cash", nil)

@@ -56,7 +56,7 @@ func loadExpenseOrAbort(c *gin.Context, db *gorm.DB, id string) (model.Expense, 
 	return expense, true
 }
 
-func applyExpenseFilters(query *gorm.DB, startDate, endDate, category, paymentMethod string) *gorm.DB {
+func applyExpenseFilters(query *gorm.DB, startDate, endDate, category, paymentMethod, keyword string) *gorm.DB {
 	q := query.Where("deleted_at IS NULL")
 
 	if startDate != "" {
@@ -71,17 +71,21 @@ func applyExpenseFilters(query *gorm.DB, startDate, endDate, category, paymentMe
 	if paymentMethod != "" {
 		q = q.Where("LOWER(payment_method) = ?", strings.ToLower(strings.TrimSpace(paymentMethod)))
 	}
+	if keyword != "" {
+		kw := "%" + strings.TrimSpace(keyword) + "%"
+		q = q.Where("description LIKE ? OR notes LIKE ? OR category LIKE ? OR payment_method LIKE ?", kw, kw, kw, kw)
+	}
 	return q
 }
 
-func calculateExpenseSummary(db *gorm.DB, startDate, endDate, category, paymentMethod string) (model.ExpenseSummary, error) {
+func calculateExpenseSummary(db *gorm.DB, startDate, endDate, category, paymentMethod, keyword string) (model.ExpenseSummary, error) {
 	type rawCategoryRow struct {
 		Category    string `gorm:"column:category"`
 		TotalAmount int64  `gorm:"column:total_amount"`
 		Count       int64  `gorm:"column:cnt"`
 	}
 
-	summaryQuery := applyExpenseFilters(db.Model(&model.Expense{}), startDate, endDate, category, paymentMethod)
+	summaryQuery := applyExpenseFilters(db.Model(&model.Expense{}), startDate, endDate, category, paymentMethod, keyword)
 
 	var rows []rawCategoryRow
 	if err := summaryQuery.Select("category, SUM(amount) as total_amount, COUNT(id) as cnt").Group("category").Scan(&rows).Error; err != nil {
@@ -119,6 +123,7 @@ func calculateExpenseSummary(db *gorm.DB, startDate, endDate, category, paymentM
 // @Security     SessionToken
 // @Param        limit query int false "Limit number of results" default(100)
 // @Param        offset query int false "Offset for pagination" default(0)
+// @Param        keyword query string false "Search keyword for description, notes, category, or payment method"
 // @Param        start_date query string false "Filter expenses from date (YYYY-MM-DD)"
 // @Param        end_date query string false "Filter expenses to date (YYYY-MM-DD)"
 // @Param        category query string false "Filter by expense category"
@@ -131,6 +136,10 @@ func calculateExpenseSummary(db *gorm.DB, startDate, endDate, category, paymentM
 func ListExpenses(c *gin.Context) {
 	limit := parsePositiveInt(c.Query("limit"), 100, 100)
 	offset := parsePositiveInt(c.Query("offset"), 0, 0)
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	if keyword == "" {
+		keyword = strings.TrimSpace(c.Query("search"))
+	}
 	startDate := strings.TrimSpace(c.Query("start_date"))
 	endDate := strings.TrimSpace(c.Query("end_date"))
 	category := strings.TrimSpace(c.Query("category"))
@@ -160,13 +169,13 @@ func ListExpenses(c *gin.Context) {
 	}
 
 	var expenses []model.Expense
-	listQuery := applyExpenseFilters(db.Model(&model.Expense{}), startDate, endDate, category, paymentMethod)
+	listQuery := applyExpenseFilters(db.Model(&model.Expense{}), startDate, endDate, category, paymentMethod, keyword)
 	if err := listQuery.Order("expense_date DESC, id DESC").Limit(limit).Offset(offset).Find(&expenses).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to retrieve expenses", Err: err})
 		return
 	}
 
-	summary, err := calculateExpenseSummary(db, startDate, endDate, category, paymentMethod)
+	summary, err := calculateExpenseSummary(db, startDate, endDate, category, paymentMethod, keyword)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate expense summary", Err: err})
 		return
@@ -433,6 +442,7 @@ func DeleteExpense(c *gin.Context) {
 // @Produce      json
 // @Security     BearerAuth
 // @Security     SessionToken
+// @Param        keyword query string false "Search keyword for description, notes, category, or payment method"
 // @Param        start_date query string false "Filter expenses from date (YYYY-MM-DD)"
 // @Param        end_date query string false "Filter expenses to date (YYYY-MM-DD)"
 // @Param        category query string false "Filter by expense category"
@@ -443,6 +453,10 @@ func DeleteExpense(c *gin.Context) {
 // @Failure      500 {object} util.APIResponse "Server error"
 // @Router       /expense/summary [get]
 func GetExpenseSummary(c *gin.Context) {
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	if keyword == "" {
+		keyword = strings.TrimSpace(c.Query("search"))
+	}
 	startDate := strings.TrimSpace(c.Query("start_date"))
 	endDate := strings.TrimSpace(c.Query("end_date"))
 	category := strings.TrimSpace(c.Query("category"))
@@ -471,7 +485,7 @@ func GetExpenseSummary(c *gin.Context) {
 		return
 	}
 
-	summary, err := calculateExpenseSummary(db, startDate, endDate, category, paymentMethod)
+	summary, err := calculateExpenseSummary(db, startDate, endDate, category, paymentMethod, keyword)
 	if err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to calculate expense summary", Err: err})
 		return
