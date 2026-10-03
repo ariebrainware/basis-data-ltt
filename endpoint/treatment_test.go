@@ -31,6 +31,8 @@ func ensurePatientExists(db *gorm.DB, patientCode string) model.Patient {
 
 	patient = model.Patient{
 		FullName:    "Test Patient",
+		Gender:      "Male",
+		Age:         30,
 		PatientCode: patientCode,
 		Email:       fmt.Sprintf("patient%d@test.com", time.Now().UnixNano()),
 	}
@@ -224,6 +226,13 @@ func TestListTreatments_Success(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
+
+	data := response["data"].(map[string]interface{})
+	treatments := data["treatments"].([]interface{})
+	assert.Len(t, treatments, 2)
+	first := treatments[0].(map[string]interface{})
+	assert.Equal(t, "Male", first["gender"])
+	assert.Equal(t, float64(30), first["age"])
 }
 
 func TestListTreatments_WithPagination(t *testing.T) {

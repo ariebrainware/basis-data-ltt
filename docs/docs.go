@@ -766,6 +766,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Search keyword for description, notes, category, or payment method",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter expenses from date (YYYY-MM-DD)",
                         "name": "start_date",
                         "in": "query"
@@ -921,6 +927,12 @@ const docTemplate = `{
                 ],
                 "summary": "Get expense summary statistics",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search keyword for description, notes, category, or payment method",
+                        "name": "keyword",
+                        "in": "query"
+                    },
                     {
                         "type": "string",
                         "description": "Filter expenses from date (YYYY-MM-DD)",
@@ -2969,6 +2981,55 @@ const docTemplate = `{
                 }
             }
         },
+        "/transaction/attachment/{filename}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Download an attachment file for a transaction (Admin only)",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Transaction"
+                ],
+                "summary": "Download a transaction attachment file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Attachment filename",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attachment binary content",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid filename",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Attachment not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/transaction/upload": {
             "post": {
                 "security": [
@@ -3995,6 +4056,10 @@ const docTemplate = `{
                         "[\"uploads/attachments/172468112_file.pdf\"]"
                     ]
                 },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "1995-05-20"
+                },
                 "email": {
                     "type": "string",
                     "example": "john@example.com"
@@ -4646,6 +4711,10 @@ const docTemplate = `{
                 "createdAt": {
                     "type": "string"
                 },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "1995-05-20"
+                },
                 "deletedAt": {
                     "$ref": "#/definitions/gorm.DeletedAt"
                 },
@@ -5117,6 +5186,10 @@ const docTemplate = `{
                     "example": [
                         "[\"uploads/attachments/172468112_file.pdf\"]"
                     ]
+                },
+                "date_of_birth": {
+                    "type": "string",
+                    "example": "1995-05-20"
                 },
                 "email": {
                     "type": "string",
