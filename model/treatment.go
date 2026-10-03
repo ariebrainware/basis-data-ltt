@@ -44,6 +44,7 @@ type ListTreatementResponse struct {
 	Treatment
 	TherapistName  string `json:"therapist_name" gorm:"column:therapist_name" example:"Dr. John Smith"`
 	PatientName    string `json:"patient_name" gorm:"column:patient_name" example:"John Doe"`
+	Gender         string `json:"gender" gorm:"column:gender" example:"Male"`
 	Age            int    `json:"age" gorm:"column:age" example:"30"`
 	Price          int64  `json:"price" gorm:"column:price" example:"250000"`
 	HealthHistory  string `json:"health_history" gorm:"column:health_history" example:"Diabetes,Hypertension"`

@@ -101,6 +101,9 @@ definitions:
         items:
           type: string
         type: array
+      date_of_birth:
+        example: "1995-05-20"
+        type: string
       email:
         example: john@example.com
         type: string
@@ -566,6 +569,9 @@ definitions:
         type: string
       createdAt:
         type: string
+      date_of_birth:
+        example: "1995-05-20"
+        type: string
       deletedAt:
         $ref: '#/definitions/gorm.DeletedAt'
       email:
@@ -905,6 +911,9 @@ definitions:
         items:
           type: string
         type: array
+      date_of_birth:
+        example: "1995-05-20"
+        type: string
       email:
         example: john@example.com
         type: string
@@ -1404,6 +1413,10 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Search keyword for description, notes, category, or payment method
+        in: query
+        name: keyword
+        type: string
       - description: Filter expenses from date (YYYY-MM-DD)
         in: query
         name: start_date
@@ -1620,6 +1633,10 @@ paths:
       description: Get aggregated expense totals and category breakdowns for optional
         date ranges and filters
       parameters:
+      - description: Search keyword for description, notes, category, or payment method
+        in: query
+        name: keyword
+        type: string
       - description: Filter expenses from date (YYYY-MM-DD)
         in: query
         name: start_date
@@ -2829,6 +2846,36 @@ paths:
       - BearerAuth: []
       - SessionToken: []
       summary: Update a transaction
+      tags:
+      - Transaction
+  /transaction/attachment/{filename}:
+    get:
+      description: Download an attachment file for a transaction (Admin only)
+      parameters:
+      - description: Attachment filename
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Attachment binary content
+          schema:
+            type: file
+        "400":
+          description: Invalid filename
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Attachment not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Download a transaction attachment file
       tags:
       - Transaction
   /transaction/upload:

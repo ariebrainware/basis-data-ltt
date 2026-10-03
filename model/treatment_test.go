@@ -338,6 +338,7 @@ func TestListTreatementResponse_Structure(t *testing.T) {
 		},
 		PatientName:   "John Doe",
 		TherapistName: "Dr. Smith",
+		Gender:        "Male",
 		Age:           30,
 	}
 
@@ -346,6 +347,7 @@ func TestListTreatementResponse_Structure(t *testing.T) {
 	assert.Equal(t, "John Doe", response.PatientName)
 	assert.Equal(t, uint(1), response.TherapistID)
 	assert.Equal(t, "Dr. Smith", response.TherapistName)
+	assert.Equal(t, "Male", response.Gender)
 	assert.Equal(t, 30, response.Age)
 	assert.Equal(t, "Patient improving", response.Treatment.Remarks)
 	assert.Equal(t, "2024-01-22", response.Treatment.NextVisit)
