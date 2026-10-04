@@ -100,6 +100,7 @@ func buildTreatmentBaseQuery(db *gorm.DB) *gorm.DB {
 		Select(`treatments.*,
 			therapists.full_name as therapist_name,
 			patients.full_name as patient_name,
+			patients.gender as gender,
 			patients.age as age,
 			patients.health_history as health_history,
 			patients.surgery_history as surgery_history,

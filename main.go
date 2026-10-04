@@ -200,9 +200,9 @@ func registerAuthenticatedRoutes(r *gin.Engine, cfg *config.Config) {
 	auth.POST("/verify-password", endpoint.VerifyPassword)
 
 	// Attachment download routes (Strict authentication required via session-token header, cookie, or ?token= query param)
-	auth.GET("/storage/attachments/:filename", endpoint.DownloadTransactionAttachment)
-	auth.GET("/uploads/attachments/:filename", endpoint.DownloadTransactionAttachment)
-	auth.GET("/transaction/attachment/:filename", endpoint.DownloadTransactionAttachment)
+	auth.GET("/storage/attachments/:filename", middleware.RequireRole(model.RoleAdmin), endpoint.DownloadTransactionAttachment)
+	auth.GET("/uploads/attachments/:filename", middleware.RequireRole(model.RoleAdmin), endpoint.DownloadTransactionAttachment)
+	auth.GET("/transaction/attachment/:filename", middleware.RequireRole(model.RoleAdmin), endpoint.DownloadTransactionAttachment)
 
 	registerUserRoutes(auth)
 	registerPatientRoutes(auth)
