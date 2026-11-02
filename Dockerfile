@@ -99,7 +99,7 @@ RUN apk add --no-cache ca-certificates curl su-exec && \
 EXPOSE 19091
 
 # Declare persistent volumes for user uploads and storage (including transaction attachments)
-VOLUME ["/app/storage", "/app/uploads", "/app/storage/attachments", "/app/uploads/attachments"]
+VOLUME ["/app/storage", "/app/uploads"]
 
 # Entrypoint will optionally fetch GeoIP DB then exec the command.
 # Default will run the binary as the non-root `ltt` user using `su-exec`.
