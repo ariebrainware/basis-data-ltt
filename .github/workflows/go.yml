@@ -73,6 +73,7 @@ jobs:
 
         docker run --name=basis-data-ltt -d -p 19091:19091 --network=baota_net \
           -v /www/wwwroot/basis-data-ltt/uploads:/app/uploads \
+          -v /www/wwwroot/basis-data-ltt/storage:/app/storage \
           --env=APPNAME=${{ vars.APPNAME }} \
           --env=APPENV=${{ vars.APPENV }} \
           --env=JWTSECRET=${{ secrets.JWTSECRET }} \
