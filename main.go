@@ -200,9 +200,12 @@ func registerAuthenticatedRoutes(r *gin.Engine, cfg *config.Config) {
 	auth.POST("/verify-password", endpoint.VerifyPassword)
 
 	// Attachment download routes (Strict authentication required via session-token header, cookie, or ?token= query param)
-	auth.GET("/storage/attachments/:filename", middleware.RequireRole(model.RoleAdmin), endpoint.DownloadTransactionAttachment)
-	auth.GET("/uploads/attachments/:filename", middleware.RequireRole(model.RoleAdmin), endpoint.DownloadTransactionAttachment)
-	auth.GET("/transaction/attachment/:filename", middleware.RequireRole(model.RoleAdmin), endpoint.DownloadTransactionAttachment)
+	auth.GET("/storage/attachments/:filename", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DownloadTransactionAttachment)
+	auth.GET("/uploads/attachments/:filename", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DownloadTransactionAttachment)
+	auth.GET("/transaction/attachment/:filename", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DownloadTransactionAttachment)
+	auth.GET("/attachments/:filename", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DownloadTransactionAttachment)
+	auth.GET("/patient/attachment/:filename", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DownloadTransactionAttachment)
+	auth.GET("/treatment/attachment/:filename", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.DownloadTransactionAttachment)
 
 	registerUserRoutes(auth)
 	registerPatientRoutes(auth)
@@ -232,17 +235,17 @@ func registerUserRoutes(auth *gin.RouterGroup) {
 
 func registerPatientRoutes(auth *gin.RouterGroup) {
 	patient := auth.Group("/patient")
-	patient.Use(middleware.RequireRole(model.RoleAdmin))
-	patient.GET("", endpoint.ListPatients)
-	patient.GET("/:id", endpoint.GetPatientInfo)
-	patient.PATCH("/:id", endpoint.UpdatePatient)
-	patient.DELETE("/:id", endpoint.DeletePatient)
+	patient.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.ListPatients)
+	patient.GET("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.GetPatientInfo)
+	patient.PATCH("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.UpdatePatient)
+	patient.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeletePatient)
 }
 
 func registerTreatmentRoutes(auth *gin.RouterGroup) {
 	treatment := auth.Group("/treatment")
 	treatment.GET("", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist, model.RoleUser), endpoint.ListTreatments)
 	treatment.POST("", middleware.RequireRole(model.RoleAdmin), endpoint.CreateTreatment)
+	treatment.POST("/upload", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.UploadAttachment)
 	treatment.PATCH("/:id", middleware.RequireRole(model.RoleAdmin, model.RoleTherapist), endpoint.UpdateTreatment)
 	treatment.DELETE("/:id", middleware.RequireRole(model.RoleAdmin), endpoint.DeleteTreatment)
 }
