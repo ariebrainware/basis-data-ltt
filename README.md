@@ -2,7 +2,6 @@
 
 Lightweight Go REST API for managing patients, diseases, treatments, therapists and sessions with comprehensive security features.
 
-
 ---
 
 ## Table of Contents
