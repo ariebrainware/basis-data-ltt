@@ -17,4 +17,5 @@ type Therapist struct {
 	Height      int    `json:"height" gorm:"column:height" example:"175"`
 	Role        string `json:"role" gorm:"column:role" example:"Physical Therapist"`
 	IsApproved  bool   `json:"is_approved" gorm:"column:is_approved;default:false" example:"false"`
+	Commission  string `json:"commission" gorm:"column:commission;type:varchar(200)" example:"50000"`
 }

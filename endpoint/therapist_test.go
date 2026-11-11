@@ -172,6 +172,29 @@ func TestUpdateTherapist_Success(t *testing.T) {
 	assert.Equal(t, "Updated Name", updated.FullName)
 }
 
+func TestUpdateTherapist_WithCommission(t *testing.T) {
+	r, db := setupTherapistTest(t)
+
+	therapist := createTestTherapist(db, t, true)
+
+	reqBody := map[string]interface{}{
+		"commission": "60000",
+	}
+	w, _, err := doRequestWithHandler(r, requestSpec{method: http.MethodPatch, registerPath: "/therapist/:id", requestPath: fmt.Sprintf("/therapist/%d", therapist.ID), handler: UpdateTherapist, body: reqBody})
+	assert.NoError(t, err)
+	assertStatus(t, w, http.StatusOK)
+
+	// Verify update on therapist
+	var updated model.Therapist
+	db.First(&updated, therapist.ID)
+	assert.Equal(t, "60000", updated.Commission)
+
+	// Verify pricing record created / updated
+	var pricing model.Pricing
+	assert.NoError(t, db.Where("therapist_id = ?", therapist.ID).First(&pricing).Error)
+	assert.Equal(t, "60000", pricing.Commission)
+}
+
 func TestUpdateTherapist_NotFound(t *testing.T) {
 	r, db := setupTherapistTest(t)
 	_ = db

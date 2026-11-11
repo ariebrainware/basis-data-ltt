@@ -12,14 +12,38 @@ import (
 )
 
 type createPricingRequest struct {
-	TherapistID uint  `json:"therapist_id"`
-	Price       int64 `json:"price"`
+	TherapistID uint    `json:"therapist_id"`
+	Price       int64   `json:"price"`
+	Commission  *string `json:"commission"`
+	Commision   *string `json:"commision"`
+}
+
+func (r *createPricingRequest) getCommission() string {
+	if r.Commission != nil {
+		return *r.Commission
+	}
+	if r.Commision != nil {
+		return *r.Commision
+	}
+	return ""
 }
 
 type updatePricingRequest struct {
 	TherapistID *uint   `json:"therapist_id"`
 	Price       *int64  `json:"price"`
+	Commission  *string `json:"commission"`
+	Commision   *string `json:"commision"`
 	Description *string `json:"description"`
+}
+
+func (r *updatePricingRequest) getCommission() *string {
+	if r.Commission != nil {
+		return r.Commission
+	}
+	if r.Commision != nil {
+		return r.Commision
+	}
+	return nil
 }
 
 type pricingWithTherapist struct {
@@ -206,10 +230,18 @@ func CreatePricing(c *gin.Context) {
 		return
 	}
 
-	pricing := model.Pricing{TherapistID: req.TherapistID, Price: req.Price}
+	pricing := model.Pricing{
+		TherapistID: req.TherapistID,
+		Price:       req.Price,
+		Commission:  req.getCommission(),
+	}
 	if err := db.Create(&pricing).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to create pricing", Err: err})
 		return
+	}
+
+	if pricing.Commission != "" {
+		_ = db.Model(&model.Therapist{}).Where("id = ?", pricing.TherapistID).Update("commission", pricing.Commission).Error
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{Msg: "Pricing created", Data: pricing})
@@ -277,6 +309,10 @@ func UpdatePricing(c *gin.Context) {
 		updates["price"] = *req.Price
 	}
 
+	if comm := req.getCommission(); comm != nil {
+		updates["commission"] = *comm
+	}
+
 	if req.Description != nil {
 		updates["description"] = *req.Description
 	}
@@ -289,6 +325,10 @@ func UpdatePricing(c *gin.Context) {
 	if err := db.Model(&pricing).Updates(updates).Error; err != nil {
 		util.CallServerError(c, util.APIErrorParams{Msg: "Failed to update pricing", Err: err})
 		return
+	}
+
+	if comm := req.getCommission(); comm != nil {
+		_ = db.Model(&model.Therapist{}).Where("id = ?", pricing.TherapistID).Update("commission", *comm).Error
 	}
 
 	if err := db.First(&pricing, pricing.ID).Error; err != nil {
