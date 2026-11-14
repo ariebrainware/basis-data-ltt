@@ -258,3 +258,46 @@ func TestDeletePricing_TherapistNotRegistered(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, status)
 }
+
+func TestPricing_CommissionField(t *testing.T) {
+	r, db := setupPricingEndpointTest(t)
+	therapist := createPricingPrerequisites(t, db)
+
+	// Create with commission
+	w, resp, err := doRequestWithHandler(r, requestSpec{
+		method:       http.MethodPost,
+		registerPath: "/pricing",
+		requestPath:  "/pricing",
+		handler:      CreatePricing,
+		body: map[string]interface{}{
+			"therapist_id": therapist.ID,
+			"price":        int64(200000),
+			"commission":   "50000",
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.True(t, resp["success"].(bool))
+
+	var p model.Pricing
+	assert.NoError(t, db.Where("therapist_id = ?", therapist.ID).First(&p).Error)
+	assert.Equal(t, "50000", p.Commission)
+
+	// Therapist commission should also be updated
+	var th model.Therapist
+	assert.NoError(t, db.First(&th, therapist.ID).Error)
+	assert.Equal(t, "50000", th.Commission)
+
+	// Update commission
+	status, _, err := doPricingIDRequest(r, http.MethodPatch, UpdatePricing, p.ID, map[string]interface{}{
+		"commission": "75000",
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+
+	assert.NoError(t, db.First(&p, p.ID).Error)
+	assert.Equal(t, "75000", p.Commission)
+
+	assert.NoError(t, db.First(&th, therapist.ID).Error)
+	assert.Equal(t, "75000", th.Commission)
+}

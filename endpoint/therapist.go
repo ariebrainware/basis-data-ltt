@@ -1,7 +1,10 @@
 package endpoint
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/ariebrainware/basis-data-ltt/model"
@@ -29,6 +32,21 @@ func fetchTherapist(db *gorm.DB, q listQuery) ([]model.Therapist, int64, error) 
 
 	if err := query.Find(&therapist).Error; err != nil {
 		return nil, 0, err
+	}
+
+	for i := range therapist {
+		if therapist[i].Commission == "" {
+			var comm string
+			_ = db.Table("pricings").
+				Select("commission").
+				Where("therapist_id = ? AND deleted_at IS NULL AND commission != ''", therapist[i].ID).
+				Order("id DESC").
+				Limit(1).
+				Pluck("commission", &comm).Error
+			if comm != "" {
+				therapist[i].Commission = comm
+			}
+		}
 	}
 
 	db.Model(&model.Therapist{}).Count(&totalTherapist)
@@ -138,6 +156,19 @@ func GetTherapistInfo(c *gin.Context) {
 	_, therapist, err := getTherapistByID(c, db)
 	if err != nil {
 		return
+	}
+
+	if therapist.Commission == "" {
+		var comm string
+		_ = db.Table("pricings").
+			Select("commission").
+			Where("therapist_id = ? AND deleted_at IS NULL AND commission != ''", therapist.ID).
+			Order("id DESC").
+			Limit(1).
+			Pluck("commission", &comm).Error
+		if comm != "" {
+			therapist.Commission = comm
+		}
 	}
 
 	util.CallSuccessOK(c, util.APISuccessParams{
@@ -390,6 +421,28 @@ func updateTherapistInDB(db *gorm.DB, id string, therapist model.Therapist) erro
 		}
 	}
 
+	if therapist.Commission != "" {
+		if err := db.Model(&existingTherapist).Update("commission", therapist.Commission).Error; err != nil {
+			return err
+		}
+
+		var pricing model.Pricing
+		if err := db.Where("therapist_id = ? AND deleted_at IS NULL", existingTherapist.ID).Order("id DESC").First(&pricing).Error; err != nil {
+			pricing = model.Pricing{
+				TherapistID: existingTherapist.ID,
+				Price:       0,
+				Commission:  therapist.Commission,
+			}
+			if err := db.Create(&pricing).Error; err != nil {
+				return err
+			}
+		} else {
+			if err := db.Model(&pricing).Update("commission", therapist.Commission).Error; err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -399,6 +452,17 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 		return "", model.Therapist{}, err
 	}
 
+	bodyBytes, err := c.GetRawData()
+	if err != nil {
+		util.CallUserError(c, util.APIErrorParams{
+			Msg: "Invalid request body",
+			Err: err,
+		})
+		return "", model.Therapist{}, err
+	}
+
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 	therapist := model.Therapist{}
 	if err := c.ShouldBindJSON(&therapist); err != nil {
 		util.CallUserError(c, util.APIErrorParams{
@@ -406,6 +470,15 @@ func getTherapistAndBindJSON(c *gin.Context) (string, model.Therapist, error) {
 			Err: err,
 		})
 		return "", model.Therapist{}, err
+	}
+
+	if therapist.Commission == "" {
+		var rawMap map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &rawMap); err == nil {
+			if comm, ok := rawMap["commision"].(string); ok && comm != "" {
+				therapist.Commission = comm
+			}
+		}
 	}
 
 	return id, therapist, nil
