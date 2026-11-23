@@ -728,6 +728,249 @@ const docTemplate = `{
                 }
             }
         },
+        "/employee/{id}/attachment": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "List documents (contract, ID card, etc.) uploaded for an employee",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Employee"
+                ],
+                "summary": "List employee attachments",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attachments retrieved",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/model.EmployeeAttachment"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid employee ID",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Employee not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Upload a document for an employee (pdf, jpeg, png, heic up to 5MB)",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Employee"
+                ],
+                "summary": "Upload an employee attachment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Attachment file (pdf, jpeg, png, heic up to 5MB)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "contract, identity or other (default other)",
+                        "name": "category",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attachment uploaded",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/util.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.EmployeeAttachment"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request, file type or size",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Employee not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Server error",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/employee/{id}/attachment/{attachmentId}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Download a document uploaded for an employee (Admin only)",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Employee"
+                ],
+                "summary": "Download an employee attachment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Attachment ID",
+                        "name": "attachmentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attachment binary content",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Attachment not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    },
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Permanently delete a document uploaded for an employee",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Employee"
+                ],
+                "summary": "Delete an employee attachment",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Employee ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Attachment ID",
+                        "name": "attachmentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Attachment deleted",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Attachment not found",
+                        "schema": {
+                            "$ref": "#/definitions/util.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/expense": {
             "get": {
                 "security": [
@@ -4117,6 +4360,12 @@ const docTemplate = `{
         "endpoint.createPricingRequest": {
             "type": "object",
             "properties": {
+                "commision": {
+                    "type": "string"
+                },
+                "commission": {
+                    "type": "string"
+                },
                 "price": {
                     "type": "integer"
                 },
@@ -4177,6 +4426,10 @@ const docTemplate = `{
         "endpoint.pricingWithTherapist": {
             "type": "object",
             "properties": {
+                "commission": {
+                    "type": "string",
+                    "example": "50000"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -4240,6 +4493,12 @@ const docTemplate = `{
         "endpoint.updatePricingRequest": {
             "type": "object",
             "properties": {
+                "commision": {
+                    "type": "string"
+                },
+                "commission": {
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -4497,6 +4756,44 @@ const docTemplate = `{
                 "religion": {
                     "type": "string",
                     "example": "Islam"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.EmployeeAttachment": {
+            "description": "Employee document attachment",
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "example": "contract"
+                },
+                "content_type": {
+                    "type": "string",
+                    "example": "application/pdf"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "deletedAt": {
+                    "$ref": "#/definitions/gorm.DeletedAt"
+                },
+                "employee_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "file_name": {
+                    "type": "string",
+                    "example": "kontrak-2026.pdf"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "size": {
+                    "type": "integer",
+                    "example": 204800
                 },
                 "updatedAt": {
                     "type": "string"
@@ -4787,6 +5084,10 @@ const docTemplate = `{
             "description": "Pricing information for a treatment",
             "type": "object",
             "properties": {
+                "commission": {
+                    "type": "string",
+                    "example": "50000"
+                },
                 "createdAt": {
                     "type": "string"
                 },
@@ -4820,6 +5121,10 @@ const docTemplate = `{
                 "address": {
                     "type": "string",
                     "example": "123 Main St"
+                },
+                "commission": {
+                    "type": "string",
+                    "example": "50000"
                 },
                 "createdAt": {
                     "type": "string"

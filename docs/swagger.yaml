@@ -145,6 +145,10 @@ definitions:
     type: object
   endpoint.createPricingRequest:
     properties:
+      commision:
+        type: string
+      commission:
+        type: string
       price:
         type: integer
       therapist_id:
@@ -188,6 +192,9 @@ definitions:
     type: object
   endpoint.pricingWithTherapist:
     properties:
+      commission:
+        example: "50000"
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -231,6 +238,10 @@ definitions:
     type: object
   endpoint.updatePricingRequest:
     properties:
+      commision:
+        type: string
+      commission:
+        type: string
       description:
         type: string
       price:
@@ -419,6 +430,33 @@ definitions:
       religion:
         example: Islam
         type: string
+      updatedAt:
+        type: string
+    type: object
+  model.EmployeeAttachment:
+    description: Employee document attachment
+    properties:
+      category:
+        example: contract
+        type: string
+      content_type:
+        example: application/pdf
+        type: string
+      createdAt:
+        type: string
+      deletedAt:
+        $ref: '#/definitions/gorm.DeletedAt'
+      employee_id:
+        example: 1
+        type: integer
+      file_name:
+        example: kontrak-2026.pdf
+        type: string
+      id:
+        type: integer
+      size:
+        example: 204800
+        type: integer
       updatedAt:
         type: string
     type: object
@@ -624,6 +662,9 @@ definitions:
   model.Pricing:
     description: Pricing information for a treatment
     properties:
+      commission:
+        example: "50000"
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -647,6 +688,9 @@ definitions:
     properties:
       address:
         example: 123 Main St
+        type: string
+      commission:
+        example: "50000"
         type: string
       createdAt:
         type: string
@@ -1394,6 +1438,153 @@ paths:
       - BearerAuth: []
       - SessionToken: []
       summary: Update employee details
+      tags:
+      - Employee
+  /employee/{id}/attachment:
+    get:
+      description: List documents (contract, ID card, etc.) uploaded for an employee
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Attachments retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/model.EmployeeAttachment'
+                  type: array
+              type: object
+        "400":
+          description: Invalid employee ID
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Employee not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: List employee attachments
+      tags:
+      - Employee
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a document for an employee (pdf, jpeg, png, heic up to 5MB)
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Attachment file (pdf, jpeg, png, heic up to 5MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: contract, identity or other (default other)
+        in: formData
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Attachment uploaded
+          schema:
+            allOf:
+            - $ref: '#/definitions/util.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.EmployeeAttachment'
+              type: object
+        "400":
+          description: Invalid request, file type or size
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Employee not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "500":
+          description: Server error
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Upload an employee attachment
+      tags:
+      - Employee
+  /employee/{id}/attachment/{attachmentId}:
+    delete:
+      description: Permanently delete a document uploaded for an employee
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Attachment deleted
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+        "404":
+          description: Attachment not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Delete an employee attachment
+      tags:
+      - Employee
+    get:
+      description: Download a document uploaded for an employee (Admin only)
+      parameters:
+      - description: Employee ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Attachment binary content
+          schema:
+            type: file
+        "404":
+          description: Attachment not found
+          schema:
+            $ref: '#/definitions/util.APIResponse'
+      security:
+      - BearerAuth: []
+      - SessionToken: []
+      summary: Download an employee attachment
       tags:
       - Employee
   /expense:
