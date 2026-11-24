@@ -136,6 +136,7 @@ func CreateEmployee(c *gin.Context) {
 		Position:    position,
 		BaseSalary:  req.BaseSalary,
 		LunchMoney:  req.LunchMoney,
+		BirthDate:   strings.TrimSpace(req.BirthDate),
 	}
 
 	if err := db.Create(&employee).Error; err != nil {
@@ -291,7 +292,7 @@ func UpdateEmployee(c *gin.Context) {
 		})
 		return
 	}
-	if req.NIK == nil && req.FullName == nil && req.Gender == nil && req.Address == nil && req.Religion == nil && req.PhoneNumber == nil && req.Email == nil && req.JoinedDate == nil && req.Position == nil && req.BaseSalary == nil && req.LunchMoney == nil {
+	if req.NIK == nil && req.FullName == nil && req.Gender == nil && req.Address == nil && req.Religion == nil && req.PhoneNumber == nil && req.Email == nil && req.JoinedDate == nil && req.Position == nil && req.BaseSalary == nil && req.LunchMoney == nil && req.BirthDate == nil {
 		util.CallUserError(c, util.APIErrorParams{Msg: "No fields to update", Err: fmt.Errorf("empty update payload")})
 		return
 	}
@@ -432,6 +433,10 @@ func UpdateEmployee(c *gin.Context) {
 			return
 		}
 		employee.LunchMoney = *req.LunchMoney
+	}
+	if req.BirthDate != nil {
+		// Optional field: an empty string clears it.
+		employee.BirthDate = strings.TrimSpace(*req.BirthDate)
 	}
 
 	if err := db.Save(&employee).Error; err != nil {

@@ -17,6 +17,8 @@ type Employee struct {
 	Position    string `json:"position" gorm:"column:position;not null" example:"Manager"`
 	BaseSalary  int    `json:"base_salary" gorm:"column:base_salary;not null" example:"5000000"`
 	LunchMoney  int    `json:"lunch_money" gorm:"column:lunch_money;not null" example:"50000"`
+	// BirthDate is free text holding place and date of birth, e.g. "Medan, 20 Juli 2007".
+	BirthDate string `json:"birth_date" gorm:"column:birth_date;type:varchar(200)" example:"Medan, 20 Juli 2007"`
 }
 
 // CreateEmployeeRequest represents the employee creation request body
@@ -33,6 +35,7 @@ type CreateEmployeeRequest struct {
 	Position    string `json:"position" binding:"required" example:"Manager"`
 	BaseSalary  int    `json:"base_salary" binding:"required" example:"5000000"`
 	LunchMoney  int    `json:"lunch_money" binding:"required" example:"50000"`
+	BirthDate   string `json:"birth_date" binding:"omitempty,max=200" example:"Medan, 20 Juli 2007"`
 }
 
 // UpdateEmployeeRequest represents the employee update request body
@@ -49,4 +52,5 @@ type UpdateEmployeeRequest struct {
 	Position    *string `json:"position" example:"Manager"`
 	BaseSalary  *int    `json:"base_salary" example:"5000000"`
 	LunchMoney  *int    `json:"lunch_money" example:"50000"`
+	BirthDate   *string `json:"birth_date" binding:"omitempty,max=200" example:"Medan, 20 Juli 2007"`
 }
