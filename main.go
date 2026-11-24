@@ -109,7 +109,7 @@ func initDB() (*gorm.DB, error) {
 func migrateAndSeed(db *gorm.DB) error {
 	applyDiseaseCodenameMigrationFix(db)
 
-	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}, &model.Item{}, &model.Employee{}, &model.Expense{}); err != nil {
+	if err := db.AutoMigrate(&model.Patient{}, &model.Disease{}, &model.User{}, &model.Session{}, &model.Therapist{}, &model.Role{}, &model.Treatment{}, &model.Pricing{}, &model.Transaction{}, &model.PatientCode{}, &model.SecurityLog{}, &model.Item{}, &model.Employee{}, &model.EmployeeAttachment{}, &model.Expense{}); err != nil {
 		return err
 	}
 
@@ -306,6 +306,10 @@ func registerEmployeeRoutes(auth *gin.RouterGroup) {
 	employee.GET("/:id", endpoint.GetEmployeeInfo)
 	employee.PATCH("/:id", endpoint.UpdateEmployee)
 	employee.DELETE("/:id", endpoint.DeleteEmployee)
+	employee.GET("/:id/attachment", endpoint.ListEmployeeAttachments)
+	employee.POST("/:id/attachment", endpoint.UploadEmployeeAttachment)
+	employee.GET("/:id/attachment/:attachmentId", endpoint.DownloadEmployeeAttachment)
+	employee.DELETE("/:id/attachment/:attachmentId", endpoint.DeleteEmployeeAttachment)
 }
 
 func registerExpenseRoutes(auth *gin.RouterGroup) {
