@@ -4591,6 +4591,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 5000000
                 },
+                "birth_date": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "example": "Medan, 20 Juli 2007"
+                },
                 "email": {
                     "type": "string",
                     "example": "john.doe@example.com"
@@ -4711,6 +4716,11 @@ const docTemplate = `{
                 "base_salary": {
                     "type": "integer",
                     "example": 5000000
+                },
+                "birth_date": {
+                    "description": "BirthDate is free text holding place and date of birth, e.g. \"Medan, 20 Juli 2007\".",
+                    "type": "string",
+                    "example": "Medan, 20 Juli 2007"
                 },
                 "createdAt": {
                     "type": "string"
@@ -5399,6 +5409,11 @@ const docTemplate = `{
                 "base_salary": {
                     "type": "integer",
                     "example": 5000000
+                },
+                "birth_date": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "example": "Medan, 20 Juli 2007"
                 },
                 "email": {
                     "type": "string",

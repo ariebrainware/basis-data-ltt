@@ -296,6 +296,10 @@ definitions:
       base_salary:
         example: 5000000
         type: integer
+      birth_date:
+        example: Medan, 20 Juli 2007
+        maxLength: 200
+        type: string
       email:
         example: john.doe@example.com
         type: string
@@ -397,6 +401,11 @@ definitions:
       base_salary:
         example: 5000000
         type: integer
+      birth_date:
+        description: BirthDate is free text holding place and date of birth, e.g.
+          "Medan, 20 Juli 2007".
+        example: Medan, 20 Juli 2007
+        type: string
       createdAt:
         type: string
       deletedAt:
@@ -888,6 +897,10 @@ definitions:
       base_salary:
         example: 5000000
         type: integer
+      birth_date:
+        example: Medan, 20 Juli 2007
+        maxLength: 200
+        type: string
       email:
         example: john.doe@example.com
         type: string
