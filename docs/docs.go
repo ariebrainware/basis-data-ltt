@@ -4176,6 +4176,11 @@ const docTemplate = `{
         "endpoint.LoginResponse": {
             "type": "object",
             "properties": {
+                "must_change_password": {
+                    "description": "MustChangePassword is true when the user logged in with the shared\ndefault password and must set a new one before using the app.",
+                    "type": "boolean",
+                    "example": false
+                },
                 "role": {
                     "type": "string",
                     "example": "Admin"

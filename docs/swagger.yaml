@@ -14,6 +14,12 @@ definitions:
     type: object
   endpoint.LoginResponse:
     properties:
+      must_change_password:
+        description: |-
+          MustChangePassword is true when the user logged in with the shared
+          default password and must set a new one before using the app.
+        example: false
+        type: boolean
       role:
         example: Admin
         type: string
