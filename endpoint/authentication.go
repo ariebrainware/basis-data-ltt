@@ -2,8 +2,10 @@ package endpoint
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -26,6 +28,27 @@ type LoginResponse struct {
 	Role        string `json:"role" example:"Admin"`
 	UserID      uint   `json:"user_id" example:"1"`
 	TherapistID uint   `json:"therapist_id,omitempty" example:"1"`
+	// MustChangePassword is true when the user logged in with the shared
+	// default password and must set a new one before using the app.
+	MustChangePassword bool `json:"must_change_password" example:"false"`
+}
+
+// fallbackDefaultUserPassword is the shared password assigned to new accounts
+// when DEFAULT_USER_PASSWORD is not set.
+const fallbackDefaultUserPassword = "LTT2025"
+
+// defaultUserPassword returns the shared default password assigned to new
+// accounts. It can be overridden with the DEFAULT_USER_PASSWORD env var.
+func defaultUserPassword() string {
+	if v := os.Getenv("DEFAULT_USER_PASSWORD"); v != "" {
+		return v
+	}
+	return fallbackDefaultUserPassword
+}
+
+// isDefaultPassword reports whether plain equals the shared default password.
+func isDefaultPassword(plain string) bool {
+	return subtle.ConstantTimeCompare([]byte(plain), []byte(defaultUserPassword())) == 1
 }
 
 // Login godoc
@@ -248,6 +271,8 @@ func finalizeLogin(ctx loginContext, user *model.User, plain string) bool {
 		Role:        role.Name,
 		UserID:      user.ID,
 		TherapistID: therapistID,
+		// plain has already been verified against the stored hash here.
+		MustChangePassword: isDefaultPassword(plain),
 	}})
 	return true
 }
